@@ -121,7 +121,9 @@ function formatToolResult(tool: string, action: string, result: unknown): string
 // ─── POST Handler ───────────────────────────────────────────────────────────────
 
 async function handlePost(request: NextRequest) {
-  const body = (await request.json()) as Record<string, unknown>;
+  // Use raw text + manual parse to avoid UTF-8 corruption in Turbopack
+  const raw = await request.text();
+  const body = JSON.parse(raw) as Record<string, unknown>;
   const message = (body.message as string)?.trim();
   const stream = body.stream === true;
   const provider = (body.provider as string) || 'deepseek';
@@ -168,68 +170,72 @@ async function handlePost(request: NextRequest) {
 
 type ToolAction = { tool: string; action: string; params: Record<string, unknown> };
 
+function hasKeyword(text: string, keywords: string[]): boolean {
+  return keywords.some(k => text.includes(k));
+}
+
 function matchToolsToQuery(query: string): ToolAction[] {
   const q = query.toLowerCase();
   const actions: ToolAction[] = [];
 
   // Inventory-related
-  if (/库存|缺货|补货|周转|滞销|安全库存/.test(q)) {
+  if (hasKeyword(q, ['库存', '缺货', '补货', '周转', '滞销', '安全库存', 'inventory'])) {
     actions.push({ tool: 'query_inventory', action: 'overview', params: { action: 'overview' } });
-    if (/缺货|补货|紧急/.test(q)) actions.push({ tool: 'query_inventory', action: 'reorder', params: { action: 'reorder' } });
+    if (hasKeyword(q, ['缺货', '补货', '紧急'])) actions.push({ tool: 'query_inventory', action: 'reorder', params: { action: 'reorder' } });
   }
 
   // Cost-related
-  if (/成本|毛利|费用|利润|margin|cost/.test(q)) {
+  if (hasKeyword(q, ['成本', '毛利', '费用', '利润', 'margin', 'cost'])) {
     actions.push({ tool: 'query_cost', action: 'overview', params: { action: 'overview' } });
   }
 
   // Sales-related
-  if (/销售|收入|订单|增长/.test(q)) {
+  if (hasKeyword(q, ['销售', '收入', '订单', '增长', 'sales'])) {
     actions.push({ tool: 'query_sales', action: 'overview', params: { action: 'overview', days: '7' } });
   }
 
   // Logistics
-  if (/物流|货运|航运|港口|延迟|delivery/.test(q)) {
+  if (hasKeyword(q, ['物流', '货运', '航运', '港口', '延迟', 'delivery', 'ship'])) {
     actions.push({ tool: 'query_logistics', action: 'stats', params: { action: 'stats' } });
   }
 
   // Risk / Cascade risk
-  if (/风险|risk|中断|传播/.test(q)) {
+  if (hasKeyword(q, ['风险', 'risk', '中断', '传播', 'cascade'])) {
     actions.push({ tool: 'query_cascade_risk', action: '', params: { scenario: 'auto' } });
   }
 
   // Suppliers
-  if (/供应商|supplier/.test(q)) {
+  if (hasKeyword(q, ['供应商', 'supplier'])) {
     actions.push({ tool: 'query_suppliers', action: 'list', params: { action: 'list' } });
   }
 
-  // Dashboard
-  if (/概览|仪表|dashboard|整体|健康/.test(q)) {
+  // Dashboard overview
+  if (hasKeyword(q, ['概览', '仪表', 'dashboard', '整体', '健康', '总览'])) {
     actions.push({ tool: 'query_dashboard', action: 'summary', params: { action: 'summary' } });
   }
 
   // Exchange rates
-  if (/汇率|人民币|美元|欧元|外汇|FX/.test(q)) {
+  if (hasKeyword(q, ['汇率', '人民币', '美元', '欧元', '外汇', 'fx', 'cny', 'usd'])) {
     actions.push({ tool: 'query_exchange_rates', action: 'latest', params: { action: 'latest', base: 'CNY' } });
   }
 
   // Weather
-  if (/天气|台风|港口.*气候|海况/.test(q)) {
+  if (hasKeyword(q, ['天气', '台风', '海况', 'weather', '气候'])) {
     actions.push({ tool: 'query_weather', action: 'summary', params: { action: 'summary' } });
   }
 
-  // Decision
-  if (/决策|建议|怎么办|如何|怎么|方案/.test(q)) {
+  // Decision graph
+  if (hasKeyword(q, ['决策', '建议', '怎么办', '如何', '怎么', '方案', '优化', '改善'])) {
     actions.push({ tool: 'query_decision_graph', action: '', params: { query } });
   }
 
-  // If nothing matched, give a dashboard overview
+  // If nothing matched, give a dashboard + inventory overview
   if (actions.length === 0) {
     actions.push({ tool: 'query_dashboard', action: 'summary', params: { action: 'summary' } });
     actions.push({ tool: 'query_inventory', action: 'overview', params: { action: 'overview' } });
   }
 
-  return actions.slice(0, 4); // Max 4 tools
+  return actions.slice(0, 4);
 }
 
 async function handleLocalMode(message: string): Promise<NextResponse> {
