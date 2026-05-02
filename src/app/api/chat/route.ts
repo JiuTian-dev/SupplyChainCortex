@@ -8,6 +8,7 @@ import { withErrorHandler, apiSuccess, apiError } from '@/lib/api-utils';
 import { withChatRateLimit } from '@/lib/api-protection';
 import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
+import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import {
   chatCompletionStream,
   chatCompletion,
@@ -188,11 +189,20 @@ async function handleHybrid(
 ): Promise<NextResponse> {
   const { toolResults, toolsUsed } = await executeMatchedTools(message);
   const dataContext = toolResults.map(r => r.result).join('\n\n');
+  const ragResults = retrieveKnowledge(message, 2);
+  const ragContext = augmentPrompt(message, ragResults);
 
   try {
     const summaryMsg: ChatMessage[] = [
-      { role: 'system', content: '你是供应链助手。基于以下查询数据，用中文给用户一个简洁自然的回答（2-4句话）。直接回答，不要重复数据格式。如果数据异常，给出建议。' },
-      { role: 'user', content: `用户问题: ${message}\n\n查询到的数据:\n${dataContext}\n\n请基于以上数据用中文回答用户。` },
+      { role: 'system', content: `你是跨境小家电供应链决策专家。综合分析实时数据+知识库+你的专业知识。
+
+回答规则:
+1. 解读数据含义（1-2句）
+2. 专业知识分析: 行业对标、风险研判、优化建议（2-4句）
+3. 可执行行动建议（1-2句）
+4. 专业但平易近人，结合行业特征（季节性/平台竞争/关税/物流不确定性）
+5. 如数据揭示风险明确警告，数据正常则指出优化空间` },
+      { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}\n请综合分析。` },
     ];
 
     const llmResult = await chatCompletion({
@@ -245,13 +255,15 @@ function handleHybridStream(
         }
 
         const dataContext = toolResults.map(r => r.result).join('\n\n');
+        const ragResults = retrieveKnowledge(message, 2);
+        const ragContext = augmentPrompt(message, ragResults);
 
         // Try LLM summarization
         let llmFailed = false;
         try {
           const summaryMsg: ChatMessage[] = [
-            { role: 'system', content: '你是供应链助手。基于以下查询数据，用中文给用户一个简洁自然的回答（2-4句话）。直接回答，不要重复数据格式。' },
-            { role: 'user', content: `用户问题: ${message}\n\n查询到的数据:\n${dataContext}\n\n请基于以上数据用中文回答用户。` },
+            { role: 'system', content: `你是跨境小家电供应链决策专家。综合分析实时数据+知识库+专业知识。规则: ①解读数据→②专业分析(行业对标/风险研判/优化建议)→③可执行行动建议。` },
+            { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}\n请综合分析。` },
           ];
 
           let fullText = '';
