@@ -106,7 +106,7 @@ export interface DecisionReport {
 // Decision Graph Definition
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const DECISION_GRAPH: DecisionNode[] = [
+export const DECISION_GRAPH: DecisionNode[] = [
   // ── Inventory Domain ──────────────────────────────────────────────────────
   {
     id: 'dg-inventory-reorder',
