@@ -153,10 +153,177 @@ async function handlePost(request: NextRequest) {
     },
   }));
 
+  // Check if any API key is available (env or frontend-provided)
+  const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+
   if (stream) {
+    if (!hasApiKey) return handleLocalModeStream(message);
     return handleStreaming(messages, toolSchemas, provider, model, apiKey);
   }
+  if (!hasApiKey) return handleLocalMode(message);
   return handleNonStreaming(messages, toolSchemas, provider, model, apiKey);
+}
+
+// ─── Local Mode (no API key) ─────────────────────────────────────────────────────
+
+type ToolAction = { tool: string; action: string; params: Record<string, unknown> };
+
+function matchToolsToQuery(query: string): ToolAction[] {
+  const q = query.toLowerCase();
+  const actions: ToolAction[] = [];
+
+  // Inventory-related
+  if (/库存|缺货|补货|周转|滞销|安全库存/.test(q)) {
+    actions.push({ tool: 'query_inventory', action: 'overview', params: { action: 'overview' } });
+    if (/缺货|补货|紧急/.test(q)) actions.push({ tool: 'query_inventory', action: 'reorder', params: { action: 'reorder' } });
+  }
+
+  // Cost-related
+  if (/成本|毛利|费用|利润|margin|cost/.test(q)) {
+    actions.push({ tool: 'query_cost', action: 'overview', params: { action: 'overview' } });
+  }
+
+  // Sales-related
+  if (/销售|收入|订单|增长/.test(q)) {
+    actions.push({ tool: 'query_sales', action: 'overview', params: { action: 'overview', days: '7' } });
+  }
+
+  // Logistics
+  if (/物流|货运|航运|港口|延迟|delivery/.test(q)) {
+    actions.push({ tool: 'query_logistics', action: 'stats', params: { action: 'stats' } });
+  }
+
+  // Risk / Cascade risk
+  if (/风险|risk|中断|传播/.test(q)) {
+    actions.push({ tool: 'query_cascade_risk', action: '', params: { scenario: 'auto' } });
+  }
+
+  // Suppliers
+  if (/供应商|supplier/.test(q)) {
+    actions.push({ tool: 'query_suppliers', action: 'list', params: { action: 'list' } });
+  }
+
+  // Dashboard
+  if (/概览|仪表|dashboard|整体|健康/.test(q)) {
+    actions.push({ tool: 'query_dashboard', action: 'summary', params: { action: 'summary' } });
+  }
+
+  // Exchange rates
+  if (/汇率|人民币|美元|欧元|外汇|FX/.test(q)) {
+    actions.push({ tool: 'query_exchange_rates', action: 'latest', params: { action: 'latest', base: 'CNY' } });
+  }
+
+  // Weather
+  if (/天气|台风|港口.*气候|海况/.test(q)) {
+    actions.push({ tool: 'query_weather', action: 'summary', params: { action: 'summary' } });
+  }
+
+  // Decision
+  if (/决策|建议|怎么办|如何|怎么|方案/.test(q)) {
+    actions.push({ tool: 'query_decision_graph', action: '', params: { query } });
+  }
+
+  // If nothing matched, give a dashboard overview
+  if (actions.length === 0) {
+    actions.push({ tool: 'query_dashboard', action: 'summary', params: { action: 'summary' } });
+    actions.push({ tool: 'query_inventory', action: 'overview', params: { action: 'overview' } });
+  }
+
+  return actions.slice(0, 4); // Max 4 tools
+}
+
+async function handleLocalMode(message: string): Promise<NextResponse> {
+  const actions = matchToolsToQuery(message);
+  const results: Array<{ tool: string; result: string }> = [];
+
+  for (const a of actions) {
+    try {
+      const data = await executeTool(a.tool, a.params);
+      const formatted = formatToolResult(a.tool, a.action, data);
+      results.push({ tool: a.tool, result: formatted });
+    } catch (err) {
+      results.push({ tool: a.tool, result: `查询失败: ${(err as Error).message}` });
+    }
+  }
+
+  if (results.length === 0) {
+    return NextResponse.json({ success: true, data: { reply: '我没有找到相关的数据。请尝试更具体的问题，例如"当前库存情况"或"最近的销售数据"。' } });
+  }
+
+  const reply = results.map(r => r.result).join('\n\n');
+  return NextResponse.json({
+    success: true,
+    data: {
+      reply,
+      toolsUsed: results.map(r => r.tool),
+      mode: 'local',
+      note: 'Local mode — no AI provider configured. Set DEEPSEEK_API_KEY for AI-powered responses.',
+    },
+  });
+}
+
+function handleLocalModeStream(message: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enqueue = (event: string, data: unknown) => {
+        controller.enqueue(encoder.encode(formatSSE(event, data)));
+      };
+
+      try {
+        enqueue('thinking', { status: 'analyzing' });
+
+        const actions = matchToolsToQuery(message);
+
+        const toolResults: string[] = [];
+        for (const a of actions) {
+          enqueue('tool_call', { tool: a.tool, parameters: a.params });
+          try {
+            const data = await executeTool(a.tool, a.params);
+            const formatted = formatToolResult(a.tool, a.action, data);
+            enqueue('tool_result', { tool: a.tool, result: formatted });
+            toolResults.push(formatted);
+          } catch (err) {
+            enqueue('tool_result', { tool: a.tool, error: (err as Error).message });
+          }
+        }
+
+        if (toolResults.length === 0) {
+          const fallback = '我没有找到相关的数据。请尝试更具体的问题，例如"当前库存情况"或"最近的销售数据"。';
+          enqueue('token', { content: fallback });
+          enqueue('done', { toolsUsed: [], complete: true });
+          controller.close();
+          return;
+        }
+
+        const reply = toolResults.join('\n\n') +
+          '\n\n---\n💡 本地模式 — 未配置 AI 提供商。设置 DEEPSEEK_API_KEY 环境变量以启用 AI 驱动的自然语言回答。';
+
+        // Stream the reply word by word to simulate typing
+        const words = reply.split(/(\s+)/);
+        for (const word of words) {
+          enqueue('token', { content: word });
+          // Small delay to simulate streaming
+          await new Promise(r => setTimeout(r, 15));
+        }
+
+        enqueue('done', { toolsUsed: actions.map(a => a.tool), mode: 'local', complete: true });
+      } catch (err) {
+        enqueue('token', { content: `处理出错: ${(err as Error).message}` });
+        enqueue('done', { complete: true, error: (err as Error).message });
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }
 
 // ─── Streaming Handler ──────────────────────────────────────────────────────────
