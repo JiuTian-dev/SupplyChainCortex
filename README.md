@@ -2,7 +2,7 @@
 
 **MCP-driven supply chain decision intelligence engine for cross-border e-commerce.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-0%20errors-blue)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-308%20passed-brightgreen)]()
 
@@ -184,4 +184,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — use it, fork it, build on it.
+[CC BY-NC 4.0](LICENSE) — 自由用于学习、研究、非商业用途。商业使用需单独授权。
