@@ -1,0 +1,431 @@
+// 小家电供应链 MCP 数据管道 - PostgreSQL Schema
+// 使用方式: bun run scripts/switch-db.ts postgresql
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 产品 ====================
+model Product {
+  id           String   @id @default(uuid())
+  sku          String   @unique
+  name         String
+  category     String
+  subCategory  String   @map("sub_category")
+  unitCost     Float    @map("unit_cost")
+  sellingPrice Float    @map("selling_price")
+  weight       Float
+  origin       String   @default("CN")
+  abcClass     String   @default("C") @map("abc_class")
+  fsnClass     String   @default("N") @map("fsn_class")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  inventory    Inventory?
+  cost         CostRecord?
+  shipments    ShipmentItem[]
+  salesRecords SalesRecord[]
+
+  @@index([category])
+  @@index([subCategory])
+  @@index([category, subCategory])
+  @@map("products")
+}
+
+// ==================== 库存 ====================
+model Inventory {
+  id            String   @id @default(uuid())
+  productId     String   @unique @map("product_id")
+  sku           String
+  productName   String   @map("product_name")
+  warehouse     String
+  quantity      Int
+  safetyStock   Int      @map("safety_stock")
+  reorderPoint  Int      @map("reorder_point")
+  inTransit     Int      @default(0) @map("in_transit")
+  turnoverRate  Float    @default(0) @map("turnover_rate")
+  turnoverDays  Int      @default(0) @map("turnover_days")
+  stockStatus   String   @default("healthy") @map("stock_status") // healthy, warning, critical, overstock
+  lastSyncAt    DateTime @default(now()) @map("last_sync_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@index([sku])
+  @@index([warehouse])
+  @@index([stockStatus])
+  @@index([warehouse, stockStatus])
+  @@map("inventories")
+}
+
+// ==================== 销售记录 ====================
+model SalesRecord {
+  id          String   @id @default(uuid())
+  productId   String   @map("product_id")
+  sku         String
+  productName String   @map("product_name")
+  date        String   // YYYY-MM-DD
+  quantity    Int
+  revenue     Float
+  platform    String   // Amazon, Shopify, Walmart, eBay
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([date])
+  @@index([platform])
+  @@index([sku])
+  @@index([productId, date])
+  @@index([platform, date])
+  @@map("sales_records")
+}
+
+// ==================== 物流货运 ====================
+model ShipmentItem {
+  id              String   @id @default(uuid())
+  trackingNumber  String   @unique @map("tracking_number")
+  productId       String   @map("product_id")
+  sku             String
+  productName     String   @map("product_name")
+  origin          String
+  destination     String
+  carrier         String
+  status          String   @default("pending") // pending, in_transit, customs, delivered, delayed, exception
+  eta             String?
+  actualDelivery  String?  @map("actual_delivery")
+  delayDays       Int      @default(0) @map("delay_days")
+  riskLevel       String   @default("low") @map("risk_level") // low, medium, high, critical
+  events          Json     @default("[]") // JSON array of logistics events
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([status])
+  @@index([riskLevel])
+  @@index([sku])
+  @@index([status, riskLevel])
+  @@map("shipment_items")
+}
+
+// ==================== 成本记录 ====================
+model CostRecord {
+  id            String   @id @default(uuid())
+  productId     String   @unique @map("product_id")
+  sku           String
+  productName   String   @map("product_name")
+  rawMaterial   Float    @map("raw_material")
+  labor         Float
+  logistics     Float
+  tariff        Float
+  platformFee   Float    @map("platform_fee")
+  exchangeRate  Float    @default(7.25) @map("exchange_rate")
+  destination   String   @default("US")
+  totalLanded   Float    @map("total_landed")
+  sellingPrice  Float    @map("selling_price")
+  grossMargin   Float    @map("gross_margin")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@index([sku])
+  @@map("cost_records")
+}
+
+// ==================== 预警规则 ====================
+model AlertRule {
+  id        String   @id @default(uuid())
+  ruleId    String   @unique @map("rule_id")
+  name      String
+  field     String
+  operator  String   // <, >, <=, >=, ==
+  threshold Float
+  unit      String
+  enabled   Boolean  @default(true)
+  severity  String   @default("warning") // warning, critical
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([enabled])
+  @@map("alert_rules")
+}
+
+// ==================== 供应链事件 ====================
+model SupplyChainEvent {
+  id          String   @id @default(uuid())
+  type        String   // 补货订单, 货运更新, 库存预警, 成本变更, 销售里程碑
+  title       String
+  description String
+  icon        String   @default("📦")
+  color       String   @default("#f97316")
+  severity    String   @default("info") // info, warning, critical
+  sku         String?
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([sku])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("supply_chain_events")
+}
+
+// ==================== 补货订单 ====================
+model ReorderOrder {
+  id          String   @id @default(uuid())
+  sku         String
+  productName String   @map("product_name")
+  quantity    Int
+  warehouse   String
+  priority    String   @default("常规") // 常规, 紧急
+  status      String   @default("pending") // pending, approved, shipped, delivered, cancelled
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([sku])
+  @@index([status])
+  @@index([priority])
+  @@map("reorder_orders")
+}
+
+// ==================== 供应链备注 ====================
+model SupplyChainNote {
+  id          String   @id @default(uuid())
+  sku         String
+  author      String   @default("系统用户")
+  content     String
+  category    String   @default("general") // general, inventory, cost, logistics, sales
+  priority    String   @default("normal")  // normal, important, urgent
+  isResolved  Boolean  @default(false) @map("is_resolved")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([sku])
+  @@index([category])
+  @@index([priority])
+  @@index([isResolved])
+  @@index([isResolved, priority])
+  @@map("supply_chain_notes")
+}
+
+// ==================== 供应商 ====================
+model Supplier {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  contact       String?
+  email         String?
+  phone         String?
+  region        String
+  category      String   // 供应品类
+  leadTime      Int      @default(14) @map("lead_time") // 平均交货天数
+  rating        Float    @default(0) // 0-5 评分
+  ratingDetails Json?    @map("rating_details") // JSON: { deliveryScore, qualityScore, priceScore, communicationScore, comments, ratedAt }
+  status        String   @default("active") // active, suspended, inactive
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([region])
+  @@index([category])
+  @@index([status])
+  @@map("suppliers")
+}
+
+// ==================== 审计日志 ====================
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String   // CREATE, UPDATE, DELETE, IMPORT, EXPORT, ADJUST, TRANSFER, RATE, SIMULATE
+  entity    String   // product, inventory, shipment, note, supplier, reorder, alert_rule, cost
+  entityId  String?  @map("entity_id") // ID of the affected entity
+  sku       String?  // Related SKU if applicable
+  userId    String   @default("system") @map("user_id") // Who performed the action
+  userName  String   @default("系统用户") @map("user_name")
+  details   Json     // JSON object with action details
+  ipAddress String?  @map("ip_address") // Request IP (when available)
+  userAgent String?  @map("user_agent") // Request user agent
+  severity  String   @default("info") // info, warning, important
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([action])
+  @@index([entity])
+  @@index([sku])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entity, action])
+  @@index([severity, createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== 用户与权限 ====================
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  name        String
+  password    String    // bcrypt hashed
+  role        String    @default("viewer") // admin, manager, viewer
+  avatar      String?
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  sessions    Session[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ==================== 质量管理 ====================
+
+// 退货记录
+model ReturnRecord {
+  id            String   @id @default(uuid())
+  sku           String
+  productName   String   @map("product_name")
+  quantity      Int
+  reason        String
+  reasonDetail  String?  @map("reason_detail")
+  platform      String?
+  costImpact    Float    @default(0) @map("cost_impact")
+  status        String   @default("pending")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([sku])
+  @@index([reason])
+  @@index([platform])
+  @@index([status])
+  @@index([createdAt])
+  @@map("return_records")
+}
+
+// 缺陷记录
+model DefectRecord {
+  id              String    @id @default(uuid())
+  sku             String
+  productName     String    @map("product_name")
+  defectType      String    @map("defect_type")
+  severity        String    @default("minor")
+  quantity        Int       @default(1)
+  detectedAt      String    @map("detected_at")
+  rootCause       String?   @map("root_cause")
+  correctiveAction String?  @map("corrective_action")
+  status          String    @default("open")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([sku])
+  @@index([defectType])
+  @@index([severity])
+  @@index([status])
+  @@index([detectedAt])
+  @@map("defect_records")
+}
+
+// 质保成本记录
+model WarrantyCost {
+  id           String   @id @default(uuid())
+  sku          String
+  productName  String   @map("product_name")
+  category     String
+  cost         Float
+  description  String?
+  claimDate    String   @map("claim_date")
+  resolvedDate String?  @map("resolved_date")
+  status       String   @default("submitted")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([sku])
+  @@index([category])
+  @@index([status])
+  @@index([claimDate])
+  @@map("warranty_costs")
+}
+
+// ==================== 合规认证 ====================
+
+// 合规证书
+model ComplianceCert {
+  id           String   @id @default(uuid())
+  certName     String   @map("cert_name")
+  certNumber   String?  @map("cert_number")
+  issuer       String?
+  sku          String?
+  productName  String?  @map("product_name")
+  category     String
+  issueDate    String?  @map("issue_date")
+  expiryDate   String   @map("expiry_date")
+  status       String   @default("active")
+  scope        String?
+  documentUrl  String?  @map("document_url")
+  notes        String?
+  reminderDays Int      @default(90) @map("reminder_days")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([certName])
+  @@index([sku])
+  @@index([status])
+  @@index([expiryDate])
+  @@index([category])
+  @@map("compliance_certs")
+}
+
+// 法规变更
+model RegulationChange {
+  id             String    @id @default(uuid())
+  title          String
+  source         String
+  category       String
+  description    String
+  impactLevel    String    @default("medium") @map("impact_level")
+  effectiveDate  String?   @map("effective_date")
+  deadline       String?
+  affectedSkus   Json      @default("[]") @map("affected_skus")
+  affectedCerts  Json      @default("[]") @map("affected_certs")
+  actionRequired String?   @map("action_required")
+  status         String    @default("new")
+  sourceUrl      String?   @map("source_url")
+  reviewedBy     String?   @map("reviewed_by")
+  reviewedAt     DateTime? @map("reviewed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([source])
+  @@index([category])
+  @@index([impactLevel])
+  @@index([status])
+  @@index([effectiveDate])
+  @@map("regulation_changes")
+}

@@ -1,0 +1,128 @@
+# ===========================================
+# 小家电供应链 MCP 数据管道 - Docker Compose
+# ===========================================
+# Local development environment with PostgreSQL.
+# MySQL is optional and can be started separately.
+#
+# Usage:
+#   Start with PostgreSQL:  docker compose up -d
+#   Start with MySQL:       docker compose --profile mysql up -d
+#   Stop all:               docker compose down
+#   Reset data:             docker compose down -v
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and configure for PostgreSQL:
+#      DATABASE_URL="postgresql://supplychain:supplychain@localhost:5432/supply_chain"
+#      DB_TYPE=postgresql
+#   2. Switch Prisma schema:  bun run db:switch:pg
+#   3. Push schema:           bun run db:push
+#   4. Seed data:             bun run db:seed
+# ===========================================
+
+services:
+  # ─── Next.js Application ────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supply-chain-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://supplychain:supplychain@postgres:5432/supply_chain}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production-at-least-32-chars-long}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NODE_ENV=${NODE_ENV:-production}
+      - DB_TYPE=${DB_TYPE:-postgresql}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - supply-chain-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  # ─── PostgreSQL 16 ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: supply-chain-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-supplychain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supplychain}
+      POSTGRES_DB: ${POSTGRES_DB:-supply_chain}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - supply-chain-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplychain} -d ${POSTGRES_DB:-supply_chain}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  # ─── MySQL 8 (optional - start with --profile mysql) ────────────────
+  mysql:
+    image: mysql:8
+    container_name: supply-chain-mysql
+    restart: unless-stopped
+    profiles:
+      - mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_USER: ${MYSQL_USER:-supplychain}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-supplychain}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-supply_chain}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - supply-chain-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # ─── pgAdmin (optional - database management UI) ────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: supply-chain-pgadmin
+    restart: unless-stopped
+    profiles:
+      - tools
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@supplychain.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - supply-chain-network
+
+# ─── Volumes ──────────────────────────────────────────────────────────
+volumes:
+  postgres-data:
+    driver: local
+    name: supply-chain-postgres-data
+  mysql-data:
+    driver: local
+    name: supply-chain-mysql-data
+
+# ─── Network ──────────────────────────────────────────────────────────
+networks:
+  supply-chain-network:
+    driver: bridge
+    name: supply-chain-network

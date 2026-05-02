@@ -1,0 +1,57 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.*
+
+# Next.js build output (rebuilt in Docker)
+.next
+out
+
+# Database files (mounted at runtime)
+db/*.db
+db/*.db-journal
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.vercel
+.claude
+.z-ai-config
+skills
+download
+upload
+agent-ctx
+REFACTORING_PLAN.md
+dev.log
+dev.out.log
+server.log
+
+# Docker files themselves
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Git
+.git
+.gitignore

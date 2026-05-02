@@ -1,0 +1,151 @@
+import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
+import { withErrorHandler, apiError } from "@/lib/api-utils";
+import { withApiRateLimit } from '@/lib/api-protection';
+import { CACHE_TAGS, CACHE_TTL } from "@/lib/cache";
+import {
+  getSupplierPerformanceAnalytics,
+  getSupplierPerformanceAnalyticsEnhanced,
+  getCostOptimizationAnalytics,
+  getInventoryForecastAnalytics,
+  getSupplyChainRiskAnalytics,
+  getSalesForecastAnalytics,
+  getInventoryOptimizationAnalytics,
+  getCostTrendsAnalytics,
+  getInventoryTurnoverAnalytics,
+  getKPIAnalytics,
+  getTimeSeriesAnalytics,
+  getComparisonAnalytics,
+  getAnomaliesAnalytics,
+} from "@/lib/queries/analytics.queries";
+
+// ─── Next.js unstable_cache wrappers for heavy analytics ──────────────────────
+// These provide persistent/deduplicated caching on top of the in-memory cache.
+// Analytics data rarely changes, so 15-minute revalidation is appropriate.
+
+const cachedSupplierPerformance = unstable_cache(
+  getSupplierPerformanceAnalytics,
+  ["analytics", "supplier-performance"],
+  { revalidate: CACHE_TTL.VERY_LONG, tags: [CACHE_TAGS.ANALYTICS, CACHE_TAGS.SUPPLIERS] }
+);
+
+const cachedSupplierPerformanceEnhanced = unstable_cache(
+  (months: number) => getSupplierPerformanceAnalyticsEnhanced(months),
+  ["analytics", "supplier-performance-enhanced"],
+  { revalidate: CACHE_TTL.VERY_LONG, tags: [CACHE_TAGS.ANALYTICS, CACHE_TAGS.SUPPLIERS] }
+);
+
+const cachedCostOptimization = unstable_cache(
+  getCostOptimizationAnalytics,
+  ["analytics", "cost-optimization"],
+  { revalidate: CACHE_TTL.VERY_LONG, tags: [CACHE_TAGS.ANALYTICS, CACHE_TAGS.COST] }
+);
+
+const cachedSupplyChainRisk = unstable_cache(
+  getSupplyChainRiskAnalytics,
+  ["analytics", "supply-chain-risk"],
+  { revalidate: CACHE_TTL.VERY_LONG, tags: [CACHE_TAGS.ANALYTICS, CACHE_TAGS.RISK] }
+);
+
+const cachedInventoryTurnover = unstable_cache(
+  getInventoryTurnoverAnalytics,
+  ["analytics", "inventory-turnover"],
+  { revalidate: CACHE_TTL.VERY_LONG, tags: [CACHE_TAGS.ANALYTICS, CACHE_TAGS.INVENTORY] }
+);
+
+const cachedKPI = unstable_cache(
+  getKPIAnalytics,
+  ["analytics", "kpi"],
+  { revalidate: CACHE_TTL.LONG, tags: [CACHE_TAGS.ANALYTICS] }
+);
+
+const cachedComparison = unstable_cache(
+  getComparisonAnalytics,
+  ["analytics", "comparison"],
+  { revalidate: CACHE_TTL.VERY_LONG, tags: [CACHE_TAGS.ANALYTICS] }
+);
+
+const cachedAnomalies = unstable_cache(
+  getAnomaliesAnalytics,
+  ["analytics", "anomalies"],
+  { revalidate: CACHE_TTL.LONG, tags: [CACHE_TAGS.ANALYTICS, CACHE_TAGS.INVENTORY, CACHE_TAGS.COST] }
+);
+
+// GET /api/analytics - 综合分析 API
+// Actions: supplier-performance, cost-optimization, inventory-forecast, supply-chain-risk,
+//          sales_forecast, inventory_optimization, supplier_performance, cost_trends, inventory_turnover,
+//          kpi, time_series, comparison, anomalies
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get("action") || "supplier-performance";
+
+  switch (action) {
+    case "supplier-performance": {
+      const data = await cachedSupplierPerformance();
+      return NextResponse.json(data);
+    }
+    case "supplier_performance": {
+      const months = parseInt(searchParams.get("months") || "6");
+      const data = await cachedSupplierPerformanceEnhanced(months);
+      return NextResponse.json(data);
+    }
+    case "cost-optimization": {
+      const data = await cachedCostOptimization();
+      return NextResponse.json(data);
+    }
+    case "inventory-forecast": {
+      // Inventory forecast is parameterized, use in-memory cache only
+      const forecastDays = parseInt(searchParams.get("days") || "14");
+      const alpha = parseFloat(searchParams.get("alpha") || "0.3");
+      const beta = parseFloat(searchParams.get("beta") || "0.1");
+      const data = await getInventoryForecastAnalytics(forecastDays, alpha, beta);
+      return NextResponse.json(data);
+    }
+    case "supply-chain-risk": {
+      const data = await cachedSupplyChainRisk();
+      return NextResponse.json(data);
+    }
+    case "sales_forecast": {
+      // Sales forecast is parameterized, use in-memory cache only
+      const forecastDays = parseInt(searchParams.get("days") || "30");
+      const data = await getSalesForecastAnalytics(forecastDays);
+      return NextResponse.json(data);
+    }
+    case "inventory_optimization": {
+      // Inventory optimization is parameterized, use in-memory cache only
+      const data = await getInventoryOptimizationAnalytics();
+      return NextResponse.json(data);
+    }
+    case "cost_trends": {
+      // Cost trends is parameterized, use in-memory cache only
+      const months = parseInt(searchParams.get("months") || "6");
+      const data = await getCostTrendsAnalytics(months);
+      return NextResponse.json(data);
+    }
+    case "inventory_turnover": {
+      const data = await cachedInventoryTurnover();
+      return NextResponse.json(data);
+    }
+    case "kpi": {
+      const data = await cachedKPI();
+      return NextResponse.json(data);
+    }
+    case "time_series": {
+      // Time series is parameterized, use in-memory cache only
+      const metric = searchParams.get("metric") || undefined;
+      const days = searchParams.get("days") ? parseInt(searchParams.get("days")!) : undefined;
+      const data = await getTimeSeriesAnalytics({ metric, days });
+      return NextResponse.json(data);
+    }
+    case "comparison": {
+      const data = await cachedComparison();
+      return NextResponse.json(data);
+    }
+    case "anomalies": {
+      const data = await cachedAnomalies();
+      return NextResponse.json(data);
+    }
+    default:
+      return apiError(`未知操作: ${action}`, 400, "UNKNOWN_ACTION");
+  }
+}));

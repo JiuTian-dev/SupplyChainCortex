@@ -1,0 +1,89 @@
+/**
+ * Dashboard Config Store — Zustand store for DashboardConfig state.
+ *
+ * Persists to localStorage on every change. All visualization components
+ * consume config via useDashboardConfig() → useConfigurableMetric(config).
+ */
+
+'use client';
+
+import { create } from 'zustand';
+import type { DashboardConfig } from '@/lib/dashboard/config';
+import { DEFAULT_CONFIG, loadConfig, saveConfig } from '@/lib/dashboard/config';
+
+interface DashboardConfigState {
+  config: DashboardConfig;
+  hydrated: boolean;
+
+  // Actions
+  setConfig: (partial: Partial<DashboardConfig>) => void;
+  setCurrency: (currency: DashboardConfig['currency']) => void;
+  setCurrencyRate: (rate: number) => void;
+  setRiskThresholds: (thresholds: DashboardConfig['riskThresholds']) => void;
+  setTimeHorizon: (horizon: DashboardConfig['timeHorizon']) => void;
+  togglePanel: (panel: keyof DashboardConfig['panels']) => void;
+  resetConfig: () => void;
+  hydrate: () => void;
+}
+
+export const useDashboardConfigStore = create<DashboardConfigState>((set, get) => ({
+  config: { ...DEFAULT_CONFIG },
+  hydrated: false,
+
+  setConfig: (partial) => {
+    const next = { ...get().config, ...partial };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  setCurrency: (currency) => {
+    const next = { ...get().config, currency };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  setCurrencyRate: (rate) => {
+    const next = { ...get().config, currencyRate: rate };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  setRiskThresholds: (thresholds) => {
+    const next = { ...get().config, riskThresholds: thresholds };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  setTimeHorizon: (horizon) => {
+    const next = { ...get().config, timeHorizon: horizon };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  togglePanel: (panel) => {
+    const next = {
+      ...get().config,
+      panels: { ...get().config.panels, [panel]: !get().config.panels[panel] },
+    };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  resetConfig: () => {
+    const defaults = { ...DEFAULT_CONFIG };
+    set({ config: defaults });
+    saveConfig(defaults);
+  },
+
+  hydrate: () => {
+    if (get().hydrated) return;
+    const stored = loadConfig();
+    set({ config: stored, hydrated: true });
+  },
+}));
+
+/** Convenience hook: subscribe to full config */
+export function useDashboardConfig(): DashboardConfig {
+  const store = useDashboardConfigStore();
+  return store.config;
+}

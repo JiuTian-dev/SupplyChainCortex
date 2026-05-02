@@ -1,0 +1,833 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --tooltip-bg: #fff;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --tooltip-bg: #1c1c1c;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ==================== Custom Scrollbar ==================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0 0 / 25%);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0 0 / 40%);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(1 0 0 / 15%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(1 0 0 / 25%);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.7 0 0 / 25%) transparent;
+}
+
+.dark * {
+  scrollbar-color: oklch(1 0 0 / 15%) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  transition: width 0.2s ease;
+}
+.custom-scrollbar:hover::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0 0 / 20%);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0 0 / 35%);
+}
+
+/* ==================== Smooth Page Transitions ==================== */
+.tab-fade-in {
+  animation: tabFadeIn 0.3s ease-out;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== Card Hover Lift Effect ==================== */
+.card-hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px oklch(0 0 0 / 8%);
+}
+.dark .card-hover-lift:hover {
+  box-shadow: 0 4px 12px -2px oklch(0 0 0 / 25%);
+}
+
+/* ==================== Card Entrance Animation ==================== */
+.card-entrance {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: cardEntrance 0.4s ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes cardEntrance {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== Scroll Reveal Animation ==================== */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==================== Focus-Visible Styles ==================== */
+:focus-visible {
+  outline: 2px solid oklch(0.708 0 0);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: 2px solid oklch(0.708 0 0);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==================== Header ==================== */
+/* Auto-refresh progress bar - solid color */
+.header-progress-bar-v2 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: #f97316;
+  transition: width 1s linear;
+  z-index: 60;
+  border-radius: 0 1px 1px 0;
+}
+
+/* Header shadow on scroll */
+.header-scrolled {
+  box-shadow: 0 1px 8px oklch(0 0 0 / 6%);
+}
+.dark .header-scrolled {
+  box-shadow: 0 1px 8px oklch(0 0 0 / 20%);
+}
+
+/* Pulsing dot for MCP online */
+.mcp-pulse-dot {
+  position: relative;
+}
+.mcp-pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.3;
+  animation: mcpPulse 2s ease-in-out infinite;
+}
+
+@keyframes mcpPulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Bell shake animation */
+@keyframes bellShake {
+  0% { transform: rotate(0deg); }
+  15% { transform: rotate(12deg); }
+  30% { transform: rotate(-8deg); }
+  45% { transform: rotate(6deg); }
+  60% { transform: rotate(-3deg); }
+  75% { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.bell-shake {
+  animation: bellShake 0.6s ease-in-out;
+  transform-origin: top center;
+}
+
+/* Badge pop animation */
+@keyframes badgePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.badge-pop-anim {
+  animation: badgePop 0.3s ease-out;
+}
+
+/* ==================== MetricCard ==================== */
+.metric-card-enhanced {
+  transition: box-shadow 0.2s ease;
+}
+.metric-card-enhanced:hover {
+  box-shadow: 0 2px 8px oklch(0 0 0 / 6%);
+}
+.dark .metric-card-enhanced:hover {
+  box-shadow: 0 2px 8px oklch(0 0 0 / 20%);
+}
+
+/* Icon subtle hover */
+.metric-icon-pulse:hover {
+  animation: iconPulse 1.5s ease-in-out infinite;
+}
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* ==================== Gauge Animation ==================== */
+.gauge-fill-animation {
+  animation: gaugeFill 1s ease-out forwards;
+  stroke-dashoffset: var(--gauge-full);
+}
+
+@keyframes gaugeFill {
+  to {
+    stroke-dashoffset: calc(var(--gauge-full) - var(--gauge-target));
+  }
+}
+
+/* ==================== MCP Connector Expand ==================== */
+.connector-card-expand {
+  max-height: 80px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.connector-card-expand.expanded {
+  max-height: 200px;
+}
+
+/* ==================== Last Updated Pulse ==================== */
+@keyframes lastUpdatedPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.last-updated-pulse {
+  animation: lastUpdatedPulse 2s ease-in-out infinite;
+}
+
+/* ==================== Loading Skeleton (simple opacity pulse) ==================== */
+.shimmer-loading {
+  animation: shimmerPulse 1.5s ease-in-out infinite;
+}
+@keyframes shimmerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ==================== Pulse Ring ==================== */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.pulse-ring {
+  position: relative;
+}
+.pulse-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: pulse-ring 1.5s ease-out infinite;
+  pointer-events: none;
+}
+
+/* ==================== Status Dots ==================== */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  position: relative;
+  flex-shrink: 0;
+}
+.status-dot-online {
+  background-color: #22c55e;
+}
+.status-dot-warning {
+  background-color: #f59e0b;
+}
+.status-dot-offline {
+  background-color: #ef4444;
+}
+
+/* ==================== Chart Card Hover ==================== */
+.chart-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.chart-card-hover:hover {
+  transform: scale(1.01);
+  box-shadow: 0 4px 12px -4px oklch(0 0 0 / 8%);
+}
+.dark .chart-card-hover:hover {
+  box-shadow: 0 4px 12px -4px oklch(0 0 0 / 25%);
+}
+
+/* ==================== Slide/Scale/Fade Animations ==================== */
+@keyframes slide-in-bottom {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-in-bottom {
+  animation: slide-in-bottom 0.25s ease-out;
+}
+
+@keyframes scale-in {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.scale-in {
+  animation: scale-in 0.15s ease-out;
+}
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.fade-scale-in {
+  animation: fadeScaleIn 0.3s ease-out forwards;
+}
+
+@keyframes slideRightIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.slide-right-in {
+  animation: slideRightIn 0.25s ease-out;
+}
+
+/* ==================== Badge Pop ==================== */
+@keyframes badgePopBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.25); }
+  50% { transform: scale(0.95); }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.badge-pop {
+  animation: badgePopBounce 0.4s ease-out;
+}
+
+/* ==================== Count-Up Utility ==================== */
+.count-up {
+  transition: opacity 0.15s ease;
+}
+.count-up-anim {
+  animation: countUpFade 0.4s ease-out;
+}
+@keyframes countUpFade {
+  0% { opacity: 0.5; transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== Number Counter Animation ==================== */
+@keyframes numberCount {
+  0% { opacity: 0.5; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.number-count-anim {
+  animation: numberCount 0.4s ease-out;
+}
+
+/* ==================== Pulse Dot for Status ==================== */
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70% { box-shadow: 0 0 0 5px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.status-pulse-dot {
+  animation: pulseRing 2s ease-out infinite;
+}
+
+/* ==================== Smooth Tab Content Transition ==================== */
+.tab-content-enter {
+  animation: tabSlideIn 0.25s ease-out;
+}
+@keyframes tabSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== Underline Animation ==================== */
+.underline-anim {
+  position: relative;
+  display: inline-block;
+}
+.underline-anim::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  transition: width 0.3s ease;
+}
+.underline-anim:hover::after {
+  width: 100%;
+}
+
+/* ==================== Keyboard Shortcut Hint ==================== */
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+  border: 1px solid oklch(0.82 0 0);
+  border-radius: 4px;
+  background: oklch(0.97 0 0);
+  color: oklch(0.45 0 0);
+}
+.dark .kbd-hint {
+  border-color: oklch(1 0 0 / 15%);
+  background: oklch(0.25 0 0);
+  color: oklch(0.6 0 0);
+}
+
+.kbd-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+  border: 1px solid oklch(0.82 0 0);
+  border-radius: 4px;
+  background: oklch(0.96 0 0);
+  color: oklch(0.4 0 0);
+  box-shadow: 0 1px 0 oklch(0.85 0 0);
+  transition: all 0.1s ease;
+}
+.kbd-key:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.dark .kbd-key {
+  border-color: oklch(1 0 0 / 12%);
+  background: oklch(0.25 0 0);
+  color: oklch(0.65 0 0);
+  box-shadow: 0 1px 0 oklch(1 0 0 / 6%);
+}
+
+/* ==================== Ripple Effect ==================== */
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+.ripple-effect::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, oklch(0.5 0 0 / 12%) 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10);
+  opacity: 0;
+  transition: transform 0.5s, opacity 0.8s;
+}
+.ripple-effect:active::after {
+  transform: scale(0);
+  opacity: 1;
+  transition: 0s;
+}
+
+/* ==================== Notification Red Dot Pop ==================== */
+@keyframes redDotPop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.notification-red-dot {
+  animation: redDotPop 0.3s ease-out;
+}
+
+/* ==================== Export Dropdown Slide ==================== */
+@keyframes exportDropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+.export-dropdown-content {
+  animation: exportDropdownSlide 0.2s ease-out;
+  transform-origin: top;
+}
+
+/* ==================== Data Grid Alternating Rows ==================== */
+.data-grid-stripe > :nth-child(even) {
+  background: oklch(0.97 0 0 / 50%);
+}
+.data-grid-stripe > :nth-child(odd) {
+  background: transparent;
+}
+.dark .data-grid-stripe > :nth-child(even) {
+  background: oklch(1 0 0 / 3%);
+}
+
+/* ==================== Tooltip Arrow Glow ==================== */
+.tooltip-arrow-glow [data-side="bottom"]::before,
+.tooltip-arrow-glow [data-side="top"]::before,
+.tooltip-arrow-glow [data-side="left"]::before,
+.tooltip-arrow-glow [data-side="right"]::before {
+  filter: drop-shadow(0 0 2px oklch(0.646 0.222 41.116 / 15%));
+}
+
+/* ==================== Weather Animations ==================== */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+/* ==================== Drag Handle Animation ==================== */
+.drag-active {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.drag-active:hover {
+  box-shadow: 0 4px 16px oklch(0 0 0 / 8%);
+}
+.dark .drag-active:hover {
+  box-shadow: 0 4px 16px oklch(0 0 0 / 25%);
+}
+
+.drag-handle-visible {
+  animation: dragHandleIn 0.2s ease-out;
+}
+@keyframes dragHandleIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ==================== Sortable Table Header ==================== */
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+.sortable-header:hover {
+  color: #f97316;
+}
+.dark .sortable-header:hover {
+  color: #fb923c;
+}
+.sort-indicator {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0;
+  margin-left: 4px;
+  vertical-align: middle;
+  line-height: 0;
+}
+.sort-indicator .sort-asc,
+.sort-indicator .sort-desc {
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  opacity: 0.25;
+  transition: opacity 0.15s ease;
+}
+.sort-asc {
+  border-bottom: 4px solid currentColor;
+}
+.sort-desc {
+  border-top: 4px solid currentColor;
+}
+.sort-active .sort-asc,
+.sort-active-desc .sort-desc {
+  opacity: 1;
+}
+
+/* ==================== Star Rating ==================== */
+.star-rating {
+  display: inline-flex;
+  gap: 2px;
+}
+.star-rating .star {
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+  color: oklch(0.82 0 0);
+}
+.star-rating .star:hover {
+  transform: scale(1.2);
+}
+.star-rating .star.filled {
+  color: #f59e0b;
+}
+.dark .star-rating .star {
+  color: oklch(1 0 0 / 20%);
+}
+.dark .star-rating .star.filled {
+  color: #fbbf24;
+}
+.star-rating .star.half {
+  position: relative;
+  color: oklch(0.82 0 0);
+}
+.dark .star-rating .star.half {
+  color: oklch(1 0 0 / 20%);
+}
+
+/* ==================== Row Expansion Animation ==================== */
+.row-expand-enter {
+  animation: rowExpand 0.2s ease-out;
+}
+@keyframes rowExpand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 200px; }
+}
+
+/* ==================== Filter Bar ==================== */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: oklch(0.98 0 0);
+  border: 1px solid oklch(0.92 0 0);
+}
+.dark .filter-bar {
+  background: oklch(0.2 0 0);
+  border-color: oklch(1 0 0 / 10%);
+}
+
+/* ==================== Bulk Actions Bar ==================== */
+.bulk-actions-bar {
+  animation: bulkBarSlideIn 0.25s ease-out;
+}
+@keyframes bulkBarSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== Chart Tooltip Dark Mode ==================== */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: oklch(0.2 0 0) !important;
+  border-color: oklch(1 0 0 / 10%) !important;
+}
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-label {
+  color: oklch(0.9 0 0) !important;
+}
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-item-list .recharts-tooltip-item {
+  color: oklch(0.85 0 0) !important;
+}
+
+/* ==================== Pagination ==================== */
+.pagination-btn {
+  transition: all 0.15s ease;
+}
+.pagination-btn:hover:not(:disabled) {
+  background: oklch(0.96 0 0);
+}
+.dark .pagination-btn:hover:not(:disabled) {
+  background: oklch(0.25 0 0);
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==================== Supplier Analytics Card Glow ==================== */
+.analytics-card-glow {
+  position: relative;
+  overflow: hidden;
+}
+.analytics-card-glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f97316, #f43f5e, #8b5cf6, transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.analytics-card-glow:hover::before {
+  opacity: 1;
+}

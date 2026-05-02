@@ -1,0 +1,157 @@
+{
+  "generatedAt": "2026-04-28T17:44:49.590Z",
+  "dataSources": {
+    "openMeteo": {
+      "points": 180,
+      "ports": 12,
+      "daysBack": 14
+    },
+    "frankfurter": {
+      "points": 63,
+      "daysBack": 90
+    },
+    "database": {
+      "shipments": 31,
+      "inventory": 72,
+      "suppliers": 20
+    }
+  },
+  "results": [
+    {
+      "edgeType": "DEPARTS_FROM",
+      "description": "Port weather severity → shipment departure delay",
+      "originalAttenuation": 0.85,
+      "calibratedAttenuation": 0.3181,
+      "confidence": 0.2057,
+      "sampleSize": 48,
+      "regressionSlope": 0.3181,
+      "regressionIntercept": 0.3736,
+      "dataPoints": [
+        {
+          "input": 10,
+          "output": 15,
+          "label": ""
+        },
+        {
+          "input": 50,
+          "output": 60,
+          "label": ""
+        },
+        {
+          "input": 80,
+          "output": 85,
+          "label": ""
+        }
+      ]
+    },
+    {
+      "edgeType": "ARRIVES_AT",
+      "description": "Destination port → shipment arrival delay",
+      "originalAttenuation": 0.7,
+      "calibratedAttenuation": 0.9,
+      "confidence": 0.95,
+      "sampleSize": 3,
+      "regressionSlope": 0.9906,
+      "regressionIntercept": 0.0208,
+      "dataPoints": [
+        {
+          "input": 10,
+          "output": 10,
+          "label": ""
+        },
+        {
+          "input": 40,
+          "output": 45,
+          "label": ""
+        },
+        {
+          "input": 70,
+          "output": 70,
+          "label": ""
+        }
+      ]
+    },
+    {
+      "edgeType": "CARRIES",
+      "description": "Shipment delay → product stock risk",
+      "originalAttenuation": 0.75,
+      "calibratedAttenuation": 0.95,
+      "confidence": 0.8666,
+      "sampleSize": 34,
+      "regressionSlope": 1.0215,
+      "regressionIntercept": 0.0064,
+      "dataPoints": [
+        {
+          "input": 10,
+          "output": 15,
+          "label": ""
+        },
+        {
+          "input": 35,
+          "output": 55,
+          "label": ""
+        },
+        {
+          "input": 80,
+          "output": 85,
+          "label": ""
+        }
+      ]
+    },
+    {
+      "edgeType": "STORED_IN",
+      "description": "Warehouse stock → product availability",
+      "originalAttenuation": 0.6,
+      "calibratedAttenuation": 0.25,
+      "confidence": 0.005,
+      "sampleSize": 75,
+      "regressionSlope": -0.0326,
+      "regressionIntercept": 0.1442,
+      "dataPoints": [
+        {
+          "input": 10,
+          "output": 10,
+          "label": ""
+        },
+        {
+          "input": 50,
+          "output": 50,
+          "label": ""
+        },
+        {
+          "input": 90,
+          "output": 80,
+          "label": ""
+        }
+      ]
+    },
+    {
+      "edgeType": "SUPPLIED_BY",
+      "description": "Supplier rating → supply risk",
+      "originalAttenuation": 0.5,
+      "calibratedAttenuation": 0.2,
+      "confidence": 0.1715,
+      "sampleSize": 22,
+      "regressionSlope": -0.231,
+      "regressionIntercept": 0.4542,
+      "dataPoints": [
+        {
+          "input": 10,
+          "output": 10,
+          "label": ""
+        },
+        {
+          "input": 50,
+          "output": 50,
+          "label": ""
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "avgConfidence": 0.44,
+    "avgAdjustmentPercent": 47,
+    "totalDataPoints": 366,
+    "recommendation": "校准置信度不足，建议增加历史数据量后重新校准。"
+  }
+}
