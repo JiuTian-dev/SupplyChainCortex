@@ -145,25 +145,163 @@ async function handlePost(request: NextRequest) {
     { role: 'user', content: message },
   ];
 
-  // Get tool schemas for the AI
-  const toolSchemas = getToolSchemas().map(t => ({
-    type: 'function' as const,
-    function: {
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters as Record<string, unknown>,
-    },
-  }));
-
-  // Check if any API key is available (env or frontend-provided)
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   if (stream) {
-    if (!hasApiKey) return handleLocalModeStream(message);
-    return handleStreaming(messages, toolSchemas, provider, model, apiKey);
+    if (hasApiKey) return handleHybridStream(message, provider, model, apiKey);
+    return handleLocalModeStream(message);
   }
-  if (!hasApiKey) return handleLocalMode(message);
-  return handleNonStreaming(messages, toolSchemas, provider, model, apiKey);
+  if (hasApiKey) return handleHybrid(message, provider, model, apiKey);
+  return handleLocalMode(message);
+}
+
+// ─── Hybrid Mode: keyword matching → tool execution → LLM summarization ──────────
+
+async function executeMatchedTools(message: string): Promise<{
+  toolResults: Array<{ tool: string; result: string }>;
+  toolsUsed: string[];
+}> {
+  const actions = matchToolsToQuery(message);
+  const toolResults: Array<{ tool: string; result: string }> = [];
+  const toolsUsed: string[] = [];
+
+  for (const a of actions) {
+    try {
+      const data = await executeTool(a.tool, a.params);
+      const formatted = formatToolResult(a.tool, a.action, data);
+      toolResults.push({ tool: a.tool, result: formatted });
+      toolsUsed.push(a.tool);
+    } catch (err) {
+      toolResults.push({ tool: a.tool, result: `查询失败: ${(err as Error).message}` });
+    }
+  }
+
+  if (toolResults.length === 0) {
+    toolResults.push({ tool: 'query_dashboard', result: '没有匹配到具体查询，请尝试更具体的问题。' });
+  }
+
+  return { toolResults, toolsUsed };
+}
+
+async function handleHybrid(
+  message: string, provider: string, model: string, apiKey?: string,
+): Promise<NextResponse> {
+  const { toolResults, toolsUsed } = await executeMatchedTools(message);
+  const dataContext = toolResults.map(r => r.result).join('\n\n');
+
+  try {
+    const summaryMsg: ChatMessage[] = [
+      { role: 'system', content: '你是供应链助手。基于以下查询数据，用中文给用户一个简洁自然的回答（2-4句话）。直接回答，不要重复数据格式。如果数据异常，给出建议。' },
+      { role: 'user', content: `用户问题: ${message}\n\n查询到的数据:\n${dataContext}\n\n请基于以上数据用中文回答用户。` },
+    ];
+
+    const llmResult = await chatCompletion({
+      provider, model, messages: summaryMsg, stream: false, apiKey,
+      maxTokens: 600, temperature: 0.7,
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        reply: llmResult.content,
+        toolsUsed,
+        dataContext: dataContext.slice(0, 1000),
+        mode: 'hybrid',
+      },
+    });
+  } catch {
+    // LLM failed — return tool results directly
+    return NextResponse.json({
+      success: true,
+      data: {
+        reply: toolResults.map(r => r.result).join('\n\n'),
+        toolsUsed,
+        mode: 'local-fallback',
+        note: 'LLM 调用失败，显示原始数据。',
+      },
+    });
+  }
+}
+
+function handleHybridStream(
+  message: string, provider: string, model: string, apiKey?: string,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enqueue = (event: string, data: unknown) => {
+        controller.enqueue(encoder.encode(formatSSE(event, data)));
+      };
+
+      try {
+        enqueue('thinking', { status: 'analyzing' });
+
+        const { toolResults, toolsUsed } = await executeMatchedTools(message);
+
+        // Send tool calls and results
+        for (const r of toolResults) {
+          enqueue('tool_call', { tool: r.tool });
+          enqueue('tool_result', { tool: r.tool, result: r.result });
+        }
+
+        const dataContext = toolResults.map(r => r.result).join('\n\n');
+
+        // Try LLM summarization
+        let llmFailed = false;
+        try {
+          const summaryMsg: ChatMessage[] = [
+            { role: 'system', content: '你是供应链助手。基于以下查询数据，用中文给用户一个简洁自然的回答（2-4句话）。直接回答，不要重复数据格式。' },
+            { role: 'user', content: `用户问题: ${message}\n\n查询到的数据:\n${dataContext}\n\n请基于以上数据用中文回答用户。` },
+          ];
+
+          let fullText = '';
+          for await (const chunk of chatCompletionStream({
+            provider, model, messages: summaryMsg, stream: true, apiKey,
+            maxTokens: 500, temperature: 0.7,
+          })) {
+            if (chunk.type === 'token' && chunk.content) {
+              fullText += chunk.content;
+              enqueue('token', { content: chunk.content });
+            }
+            if (chunk.type === 'done') break;
+            if (chunk.type === 'error') {
+              llmFailed = true;
+              break;
+            }
+          }
+
+          if (!llmFailed && fullText) {
+            enqueue('done', { toolsUsed, mode: 'hybrid', complete: true });
+            controller.close();
+            return;
+          }
+        } catch { llmFailed = true; }
+
+        // Fallback: stream the tool results
+        const fallback = toolResults.map(r => r.result).join('\n\n') +
+          '\n\n---\n💡 AI 总结生成失败，以上为查询到的原始数据。';
+        for (const word of fallback.split(/(\s+)/)) {
+          enqueue('token', { content: word });
+          await new Promise(r => setTimeout(r, 10));
+        }
+
+        enqueue('done', { toolsUsed, mode: 'local-fallback', complete: true });
+      } catch (err) {
+        enqueue('token', { content: `处理出错: ${(err as Error).message}` });
+        enqueue('done', { complete: true, error: (err as Error).message });
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }
 
 // ─── Local Mode (no API key) ─────────────────────────────────────────────────────
