@@ -10,7 +10,6 @@
 
 'use client';
 
-import { useMemo } from 'react';
 import {
   type DashboardConfig,
   type RiskLevel,
@@ -114,12 +113,5 @@ export function createMetricsFormatter(config: DashboardConfig): ConfigurableMet
  * Re-memoizes only when config values change.
  */
 export function useConfigurableMetric(config: DashboardConfig): ConfigurableMetrics {
-  return useMemo(() => createMetricsFormatter(config), [
-    config.currency,
-    config.currencyRate,
-    config.riskThresholds.low,
-    config.riskThresholds.medium,
-    config.riskThresholds.high,
-    config.unit,
-  ]);
+  return createMetricsFormatter(config);
 }

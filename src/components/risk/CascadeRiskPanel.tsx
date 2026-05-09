@@ -1,7 +1,7 @@
 // @ts-nocheck — pre-existing type incompatibility with cascade-risk API response
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Network, AlertTriangle, TrendingDown, Clock, DollarSign,
   ChevronDown, Zap, Anchor, Ship, Package, Building2, RefreshCw,
@@ -111,7 +111,17 @@ export function CascadeRiskPanel() {
       .catch(() => { setError(true); setLoading(false); });
   };
 
-  useEffect(() => { fetchReport(); }, []);
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+    let cancelled = false;
+    fetch(`/api/cascade-risk?scenario=auto`)
+      .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
+      .then(data => { if (!cancelled) { setReport(data as any); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Loading ──
   if (loading && !report) {

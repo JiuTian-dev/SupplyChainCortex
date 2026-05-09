@@ -168,7 +168,7 @@ export function CostWaterfallChart() {
     const fxImpact = usdDisplayRate ? (cnyPortion * 0.03 / usdDisplayRate) : total * 0.03;
 
     return { total, maxComponent, top2Pct, fxImpact };
-  }, [avgData]);
+  }, [avgData, usdDisplayRate]);
 
   // Table data with cumulative and margin
   const tableData = useMemo(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Cloud, Wind, Thermometer, AlertTriangle, Anchor, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +48,17 @@ export function WeatherRiskWidget() {
       .catch(() => { setError(true); setLoading(false); });
   };
 
-  useEffect(() => { fetchWeather(); }, []);
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+    let cancelled = false;
+    fetch('/api/weather?action=summary')
+      .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
+      .then(data => { if (!cancelled) { setWeather(data); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading) {
     return (

@@ -87,7 +87,6 @@ function parseCSV(text: string): string[][] {
     skipEmptyLines: true,
   });
   if (result.errors.length > 0) {
-    // eslint-disable-next-line no-console
     console.warn('CSV parse warnings:', result.errors);
   }
   return result.data.filter((row) => row.some((cell) => cell.trim() !== ''));

@@ -120,7 +120,7 @@ export function ShipmentRouteMap() {
     });
 
     return mapping;
-  }, [shipments]);
+  }, [shipments, routeDefs]);
 
   // Compute route statuses from shipments
   const routeStatuses = useMemo(() => {
@@ -143,7 +143,7 @@ export function ShipmentRouteMap() {
       }
     });
     return statuses;
-  }, [routeShipments]);
+  }, [routeDefs, routeShipments]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -159,7 +159,7 @@ export function ShipmentRouteMap() {
     const avgTransit = routeDefs.reduce((sum, r) => sum + r.avgTransitDays, 0) / routeDefs.length;
 
     return { totalRoutes, activeShipments, onTimeRate, avgTransit: Math.round(avgTransit * 10) / 10 };
-  }, [shipments]);
+  }, [shipments, routeDefs]);
 
   // Build curved SVG path
   const buildPath = useCallback((origin: string, destination: string) => {
@@ -194,7 +194,7 @@ export function ShipmentRouteMap() {
         });
       }
     },
-    [routeShipments]
+    [routeDefs, routeShipments]
   );
 
   const handleRouteLeave = useCallback(() => {

@@ -310,7 +310,7 @@ export function LogisticsTab() {
         let predictedDaysRemaining: number;
         let confidenceLevel: 'high' | 'medium' | 'low';
         let delayRisk: 'none' | 'low' | 'medium' | 'high';
-        let factors: string[] = [];
+        const factors: string[] = [];
         
         if (s.status === 'in_transit') {
           currentProgress = Math.min(85, Math.max(30, 100 - (daysToEta / baseline) * 100));

@@ -90,7 +90,7 @@ export function RiskMatrixHeatmap() {
   const [expandedCell, setExpandedCell] = useState<{ likelihood: number; impact: number } | null>(null);
 
   const matrixData = data as RiskMatrixData | undefined;
-  const matrixItems = matrixData?.matrix ?? [];
+  const matrixItems = useMemo(() => matrixData?.matrix ?? [], [matrixData?.matrix]);
 
   // Group products by cell
   const productsByCell = useMemo(() => {

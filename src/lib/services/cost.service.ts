@@ -334,7 +334,7 @@ export async function getCostList(params: {
   const costs = await db.costRecord.findMany({ where, include: { product: true }, take: 1000 });
 
   // Fetch live exchange rates for recalculation
-  let liveRates: Record<string, number> = {};
+  const liveRates: Record<string, number> = {};
   try {
     const liveData = await getLiveExchangeRates();
     for (const entry of liveData.rates) {

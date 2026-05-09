@@ -56,7 +56,7 @@ export function OfflineBanner() {
     };
   }, [clearTimers]);
 
-  // If initially offline, start reconnect timer
+  // Start reconnect timer if initially offline (bannerState already set via lazy init)
   useEffect(() => {
     if (bannerState === 'offline') {
       reconnectTimerRef.current = setTimeout(() => {
@@ -66,7 +66,7 @@ export function OfflineBanner() {
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       };
     }
-  }, []);
+  }, [bannerState]);
 
   const handleDismiss = () => {
     setDismissed(true);

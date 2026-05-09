@@ -228,7 +228,7 @@ export function SupplierGeoMap() {
             ))}
 
             {/* Supplier markers */}
-            {enrichedLocations.map((loc) => (
+            {enrichedLocations.map((loc, idx) => (
               <g key={loc.name}>
                 {/* Supplier pulse ring */}
                 <circle
@@ -240,7 +240,7 @@ export function SupplierGeoMap() {
                   strokeWidth="0.2"
                   opacity="0.4"
                   className="geo-pulse-dot"
-                  style={{ animationDelay: `${Math.random() * 2}s` }}
+                  style={{ animationDelay: `${(idx * 0.3) % 2}s` }}
                 />
                 {/* Supplier dot */}
                 <circle

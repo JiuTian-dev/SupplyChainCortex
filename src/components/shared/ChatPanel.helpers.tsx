@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,12 +118,10 @@ export function saveDragPos(key: string, p: DragPos) {
 }
 
 export function useDraggable(sKey: string, dx: number, dy: number) {
-  const pr = useRef<DragPos>({ x: 0, y: 0 });
-  const [pos, setPos] = useState<DragPos>({ x: dx, y: dy });
+  const [pos, setPos] = useState<DragPos>(() => loadDragPos(sKey, dx, dy));
+  const pr = useRef<DragPos>({ x: pos.x, y: pos.y });
   const dragging = useRef(false);
   const off = useRef({ x: 0, y: 0 });
-  const hyd = useRef(false);
-  useEffect(() => { if (!hyd.current) { const s = loadDragPos(sKey, dx, dy); pr.current = s; setPos(s); hyd.current = true; } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const onDown = useCallback((e: React.PointerEvent) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); dragging.current = true; off.current = { x: e.clientX - pr.current.x, y: e.clientY - pr.current.y }; }, []);
   const onMove = useCallback((e: React.PointerEvent) => { if (!dragging.current) return; const np = { x: e.clientX - off.current.x, y: e.clientY - off.current.y }; pr.current = np; setPos(np); }, []);
   const onUp = useCallback(() => { if (!dragging.current) return; dragging.current = false; saveDragPos(sKey, pr.current); }, [sKey]);
@@ -148,13 +146,10 @@ export function saveSize(key: string, s: SizeState) {
 type ResizeEdge = 'left' | 'top' | 'top-left' | 'bottom';
 
 export function useResizable(sKey: string, defW: number, defH: number, minW = 280, minH = 200, maxW = 800, maxH = 700) {
-  const sr = useRef<SizeState>({ w: defW, h: defH });
-  const [size, setSize] = useState<SizeState>({ w: defW, h: defH });
+  const [size, setSize] = useState<SizeState>(() => loadSize(sKey, defW, defH));
+  const sr = useRef<SizeState>({ w: size.w, h: size.h });
   const resizing = useRef<ResizeEdge | null>(null);
   const startRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
-  const hyd = useRef(false);
-
-  useEffect(() => { if (!hyd.current) { const s = loadSize(sKey, defW, defH); sr.current = s; setSize(s); hyd.current = true; } }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onResizeDown = useCallback((edge: ResizeEdge) => (e: React.PointerEvent) => {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);

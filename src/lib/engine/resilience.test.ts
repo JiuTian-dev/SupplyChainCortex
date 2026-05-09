@@ -109,14 +109,14 @@ describe('CircuitBreaker', () => {
   it('throws CircuitBreakerOpenError when open', async () => {
     breaker.reset();
     for (let i = 0; i < 3; i++) {
-      try { await breaker.execute(() => { throw new Error('fail'); }); } catch {}
+      try { await breaker.execute(() => { throw new Error('fail'); }); } catch { /* expected */ }
     }
     await expect(breaker.execute(async () => 42)).rejects.toThrow(CircuitBreakerOpenError);
   });
 
   it('can be manually reset', async () => {
     for (let i = 0; i < 3; i++) {
-      try { await breaker.execute(() => { throw new Error('fail'); }); } catch {}
+      try { await breaker.execute(() => { throw new Error('fail'); }); } catch { /* expected */ }
     }
     breaker.reset();
     const result = await breaker.execute(async () => 42);

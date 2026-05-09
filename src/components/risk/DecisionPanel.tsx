@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Lightbulb, ArrowRight, TrendingUp, Shield, Zap, DollarSign,
   Clock, Package, Building2, AlertTriangle, RefreshCw,
@@ -74,7 +74,17 @@ export function DecisionPanel() {
       .catch(() => { setError(true); setLoading(false); });
   };
 
-  useEffect(() => { fetchDecisions(); }, []);
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+    let cancelled = false;
+    fetch(`/api/decision-graph?domains=cross_domain&query=自动检测供应链状态`)
+      .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
+      .then(data => { if (!cancelled) { setReport(data); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading && !report) {
     return (

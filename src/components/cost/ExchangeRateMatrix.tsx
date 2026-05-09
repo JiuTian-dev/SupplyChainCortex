@@ -66,7 +66,7 @@ export function ExchangeRateMatrix() {
   const staticSnapshot = useMemo(() => getExchangeRates(), []);
   const [rates, setRates] = useState<ExchangeRateEntry[]>(staticSnapshot.rates);
   const [dataSource, setDataSource] = useState<'frankfurter' | 'hybrid' | 'static'>('static');
-  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  const [lastUpdated, setLastUpdated] = useState<number>(() => Date.now());
 
   // Fetch live rates from Frankfurter API on mount, then refresh every 5 minutes
   useEffect(() => {

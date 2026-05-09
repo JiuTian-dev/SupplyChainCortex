@@ -527,7 +527,7 @@ export function ComplianceTab() {
                     <FileCheck className="h-8 w-8 text-green-500" />
                   </div>
                   <p className="text-sm font-semibold text-muted-foreground">暂无合规证书</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">点击"新增证书"添加第一个合规证书</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">点击 &quot;新增证书&quot; 添加第一个合规证书</p>
                 </CardContent>
               </Card>
             ) : (
@@ -627,7 +627,7 @@ export function ComplianceTab() {
                     <BookOpen className="h-8 w-8 text-blue-500" />
                   </div>
                   <p className="text-sm font-semibold text-muted-foreground">暂无法规变更</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">点击"新增法规"添加法规变更记录</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">点击 &quot;新增法规&quot; 添加法规变更记录</p>
                 </CardContent>
               </Card>
             ) : (

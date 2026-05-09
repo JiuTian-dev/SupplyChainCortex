@@ -245,7 +245,7 @@ export async function* chatCompletionStream(params: ChatCompletionParams): Async
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let accumulatedToolCalls: Map<number, { name: string; arguments: string }> = new Map();
+  const accumulatedToolCalls: Map<number, { name: string; arguments: string }> = new Map();
 
   try {
     while (true) {
