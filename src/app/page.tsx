@@ -208,16 +208,16 @@ function HomePageContent() {
         {/* ── Decision Flow Tabs (Monitor → Analysis → Decision → Simulation) ── */}
         <Tabs value={decisionTab} onValueChange={setDecisionTab} className="space-y-4">
           <TabsList className="grid w-full grid-cols-4 h-10 max-w-xl">
-            <TabsTrigger value="monitor" className="gap-1.5 text-xs data-[state=active]:bg-emerald-50 dark:data-[state=active]:bg-emerald-950/30 data-[state=active]:text-emerald-700">
+            <TabsTrigger value="monitor" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <Eye className="h-3.5 w-3.5" />监控
             </TabsTrigger>
-            <TabsTrigger value="analysis" className="gap-1.5 text-xs data-[state=active]:bg-purple-50 dark:data-[state=active]:bg-purple-950/30 data-[state=active]:text-purple-700">
+            <TabsTrigger value="analysis" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <Search className="h-3.5 w-3.5" />分析
             </TabsTrigger>
-            <TabsTrigger value="decision" className="gap-1.5 text-xs data-[state=active]:bg-orange-50 dark:data-[state=active]:bg-orange-950/30 data-[state=active]:text-orange-700">
+            <TabsTrigger value="decision" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <Zap className="h-3.5 w-3.5" />决策
             </TabsTrigger>
-            <TabsTrigger value="simulation" className="gap-1.5 text-xs data-[state=active]:bg-blue-50 dark:data-[state=active]:bg-blue-950/30 data-[state=active]:text-blue-700">
+            <TabsTrigger value="simulation" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <Calendar className="h-3.5 w-3.5" />推演
             </TabsTrigger>
           </TabsList>
@@ -260,12 +260,12 @@ function HomePageContent() {
         <Separator />
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="grid w-full grid-cols-6 h-9 max-w-xl">
-            <TabsTrigger value="inventory" className="gap-1 text-xs px-2 data-[state=active]:bg-emerald-50 dark:data-[state=active]:bg-emerald-950/30"><Boxes className="h-3 w-3" />库存</TabsTrigger>
-            <TabsTrigger value="cost" className="gap-1 text-xs px-2 data-[state=active]:bg-rose-50 dark:data-[state=active]:bg-rose-950/30"><DollarSign className="h-3 w-3" />成本</TabsTrigger>
-            <TabsTrigger value="logistics" className="gap-1 text-xs px-2 data-[state=active]:bg-violet-50 dark:data-[state=active]:bg-violet-950/30"><Ship className="h-3 w-3" />物流</TabsTrigger>
-            <TabsTrigger value="supplier" className="gap-1 text-xs px-2 data-[state=active]:bg-amber-50 dark:data-[state=active]:bg-amber-950/30"><Building2 className="h-3 w-3" />供应商</TabsTrigger>
-            <TabsTrigger value="risk" className="gap-1 text-xs px-2 data-[state=active]:bg-red-50 dark:data-[state=active]:bg-red-950/30"><Shield className="h-3 w-3" />风险</TabsTrigger>
-            <TabsTrigger value="dashboard" className="gap-1 text-xs px-2 data-[state=active]:bg-orange-50 dark:data-[state=active]:bg-orange-950/30"><Activity className="h-3 w-3" />仪表盘</TabsTrigger>
+            <TabsTrigger value="inventory" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">库存</TabsTrigger>
+            <TabsTrigger value="cost" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">成本</TabsTrigger>
+            <TabsTrigger value="logistics" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">物流</TabsTrigger>
+            <TabsTrigger value="supplier" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">供应商</TabsTrigger>
+            <TabsTrigger value="risk" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">风险</TabsTrigger>
+            <TabsTrigger value="dashboard" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">仪表盘</TabsTrigger>
           </TabsList>
           <TabsContent value="inventory" className="tab-fade-in"><SectionErrorBoundary sectionName="库存"><InventoryTab /></SectionErrorBoundary></TabsContent>
           <TabsContent value="cost" className="tab-fade-in"><SectionErrorBoundary sectionName="成本"><CostTab /></SectionErrorBoundary></TabsContent>

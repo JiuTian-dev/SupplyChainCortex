@@ -126,7 +126,7 @@ export function CascadeRiskPanel() {
   // ── Loading ──
   if (loading && !report) {
     return (
-      <Card className="card-entrance border-purple-200 dark:border-purple-900">
+      <Card className="card-dashboard border-purple-200 dark:border-purple-900">
         <CardHeader className="pb-2">
           <Skeleton className="h-5 w-64" />
           <Skeleton className="h-3 w-96 mt-1" />
@@ -141,7 +141,7 @@ export function CascadeRiskPanel() {
   // ── Error ──
   if (error && !report) {
     return (
-      <Card className="card-entrance border-purple-200 dark:border-purple-900">
+      <Card className="card-dashboard border-purple-200 dark:border-purple-900">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Network className="h-4 w-4 text-purple-500" />
@@ -165,7 +165,7 @@ export function CascadeRiskPanel() {
   const shipments = propagation.filter(p => p.type === 'SHIPMENT' && p.propagatedRisk > 0);
 
   return (
-    <Card className="card-entrance border-purple-200 dark:border-purple-900 hover:shadow-md transition-shadow duration-200">
+    <Card className="card-dashboard border-purple-200 dark:border-purple-900">
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex-1">

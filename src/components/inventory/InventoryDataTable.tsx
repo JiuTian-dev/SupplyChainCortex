@@ -386,7 +386,7 @@ export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: I
 
   return (
     <Card
-      className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+      className="card-dashboard"
       style={{ '--delay': '300ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-3">

@@ -280,7 +280,7 @@ export function WarehouseZonesPanel() {
 
   if (zonesLoading || trendLoading) {
     return (
-      <Card className="card-entrance border-l-[4px] border-l-teal-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard border-l-[4px] border-l-teal-400">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Warehouse className="h-4 w-4 text-teal-500" />
@@ -300,7 +300,7 @@ export function WarehouseZonesPanel() {
 
   return (
     <>
-      <Card className="card-entrance border-l-[4px] border-l-teal-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard border-l-[4px] border-l-teal-400">
         <CardHeader className="pb-2 bg-teal-50 dark:bg-teal-950/20">
           <div className="flex items-center justify-between">
             <div>

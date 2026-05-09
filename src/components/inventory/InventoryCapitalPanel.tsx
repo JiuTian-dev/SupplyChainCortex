@@ -69,7 +69,7 @@ export function InventoryCapitalPanel() {
 
   if (isLoading) {
     return (
-      <Card className="card-entrance border-l-[4px] border-l-amber-400">
+      <Card className="card-dashboard border-l-[4px] border-l-amber-400">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-amber-500" />
@@ -102,7 +102,7 @@ export function InventoryCapitalPanel() {
   }));
 
   return (
-    <Card className="card-entrance border-l-[4px] border-l-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+    <Card className="card-dashboard border-l-[4px] border-l-amber-400">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-amber-500" />

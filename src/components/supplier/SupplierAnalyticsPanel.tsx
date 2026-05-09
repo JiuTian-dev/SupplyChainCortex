@@ -150,7 +150,7 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
 
   if (suppliers.length === 0) {
     return (
-      <Card className="card-entrance glass-card">
+      <Card className="card-dashboard glass-card">
         <CardContent className="p-8 text-center text-muted-foreground">
           <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">暂无供应商数据可供分析</p>
@@ -162,7 +162,7 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* ==================== 1. Supplier Score Ranking ==================== */}
-      <Card className="card-entrance chart-card-hover glass-card" style={{ '--delay': '0ms' } as React.CSSProperties}>
+      <Card className="card-dashboard card-dashboard glass-card" style={{ '--delay': '0ms' } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-orange-500" />
@@ -197,7 +197,7 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
       </Card>
 
       {/* ==================== 2. Performance Trend ==================== */}
-      <Card className="card-entrance chart-card-hover glass-card" style={{ '--delay': '100ms' } as React.CSSProperties}>
+      <Card className="card-dashboard card-dashboard glass-card" style={{ '--delay': '100ms' } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -234,7 +234,7 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
       </Card>
 
       {/* ==================== 3. Risk Distribution ==================== */}
-      <Card className="card-entrance chart-card-hover glass-card" style={{ '--delay': '200ms' } as React.CSSProperties}>
+      <Card className="card-dashboard card-dashboard glass-card" style={{ '--delay': '200ms' } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <PieChartIcon className="h-4 w-4 text-amber-500" />
@@ -273,7 +273,7 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
       </Card>
 
       {/* ==================== 4. Lead Time Comparison ==================== */}
-      <Card className="card-entrance chart-card-hover glass-card" style={{ '--delay': '300ms' } as React.CSSProperties}>
+      <Card className="card-dashboard card-dashboard glass-card" style={{ '--delay': '300ms' } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 text-cyan-500" />
@@ -306,7 +306,7 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
       </Card>
 
       {/* ==================== 5. Category Distribution ==================== */}
-      <Card className="card-entrance chart-card-hover glass-card md:col-span-2 lg:col-span-2" style={{ '--delay': '400ms' } as React.CSSProperties}>
+      <Card className="card-dashboard card-dashboard glass-card md:col-span-2 lg:col-span-2" style={{ '--delay': '400ms' } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Tag className="h-4 w-4 text-rose-500" />

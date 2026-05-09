@@ -187,7 +187,7 @@ export function CostWaterfallChart() {
   // Loading state
   if (costListQuery.isLoading || !avgData) {
     return (
-      <Card className="card-entrance" style={{ '--delay': '200ms' } as React.CSSProperties}>
+      <Card className="card-dashboard" style={{ '--delay': '200ms' } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">成本瀑布图</CardTitle>
           <CardDescription>成本构成瀑布分析</CardDescription>
@@ -201,7 +201,7 @@ export function CostWaterfallChart() {
 
   return (
     <Card
-      className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+      className="card-dashboard"
       style={{ '--delay': '200ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-2">
@@ -318,7 +318,7 @@ export function CostWaterfallChart() {
 
               {/* Active bar detail panel */}
               {activeBar && activeBar !== 'base' && activeBar !== 'total' && (
-                <div className="mt-4 p-3 rounded-lg border bg-muted/30 dark:bg-muted/10 slide-in-bottom">
+                <div className="mt-4 p-3 rounded-lg border bg-muted/30 dark:bg-muted/10">
                   <div className="flex items-center gap-2 mb-2">
                     <div
                       className="w-3 h-3 rounded-sm"
@@ -346,7 +346,7 @@ export function CostWaterfallChart() {
                 </div>
               )}
               {activeBar === 'total' && (
-                <div className="mt-4 p-3 rounded-lg border bg-red-50/50 dark:bg-red-950/20 slide-in-bottom">
+                <div className="mt-4 p-3 rounded-lg border bg-red-50/50 dark:bg-red-950/20">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-3 rounded-sm bg-red-500" />
                     <span className="text-sm font-semibold">总成本</span>

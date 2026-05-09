@@ -88,7 +88,7 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
 
   return (
     <Card
-      className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+      className="card-dashboard"
       style={{ '--delay': '150ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-2">

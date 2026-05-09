@@ -88,7 +88,7 @@ export function DecisionPanel() {
 
   if (loading && !report) {
     return (
-      <Card className="card-entrance border-amber-200 dark:border-amber-900">
+      <Card className="card-dashboard border-amber-200 dark:border-amber-900">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
@@ -104,7 +104,7 @@ export function DecisionPanel() {
 
   if (error && !report) {
     return (
-      <Card className="card-entrance border-amber-200 dark:border-amber-900">
+      <Card className="card-dashboard border-amber-200 dark:border-amber-900">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
             <Lightbulb className="h-5 w-5 text-amber-500" />
@@ -124,7 +124,7 @@ export function DecisionPanel() {
   const hasUrgent = summary.urgentActions > 0;
 
   return (
-    <Card className={`card-entrance hover:shadow-md transition-shadow duration-200 ${hasUrgent ? 'border-red-300 dark:border-red-800' : 'border-amber-200 dark:border-amber-900'}`}>
+    <Card className={`card-dashboard ${hasUrgent ? 'border-red-300 dark:border-red-800' : 'border-amber-200 dark:border-amber-900'}`}>
       <CardHeader className={`pb-2 ${hasUrgent ? 'bg-red-50/50 dark:bg-red-950/20' : 'bg-amber-50/30 dark:bg-amber-950/10'}`}>
         <div className="flex items-center justify-between">
           <div>

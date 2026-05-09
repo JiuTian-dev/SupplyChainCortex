@@ -102,7 +102,7 @@ export function ReorderRecommendationPanel() {
   // Loading state
   if (isLoading) {
     return (
-      <Card className="card-entrance border-l-[4px] border-l-orange-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard border-l-[4px] border-l-orange-400">
         <CardHeader className="pb-2">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-4 w-64" />
@@ -126,7 +126,7 @@ export function ReorderRecommendationPanel() {
   // Error state
   if (error) {
     return (
-      <Card className="card-entrance border-l-[4px] border-l-red-400">
+      <Card className="card-dashboard border-l-[4px] border-l-red-400">
         <CardContent className="p-6 text-center">
           <AlertTriangle className="h-8 w-8 mx-auto text-red-500 mb-2" />
           <p className="text-sm text-muted-foreground">加载补货推荐数据失败</p>
@@ -137,7 +137,7 @@ export function ReorderRecommendationPanel() {
 
   return (
     <Card
-      className="card-entrance border-l-[4px] border-l-orange-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+      className="card-dashboard border-l-[4px] border-l-orange-400"
       style={{ '--delay': '350ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-2 bg-orange-50 dark:bg-orange-950/20">

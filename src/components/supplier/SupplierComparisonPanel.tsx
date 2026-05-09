@@ -364,7 +364,7 @@ export function SupplierComparisonPanel({ suppliers, supplierPerformance }: Supp
   return (
     <Card
       className={cn(
-        'card-entrance hover:translate-y-[-2px] hover:shadow-lg hover:shadow-orange-500/5 hover:border-orange-200 dark:hover:border-orange-800 transition-all duration-300 ease-out overflow-hidden',
+        'card-dashboard hover:translate-y-[-2px] hover:shadow-lg hover:shadow-orange-500/5 hover:border-orange-200 dark:hover:border-orange-800 transition-all duration-300 ease-out overflow-hidden',
         animatedIn && 'opacity-100 translate-y-0',
         !animatedIn && 'opacity-0 translate-y-4',
       )}

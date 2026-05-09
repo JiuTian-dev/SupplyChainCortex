@@ -143,7 +143,7 @@ export function RiskTab() {
           ══════════════════════════════════════════════════════════════════ */}
 
       {/* ==================== Overall Risk Score Gauge ==================== */}
-      <Card className="card-entrance border-l-[4px] border-l-red-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard border-l-[4px] border-l-red-400">
         <CardHeader className="pb-2 bg-red-50 dark:bg-red-950/20">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Shield className="h-4 w-4 text-red-500" />
@@ -292,7 +292,7 @@ export function RiskTab() {
       </Card>
 
       {/* ==================== Risk Matrix Heatmap ==================== */}
-      <Card className="card-entrance border-l-[4px] border-l-orange-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard border-l-[4px] border-l-orange-400">
         <CardHeader className="pb-2 bg-orange-50 dark:bg-orange-950/20">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-orange-500" />

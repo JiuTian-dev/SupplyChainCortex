@@ -56,7 +56,7 @@ export function SeasonalIndexPanel() {
 
   if (isLoading) {
     return (
-      <Card className="card-entrance border-l-[4px] border-l-cyan-400">
+      <Card className="card-dashboard border-l-[4px] border-l-cyan-400">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Thermometer className="h-4 w-4 text-cyan-500" />
@@ -72,7 +72,7 @@ export function SeasonalIndexPanel() {
 
   if (!seasonalData || seasonalData.indices.length === 0) {
     return (
-      <Card className="card-entrance border-l-[4px] border-l-cyan-400">
+      <Card className="card-dashboard border-l-[4px] border-l-cyan-400">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Thermometer className="h-4 w-4 text-cyan-500" />
@@ -93,7 +93,7 @@ export function SeasonalIndexPanel() {
   const strengthColor = summary.seasonalityStrength > 30 ? 'text-red-600' : summary.seasonalityStrength > 15 ? 'text-amber-600' : 'text-green-600';
 
   return (
-    <Card className="card-entrance border-l-[4px] border-l-cyan-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+    <Card className="card-dashboard border-l-[4px] border-l-cyan-400">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Thermometer className="h-4 w-4 text-cyan-500" />

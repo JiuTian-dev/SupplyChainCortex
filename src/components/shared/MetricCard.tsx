@@ -199,7 +199,7 @@ export function MetricCard({
           <div>
             <p className="text-xs text-muted-foreground">{title}</p>
             <div className="flex items-center gap-1.5 mt-1">
-              <p key={`num-${value}`} className="text-2xl font-bold tabular-nums number-count-anim">
+              <p key={`num-${value}`} className="text-2xl font-bold tabular-nums">
                 {typeof value === 'number' ? displayValue : value}
               </p>
               {unit && (

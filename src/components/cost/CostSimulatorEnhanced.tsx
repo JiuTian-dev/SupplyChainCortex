@@ -325,7 +325,7 @@ export function CostSimulatorEnhanced({ costs }: CostSimulatorEnhancedProps) {
 
   return (
     <Card
-      className="card-entrance border-cyan-200 dark:border-cyan-900 bg-cyan-50 dark:bg-cyan-950/20 hover:shadow-md transition-shadow duration-200"
+      className="card-dashboard border-cyan-200 dark:border-cyan-900 bg-cyan-50 dark:bg-cyan-950/20"
       style={{ '--delay': '200ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-2">

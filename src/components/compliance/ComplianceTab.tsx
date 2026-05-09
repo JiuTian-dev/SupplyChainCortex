@@ -363,7 +363,7 @@ export function ComplianceTab() {
     <div className="space-y-6">
       {/* ==================== Expiring Soon Alert ==================== */}
       {expiringCerts.length > 0 && (
-        <Card className="border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/20 card-entrance">
+        <Card className="border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/20 card-dashboard">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <div className="rounded-full bg-yellow-100 dark:bg-yellow-900/40 p-2 mt-0.5">
@@ -468,7 +468,7 @@ export function ComplianceTab() {
         <TabsContent value="certs" className="space-y-4">
           {/* Category Pie Chart */}
           {categoryPieData.length > 0 && (
-            <Card className="card-entrance border-l-[4px] border-l-green-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+            <Card className="card-dashboard border-l-[4px] border-l-green-400">
               <CardHeader className="pb-2 bg-green-50 dark:bg-green-950/20">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <FileCheck className="h-4 w-4 text-green-500" />
@@ -539,7 +539,7 @@ export function ComplianceTab() {
                 return (
                   <Card
                     key={cert.id}
-                    className={`card-entrance hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer ${
+                    className={`card-dashboard hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer ${
                       isCritical ? 'border-red-300 dark:border-red-700' : isExpiring ? 'border-yellow-300 dark:border-yellow-700' : isExpired ? 'border-red-200 dark:border-red-800' : ''
                     }`}
                     onClick={() => openEditCert(cert)}
@@ -636,7 +636,7 @@ export function ComplianceTab() {
                   try { return JSON.parse(reg.affectedSkus || '[]'); } catch { return []; }
                 })();
                 return (
-                  <Card key={reg.id} className="card-entrance hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                  <Card key={reg.id} className="card-dashboard hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                     <CardContent className="p-4">
                       <div className="flex flex-col gap-3">
                         {/* Header: Title + Badges */}

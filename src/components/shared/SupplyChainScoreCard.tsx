@@ -105,7 +105,7 @@ export function SupplyChainScoreCard() {
   const gradeBg = GRADE_BG[grade] || GRADE_BG.C;
 
   return (
-    <Card className={`card-entrance ${gradeBg} hover:shadow-md transition-shadow duration-200`}
+    <Card className={`card-dashboard ${gradeBg}`}
       style={{ '--delay': '0ms' } as React.CSSProperties}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">

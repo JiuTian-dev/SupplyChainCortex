@@ -91,7 +91,7 @@ export function SupplierGeoMap() {
 
   return (
     <Card
-      className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+      className="card-dashboard"
       style={{ '--delay': '100ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-2">

@@ -411,7 +411,7 @@ export function LogisticsTab() {
     <div className="space-y-6">
       {/* 物流路线图 */}
       <Card
-        className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+        className="card-dashboard"
         style={{ '--delay': '0ms' } as React.CSSProperties}
       >
         <CardHeader className="pb-2">
@@ -464,7 +464,7 @@ export function LogisticsTab() {
 
       {/* 货运追踪列表 */}
       <Card
-        className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+        className="card-dashboard"
         style={{ '--delay': '200ms' } as React.CSSProperties}
       >
         <CardHeader className="pb-2">
@@ -530,7 +530,7 @@ export function LogisticsTab() {
 
       {/* 到货预测分析 */}
       <Card
-        className="card-entrance border-l-[4px] border-l-cyan-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+        className="card-dashboard border-l-[4px] border-l-cyan-400"
         style={{ '--delay': '250ms' } as React.CSSProperties}
       >
         <CardHeader className="pb-2 bg-muted/30">

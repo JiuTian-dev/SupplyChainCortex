@@ -435,7 +435,7 @@ export function Header({
                     onClick={() => setNotificationOpen(!notificationOpen)}
                   >
                     {unreadCount > 0 ? (
-                      <Bell key={`bell-${bellShakeKey}`} className="h-3.5 w-3.5 text-orange-500 bell-shake" />
+                      <Bell key={`bell-${bellShakeKey}`} className="h-3.5 w-3.5 text-orange-500" />
                     ) : (
                       <Bell className="h-3.5 w-3.5" />
                     )}

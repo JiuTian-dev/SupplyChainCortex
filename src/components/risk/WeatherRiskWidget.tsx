@@ -62,7 +62,7 @@ export function WeatherRiskWidget() {
 
   if (loading) {
     return (
-      <Card className="card-entrance border-sky-200 dark:border-sky-900">
+      <Card className="card-dashboard border-sky-200 dark:border-sky-900">
         <CardHeader className="pb-2">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-3 w-64 mt-1" />
@@ -80,7 +80,7 @@ export function WeatherRiskWidget() {
 
   if (error || !weather) {
     return (
-      <Card className="card-entrance border-sky-200 dark:border-sky-900">
+      <Card className="card-dashboard border-sky-200 dark:border-sky-900">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Cloud className="h-4 w-4 text-sky-500" />
@@ -99,7 +99,7 @@ export function WeatherRiskWidget() {
   }
 
   return (
-    <Card className="card-entrance border-sky-200 dark:border-sky-900 hover:shadow-md transition-shadow duration-200">
+    <Card className="card-dashboard border-sky-200 dark:border-sky-900">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>

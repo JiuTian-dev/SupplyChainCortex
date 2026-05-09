@@ -407,7 +407,7 @@ export function ReturnAnalysisTab() {
 
       {/* Pareto Chart */}
       {paretoData && paretoData.length > 0 && (
-        <Card className="card-entrance chart-container hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+        <Card className="card-dashboard chart-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <RotateCcw className="h-4 w-4 text-orange-500" />
@@ -433,7 +433,7 @@ export function ReturnAnalysisTab() {
       )}
 
       {/* Records Table */}
-      <Card className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -600,7 +600,7 @@ export function DefectAnalysisTab() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Pie Chart - Defect Distribution */}
         {pieData.length > 0 && (
-          <Card className="card-entrance chart-container hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+          <Card className="card-dashboard chart-container">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Bug className="h-4 w-4 text-red-500" />
@@ -633,7 +633,7 @@ export function DefectAnalysisTab() {
         )}
 
         {/* Severity Breakdown */}
-        <Card className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+        <Card className="card-dashboard">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-orange-500" />
@@ -667,7 +667,7 @@ export function DefectAnalysisTab() {
       </div>
 
       {/* Records Table */}
-      <Card className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -852,7 +852,7 @@ export function WarrantyCostTab() {
 
       {/* Cost by Category Chart */}
       {stackedBarData.length > 0 && (
-        <Card className="card-entrance chart-container hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+        <Card className="card-dashboard chart-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Wrench className="h-4 w-4 text-violet-500" />
@@ -897,7 +897,7 @@ export function WarrantyCostTab() {
       )}
 
       {/* Records Table */}
-      <Card className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+      <Card className="card-dashboard">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center justify-between">
             <span className="flex items-center gap-2">

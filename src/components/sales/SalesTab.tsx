@@ -421,7 +421,7 @@ export function SalesTab() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* 平台销售分布 */}
         <Card
-          className="card-entrance chart-container hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+          className="card-dashboard chart-container"
           style={{ '--delay': '0ms' } as React.CSSProperties}
         >
           <CardHeader className="pb-2">
@@ -458,7 +458,7 @@ export function SalesTab() {
 
         {/* 产品销售额排名 */}
         <Card
-          className="card-entrance chart-container hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+          className="card-dashboard chart-container"
           style={{ '--delay': '100ms' } as React.CSSProperties}
         >
           <CardHeader className="pb-2">
@@ -508,7 +508,7 @@ export function SalesTab() {
 
       {/* 销售日历热力图 */}
       <Card
-        className="card-entrance border-l-[4px] border-l-orange-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+        className="card-dashboard border-l-[4px] border-l-orange-400"
         style={{ '--delay': '250ms' } as React.CSSProperties}
       >
         <CardHeader className="pb-2">
@@ -592,7 +592,7 @@ export function SalesTab() {
 
       {/* 销售详情表 */}
       <Card
-        className="card-entrance hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+        className="card-dashboard"
         style={{ '--delay': '400ms' } as React.CSSProperties}
       >
         <CardHeader className="pb-2">

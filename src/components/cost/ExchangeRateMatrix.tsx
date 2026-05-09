@@ -114,7 +114,7 @@ export function ExchangeRateMatrix() {
 
   return (
     <Card
-      className="card-entrance border-cyan-200 dark:border-cyan-900 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+      className="card-dashboard border-cyan-200 dark:border-cyan-900"
       style={{ '--delay': '0ms' } as React.CSSProperties}
     >
       <CardHeader className="pb-2">
