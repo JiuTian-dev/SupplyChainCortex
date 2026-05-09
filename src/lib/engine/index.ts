@@ -77,6 +77,16 @@ export {
 } from './deterministic';
 export type { StateSnapshot, SimulationRunConfig } from './deterministic';
 
+// Agent Memory (Dimension 5)
+export { agentMemory } from './memory';
+export type {
+  SharedContext,
+  CascadeRiskContext,
+  DecisionGraphContext,
+  SandboxContext,
+  MCPOrchestratorContext,
+} from './memory';
+
 // Feedback Loop (Dimension 4)
 export {
   feedbackStore,

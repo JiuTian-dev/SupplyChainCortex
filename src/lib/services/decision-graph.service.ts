@@ -13,6 +13,7 @@
 
 import { db } from '@/lib/db';
 import { getExchangeRate } from '@/lib/exchange-rate';
+import { agentMemory } from '@/lib/engine/memory';
 import { getCascadeRisk } from '@/lib/services/cascade-risk.service';
 import { getLatestRates } from '@/lib/queries/exchange-rate.queries';
 
@@ -545,6 +546,20 @@ export async function executeDecisionGraph(options?: {
     : weekCount > 0
       ? `📋 ${weekCount} 项需要本周内决策。整体供应链可控，预计可节省 $${totalSaving.toLocaleString()}。`
       : `✅ 当前供应链运行正常，所有指标在安全范围内。`;
+
+  // Write to shared agent memory before returning
+  agentMemory.updateShared('decisionGraph', {
+    lastRun: new Date().toISOString(),
+    urgentActions: urgentCount,
+    thisWeekActions: weekCount,
+    estimatedTotalSaving: totalSaving,
+    actionPlan: actionPlan.map(a => ({
+      priority: a.priority,
+      action: a.action,
+      domain: a.domain,
+      urgency: a.urgency,
+    })),
+  });
 
   return {
     triggeredBy: {

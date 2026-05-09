@@ -50,7 +50,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   // ── Single agent mode ──────────────────────────────────────────────
   if (role && ['warehouse', 'supplier', 'forwarder', 'market'].includes(role)) {
-    const decision = await runLLMAgent({ role: role as any, state });
+    const decision = await runLLMAgent({ role: role as any, state }, { serverSide: true });
     return NextResponse.json({
       success: true,
       mode: 'single',
@@ -62,7 +62,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   // ── Compare mode: LLM vs rule-based ────────────────────────────────
   if (mode === 'compare') {
-    const llmDecisions = await runAllAgents(state);
+    const llmDecisions = await runAllAgents(state, { serverSide: true });
     return NextResponse.json({
       success: true,
       mode: 'compare',

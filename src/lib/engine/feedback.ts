@@ -126,6 +126,11 @@ class FeedbackStore {
   }
 
   /** Clear all feedback (testing only) */
+  /** Create a smaller instance for testing bounded queue behavior. */
+  _createSmall(maxSize: number): FeedbackStore {
+    return new FeedbackStore(maxSize);
+  }
+
   _clear(): void {
     this.feedback = [];
   }

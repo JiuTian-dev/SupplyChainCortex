@@ -107,7 +107,27 @@ async function callLLM(
   userMessage: string,
   provider = 'deepseek',
   model = 'deepseek-chat',
+  options?: { serverSide?: boolean },
 ): Promise<string | null> {
+  // Server-side: call AI provider directly to avoid HTTP loopback
+  if (options?.serverSide) {
+    try {
+      const { chatCompletion } = await import('@/lib/services/ai-providers.service');
+      const result = await chatCompletion({
+        provider,
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        stream: false,
+      });
+      return (result as unknown as { content?: string })?.content || null;
+    } catch {
+      // Fall through to fetch-based path on import failure
+    }
+  }
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -132,7 +152,7 @@ async function callLLM(
 
 // ─── JSON Parser ─────────────────────────────────────────────────────────────────
 
-function parseAgentResponse(text: string): Partial<AgentDecision> | null {
+export function parseAgentResponse(text: string): Partial<AgentDecision> | null {
   try {
     // Extract JSON block
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -147,7 +167,7 @@ function parseAgentResponse(text: string): Partial<AgentDecision> | null {
 
 export async function runLLMAgent(
   ctx: AgentContext,
-  options?: { provider?: string; model?: string },
+  options?: { provider?: string; model?: string; serverSide?: boolean },
 ): Promise<AgentDecision> {
   const systemPrompt = ROLE_PROMPTS[ctx.role];
   const stateText = formatState(ctx.role, ctx);
@@ -157,7 +177,7 @@ export async function runLLMAgent(
   const model = options?.model || 'deepseek-chat';
 
   // Try LLM
-  const llmResponse = await callLLM(systemPrompt, userMessage, provider, model);
+  const llmResponse = await callLLM(systemPrompt, userMessage, provider, model, { serverSide: options?.serverSide });
 
   if (llmResponse) {
     const parsed = parseAgentResponse(llmResponse);
@@ -179,7 +199,7 @@ export async function runLLMAgent(
 
 // ─── Rule-Based Fallback ─────────────────────────────────────────────────────────
 
-function ruleBasedFallback(ctx: AgentContext): AgentDecision {
+export function ruleBasedFallback(ctx: AgentContext): AgentDecision {
   const { role, state } = ctx;
 
   switch (role) {
@@ -236,7 +256,7 @@ function ruleBasedFallback(ctx: AgentContext): AgentDecision {
 
 export async function runAllAgents(
   state: AgentContext['state'],
-  options?: { provider?: string; model?: string },
+  options?: { provider?: string; model?: string; serverSide?: boolean },
 ): Promise<Record<string, AgentDecision>> {
   const roles: AgentContext['role'][] = ['warehouse', 'supplier', 'forwarder', 'market'];
   const results: Record<string, AgentDecision> = {};

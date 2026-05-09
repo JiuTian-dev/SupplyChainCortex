@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { agentMemory } from '@/lib/engine/memory';
 /**
  * Supply Chain Cascading Risk Propagation Engine v2
  *
@@ -1042,6 +1043,20 @@ export async function getCascadeRisk(options?: {
       ],
     },
     warnings: degradedSources.length > 0 ? degradedSources.map(s => `${s} was degraded`) : [],
+  });
+
+  // Write to shared agent memory for cross-agent context
+  agentMemory.updateShared('cascadeRisk', {
+    lastRun: new Date().toISOString(),
+    overallRisk: sourceNodes.reduce((sum, n) => sum + (n.riskScore || 0), 0) / Math.max(sourceNodes.length, 1),
+    affectedNodes: affectedNodes.length,
+    maxDepth: maxDepth,
+    scenario: scenario || 'auto',
+    topRisks: (topAffectedProducts || []).slice(0, 5).map(p => ({
+      nodeId: p.sku || p.productName,
+      riskScore: typeof p.impactScore === 'number' ? p.impactScore : 0,
+      label: p.productName,
+    })),
   });
 
   return report;

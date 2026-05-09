@@ -1,649 +1,731 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="308" failures="0" errors="0" time="2.1307375">
-    <testsuite name="src/lib/api-utils.test.ts" timestamp="2026-05-02T17:03:53.578Z" hostname="qaswe12340" tests="16" failures="0" errors="0" skipped="0" time="0.0076738">
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiSuccess &gt; returns standardized success response" time="0.0032678">
+<testsuites name="vitest tests" tests="346" failures="0" errors="0" time="2.1168474">
+    <testsuite name="src/lib/api-utils.test.ts" timestamp="2026-05-09T17:51:16.560Z" hostname="qaswe12340" tests="16" failures="0" errors="0" skipped="0" time="0.0070556">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiSuccess &gt; returns standardized success response" time="0.0027325">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiSuccess &gt; accepts custom status code" time="0.0002078">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiSuccess &gt; accepts custom status code" time="0.0002053">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiError &gt; returns standardized error response" time="0.0002008">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiError &gt; returns standardized error response" time="0.0002059">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiError &gt; defaults to 500 status" time="0.0001353">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; apiError &gt; defaults to 500 status" time="0.0001497">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; returns correct page of items" time="0.0006548">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; returns correct page of items" time="0.0005937">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; returns correct pagination metadata" time="0.000173">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; returns correct pagination metadata" time="0.0001618">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; handles last page with fewer items" time="0.0001154">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; handles last page with fewer items" time="0.0001143">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; handles empty array" time="0.0001202">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; handles empty array" time="0.0001688">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; handles page beyond range" time="0.0001835">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; paginate &gt; handles page beyond range" time="0.0001413">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; parsePagination &gt; parses valid pagination params" time="0.0008866">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; parsePagination &gt; parses valid pagination params" time="0.0009489">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; parsePagination &gt; uses defaults for missing params" time="0.0001404">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; parsePagination &gt; uses defaults for missing params" time="0.0001362">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; NotFoundError creates 404 error" time="0.0001115">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; NotFoundError creates 404 error" time="0.0001362">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; ValidationError creates 400 error" time="0.0000864">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; ValidationError creates 400 error" time="0.0000846">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; UnauthorizedError creates 401 error" time="0.0000597">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; UnauthorizedError creates 401 error" time="0.0000605">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; ForbiddenError creates 403 error" time="0.000055">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; ForbiddenError creates 403 error" time="0.000058">
         </testcase>
-        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; ConflictError creates 409 error" time="0.0000496">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/lib/auth-helpers.test.ts" timestamp="2026-05-02T17:03:53.581Z" hostname="qaswe12340" tests="18" failures="0" errors="0" skipped="0" time="0.0057147">
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; throws UnauthorizedError when no session" time="0.0018618">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; throws UnauthorizedError with correct status when no session" time="0.000337">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; returns session when user is authenticated" time="0.0004102">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; throws UnauthorizedError when session has no user" time="0.000222">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; throws ForbiddenError when role lacks permission" time="0.0002479">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; returns session when role has permission" time="0.0001133">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; throws UnauthorizedError when no session" time="0.0001643">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; manager has write permission for inventory" time="0.0001098">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; viewer lacks user:manage permission" time="0.0001454">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAnyPermission &gt; returns session when user has at least one permission" time="0.0001801">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAnyPermission &gt; throws ForbiddenError when user has none of the permissions" time="0.000117">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAnyPermission &gt; throws UnauthorizedError when no session" time="0.0001586">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; throws ForbiddenError for non-admin role" time="0.0001443">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; returns session for admin role" time="0.0000783">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; throws ForbiddenError for manager role" time="0.0000889">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; throws UnauthorizedError when no session" time="0.0001162">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; getAuth &gt; returns null when no session" time="0.0000787">
-        </testcase>
-        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; getAuth &gt; returns session when user is authenticated" time="0.0000598">
+        <testcase classname="src/lib/api-utils.test.ts" name="API Utils &gt; Error factories &gt; ConflictError creates 409 error" time="0.0000556">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/cache.test.ts" timestamp="2026-05-02T17:03:53.584Z" hostname="qaswe12340" tests="33" failures="0" errors="0" skipped="0" time="0.0087696">
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; stores and retrieves a value" time="0.0013755">
+    <testsuite name="src/lib/auth-helpers.test.ts" timestamp="2026-05-09T17:51:16.562Z" hostname="qaswe12340" tests="18" failures="0" errors="0" skipped="0" time="0.0059177">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; throws UnauthorizedError when no session" time="0.0018182">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; returns null for non-existent key" time="0.000146">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; throws UnauthorizedError with correct status when no session" time="0.0003787">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; stores primitive values" time="0.0002139">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; returns session when user is authenticated" time="0.0004484">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; stores null and undefined-like values" time="0.000144">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAuth &gt; throws UnauthorizedError when session has no user" time="0.0002107">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; overwrites existing key" time="0.0001013">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; throws ForbiddenError when role lacks permission" time="0.0002789">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - TTL expiration &gt; returns value before TTL expires" time="0.0000938">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; returns session when role has permission" time="0.0001344">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - TTL expiration &gt; returns null after TTL expires" time="0.0011879">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; throws UnauthorizedError when no session" time="0.000175">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - TTL expiration &gt; different TTL values work correctly" time="0.0003472">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; manager has write permission for inventory" time="0.0001576">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidateExact removes specific key" time="0.0001958">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requirePermission &gt; viewer lacks user:manage permission" time="0.0001969">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidateExact returns false for non-existent key" time="0.0001018">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAnyPermission &gt; returns session when user has at least one permission" time="0.0001851">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidate removes keys by prefix" time="0.0001516">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAnyPermission &gt; throws ForbiddenError when user has none of the permissions" time="0.000127">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidate returns 0 when no keys match prefix" time="0.0000636">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAnyPermission &gt; throws UnauthorizedError when no session" time="0.0001439">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - clear operation &gt; clears all cache entries" time="0.0000726">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; throws ForbiddenError for non-admin role" time="0.0001362">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports correct size" time="0.0000879">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; returns session for admin role" time="0.0000685">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports all keys" time="0.0005161">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; throws ForbiddenError for manager role" time="0.0000765">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports hit counts" time="0.000079">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; requireAdmin &gt; throws UnauthorizedError when no session" time="0.0001192">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports empty stats after clear" time="0.0000745">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; getAuth &gt; returns null when no session" time="0.0000873">
         </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - LRU eviction &gt; evicts expired entries when at capacity" time="0.0003154">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; joins parts with colon" time="0.0000742">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; handles multiple parts" time="0.0000407">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; handles boolean parts" time="0.0000346">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; handles single part" time="0.0000415">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; returns cached data on second call" time="0.0003718">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; calls fetcher for different keys" time="0.0001063">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; propagates fetcher errors" time="0.0008416">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; retries fetcher after error (no cache on error)" time="0.0002596">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has SHORT preset" time="0.0000599">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has MEDIUM preset" time="0.0000379">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has LONG preset" time="0.0000372">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has VERY_LONG preset" time="0.000033">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TAGS &gt; has all expected cache tags" time="0.0001404">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; Cache key prefix isolation &gt; different prefixes do not interfere" time="0.0000806">
-        </testcase>
-        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; Cache key prefix isolation &gt; invalidate with empty prefix does not match anything" time="0.0000503">
+        <testcase classname="src/lib/auth-helpers.test.ts" name="Auth Helpers &gt; getAuth &gt; returns session when user is authenticated" time="0.0000602">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/rate-limit.test.ts" timestamp="2026-05-02T17:03:53.587Z" hostname="qaswe12340" tests="3" failures="0" errors="0" skipped="0" time="0.0027235">
-        <testcase classname="src/lib/rate-limit.test.ts" name="Rate Limiter &gt; allows requests within limit" time="0.0014517">
+    <testsuite name="src/lib/cache.test.ts" timestamp="2026-05-09T17:51:16.563Z" hostname="qaswe12340" tests="33" failures="0" errors="0" skipped="0" time="0.0099722">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; stores and retrieves a value" time="0.0016766">
         </testcase>
-        <testcase classname="src/lib/rate-limit.test.ts" name="Rate Limiter &gt; blocks requests when limit exceeded" time="0.0002544">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; returns null for non-existent key" time="0.0002243">
         </testcase>
-        <testcase classname="src/lib/rate-limit.test.ts" name="Rate Limiter &gt; tracks remaining tokens correctly" time="0.0001467">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; stores primitive values" time="0.00027">
         </testcase>
-    </testsuite>
-    <testsuite name="src/lib/rbac.test.ts" timestamp="2026-05-02T17:03:53.588Z" hostname="qaswe12340" tests="12" failures="0" errors="0" skipped="0" time="0.0066445">
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; admin has all permissions" time="0.001486">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; stores null and undefined-like values" time="0.0002248">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; manager has read+write but no admin permissions" time="0.0002317">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - set/get operations &gt; overwrites existing key" time="0.0001161">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; viewer has only read permissions" time="0.0002028">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - TTL expiration &gt; returns value before TTL expires" time="0.0001303">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; unknown role has no permissions" time="0.0000922">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - TTL expiration &gt; returns null after TTL expires" time="0.0012966">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAllPermissions &gt; returns true when all permissions are present" time="0.0001705">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - TTL expiration &gt; different TTL values work correctly" time="0.0003133">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAllPermissions &gt; returns false when any permission is missing" time="0.0000981">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidateExact removes specific key" time="0.0001494">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAnyPermission &gt; returns true when any permission is present" time="0.0001339">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidateExact returns false for non-existent key" time="0.0001077">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAnyPermission &gt; returns false when no permissions are present" time="0.0001096">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidate removes keys by prefix" time="0.0001491">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; getRolePermissions &gt; returns all permissions for admin" time="0.0010914">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - delete operations &gt; invalidate returns 0 when no keys match prefix" time="0.0000629">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; getRolePermissions &gt; returns empty array for unknown role" time="0.0008507">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - clear operation &gt; clears all cache entries" time="0.0000947">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; ROLE_LABELS &gt; has labels for all roles" time="0.0002348">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports correct size" time="0.0001492">
         </testcase>
-        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; ROLE_COLORS &gt; has color classes for all roles" time="0.0002456">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports all keys" time="0.0005547">
         </testcase>
-    </testsuite>
-    <testsuite name="src/lib/security-headers.test.ts" timestamp="2026-05-02T17:03:53.589Z" hostname="qaswe12340" tests="9" failures="0" errors="0" skipped="0" time="0.0027355">
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has X-Frame-Options header" time="0.0009902">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports hit counts" time="0.0000841">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has X-Content-Type-Options header" time="0.0001368">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - stats reporting &gt; reports empty stats after clear" time="0.0000799">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has X-XSS-Protection header" time="0.0000837">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; serverCache - LRU eviction &gt; evicts expired entries when at capacity" time="0.0003408">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has Referrer-Policy header" time="0.0000707">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; joins parts with colon" time="0.0000779">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has Content-Security-Policy header" time="0.0001389">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; handles multiple parts" time="0.0000428">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has Permissions-Policy header" time="0.0000774">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; handles boolean parts" time="0.000038">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; skips Cross-Origin headers for preview panel compatibility" time="0.000083">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cacheKey &gt; handles single part" time="0.0000349">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; rateLimitHeaders &gt; generates correct headers" time="0.0001348">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; returns cached data on second call" time="0.0003761">
         </testcase>
-        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; rateLimitHeaders &gt; includes Retry-After when provided" time="0.0000873">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; calls fetcher for different keys" time="0.0001116">
         </testcase>
-    </testsuite>
-    <testsuite name="src/components/auth/LoginDialog.test.tsx" timestamp="2026-05-02T17:03:53.590Z" hostname="qaswe12340" tests="8" failures="0" errors="0" skipped="0" time="1.8685877">
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; renders login form when open" time="0.0335512">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; propagates fetcher errors" time="0.0009767">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; shows demo accounts" time="0.0037108">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; cachedFetch &gt; retries fetcher after error (no cache on error)" time="0.000308">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; has email input field" time="0.0030698">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has SHORT preset" time="0.0000601">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; has password input field" time="0.0022687">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has MEDIUM preset" time="0.0000393">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; handles email input change" time="0.3711359">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has LONG preset" time="0.0000384">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; handles password input change" time="0.1690156">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TTL presets &gt; has VERY_LONG preset" time="0.0000396">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; submits form on login button click" time="0.6262818">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; CACHE_TAGS &gt; has all expected cache tags" time="0.0001467">
         </testcase>
-        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; shows loading state during login" time="0.6566415">
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; Cache key prefix isolation &gt; different prefixes do not interfere" time="0.000061">
+        </testcase>
+        <testcase classname="src/lib/cache.test.ts" name="Cache Module &gt; Cache key prefix isolation &gt; invalidate with empty prefix does not match anything" time="0.0000507">
         </testcase>
     </testsuite>
-    <testsuite name="src/components/error/GlobalErrorBoundary.test.tsx" timestamp="2026-05-02T17:03:53.591Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0809907">
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; renders children when no error" time="0.0122901">
+    <testsuite name="src/lib/rate-limit.test.ts" timestamp="2026-05-09T17:51:16.568Z" hostname="qaswe12340" tests="3" failures="0" errors="0" skipped="0" time="0.0041853">
+        <testcase classname="src/lib/rate-limit.test.ts" name="Rate Limiter &gt; allows requests within limit" time="0.0024206">
         </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows error UI when child throws" time="0.0168209">
+        <testcase classname="src/lib/rate-limit.test.ts" name="Rate Limiter &gt; blocks requests when limit exceeded" time="0.0003028">
         </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows error detail in collapsible section" time="0.005899">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows retry button when error occurs" time="0.0090392">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; retry button resets error state" time="0.007277">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; calls onError callback when error occurs" time="0.005055">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; renders custom fallback when provided" time="0.0009215">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows page-level error message for page level" time="0.0057274">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows component-level error message for component level" time="0.0053811">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows &quot;返回首页&quot; button for page-level errors" time="0.0056925">
-        </testcase>
-        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; does not show &quot;返回首页&quot; button for non-page-level errors" time="0.005239">
+        <testcase classname="src/lib/rate-limit.test.ts" name="Rate Limiter &gt; tracks remaining tokens correctly" time="0.0001529">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/engine/deterministic.test.ts" timestamp="2026-05-02T17:03:53.592Z" hostname="qaswe12340" tests="18" failures="0" errors="0" skipped="0" time="0.0145032">
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; produces same sequence for same seed" time="0.0021856">
+    <testsuite name="src/lib/rbac.test.ts" timestamp="2026-05-09T17:51:16.569Z" hostname="qaswe12340" tests="12" failures="0" errors="0" skipped="0" time="0.0040547">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; admin has all permissions" time="0.0010355">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; produces different sequences for different seeds" time="0.0002498">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; manager has read+write but no admin permissions" time="0.0001554">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; next() returns values in [0, 1)" time="0.0022319">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; viewer has only read permissions" time="0.0001275">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; nextInt returns values in range" time="0.0017172">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasPermission &gt; unknown role has no permissions" time="0.0000694">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; chance returns boolean matching probability" time="0.0004721">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAllPermissions &gt; returns true when all permissions are present" time="0.000108">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; reset returns to original state" time="0.0002676">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAllPermissions &gt; returns false when any permission is missing" time="0.0000749">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; clone produces independent copy" time="0.0001083">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAnyPermission &gt; returns true when any permission is present" time="0.0000696">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; pick selects from array" time="0.0012962">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; hasAnyPermission &gt; returns false when no permissions are present" time="0.0000487">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="seedFromString &gt; returns same seed for same string" time="0.0002642">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; getRolePermissions &gt; returns all permissions for admin" time="0.000621">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="seedFromString &gt; returns different seeds for different strings" time="0.0003401">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; getRolePermissions &gt; returns empty array for unknown role" time="0.0004585">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="seedFromDate &gt; returns consistent seed for same date" time="0.0017615">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; ROLE_LABELS &gt; has labels for all roles" time="0.0001154">
         </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; records first round always" time="0.0005502">
-        </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; records inflection points only (≥ 5% change)" time="0.0002626">
-        </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; caps at maxSize" time="0.0002028">
-        </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; reset clears all snapshots" time="0.0001706">
-        </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SimulationContext &gt; creates reproducible runs with same seed" time="0.0003497">
-        </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SimulationContext &gt; tick records inflection points" time="0.0001234">
-        </testcase>
-        <testcase classname="src/lib/engine/deterministic.test.ts" name="SimulationContext &gt; summarize returns correct metadata" time="0.000173">
+        <testcase classname="src/lib/rbac.test.ts" name="RBAC Permission System &gt; ROLE_COLORS &gt; has color classes for all roles" time="0.0000939">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/engine/passport.test.ts" timestamp="2026-05-02T17:03:53.594Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.005588">
-        <testcase classname="src/lib/engine/passport.test.ts" name="createPassport &gt; generates a valid passport with all required fields" time="0.003139">
+    <testsuite name="src/lib/security-headers.test.ts" timestamp="2026-05-09T17:51:16.571Z" hostname="qaswe12340" tests="9" failures="0" errors="0" skipped="0" time="0.0034089">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has X-Frame-Options header" time="0.0011926">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="createPassport &gt; clamps confidence to [0, 1]" time="0.0001864">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has X-Content-Type-Options header" time="0.0001105">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="createPassport &gt; sorts alternatives by confidence descending" time="0.0001287">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has X-XSS-Protection header" time="0.0000834">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="provenanceEntry &gt; creates an ok entry" time="0.0001074">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has Referrer-Policy header" time="0.00008">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="degradedProvenance &gt; creates a degraded entry" time="0.0000929">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has Content-Security-Policy header" time="0.0001401">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="unavailableProvenance &gt; creates an unavailable entry" time="0.0001319">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; has Permissions-Policy header" time="0.0000794">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns 1 when all sources are ok" time="0.0001162">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; skips Cross-Origin headers for preview panel compatibility" time="0.0000788">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns lower score when sources are degraded" time="0.0000638">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; rateLimitHeaders &gt; generates correct headers" time="0.0001411">
         </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns significantly lower when critical source is unavailable" time="0.0000701">
-        </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns 0.5 for empty weights" time="0.0001103">
-        </testcase>
-        <testcase classname="src/lib/engine/passport.test.ts" name="serializeForFrontend &gt; strips internal trace fields and adds UI labels" time="0.0003564">
+        <testcase classname="src/lib/security-headers.test.ts" name="Security Headers &gt; rateLimitHeaders &gt; includes Retry-After when provided" time="0.0000859">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/engine/resilience.test.ts" timestamp="2026-05-02T17:03:53.595Z" hostname="qaswe12340" tests="17" failures="0" errors="0" skipped="0" time="0.0812715">
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withTimeout &gt; returns result when promise resolves before timeout" time="0.0022883">
+    <testsuite name="src/components/auth/LoginDialog.test.tsx" timestamp="2026-05-09T17:51:16.572Z" hostname="qaswe12340" tests="8" failures="0" errors="0" skipped="0" time="1.7628364">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; renders login form when open" time="0.0307356">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withTimeout &gt; throws TimeoutError when promise exceeds timeout" time="0.012263">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; shows demo accounts" time="0.0043261">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withTimeout &gt; re-throws non-timeout errors" time="0.0007001">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; has email input field" time="0.0030735">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withPromiseTimeout &gt; works with plain promises" time="0.0002739">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; has password input field" time="0.0025193">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; returns on first success" time="0.0006502">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; handles email input change" time="0.3771468">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; retries on failure" time="0.0451591">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; handles password input change" time="0.1728346">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; throws after exhausting retries" time="0.0160827">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; submits form on login button click" time="0.5500958">
         </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; respects shouldRetry filter" time="0.0003088">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; executes successfully when closed" time="0.0004317">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; opens after N consecutive failures" time="0.0004474">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; throws CircuitBreakerOpenError when open" time="0.0002153">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; can be manually reset" time="0.0001497">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="getCircuitBreaker &gt; returns same instance for same name" time="0.0000772">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; uses primary when it succeeds" time="0.0001432">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; falls back when primary fails" time="0.0001721">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; supports sync fallback" time="0.0001301">
-        </testcase>
-        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; throws when both primary and fallback fail" time="0.0002351">
+        <testcase classname="src/components/auth/LoginDialog.test.tsx" name="LoginDialog &gt; shows loading state during login" time="0.6201029">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/validators/index.test.ts" timestamp="2026-05-02T17:03:53.597Z" hostname="qaswe12340" tests="85" failures="0" errors="0" skipped="0" time="0.0223424">
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; DATE_REGEX &gt; matches valid YYYY-MM-DD format" time="0.0015377">
+    <testsuite name="src/components/error/GlobalErrorBoundary.test.tsx" timestamp="2026-05-09T17:51:16.573Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0887859">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; renders children when no error" time="0.0137884">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; DATE_REGEX &gt; rejects invalid date formats" time="0.00031">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows error UI when child throws" time="0.0185449">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; validates valid date range" time="0.0011204">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows error detail in collapsible section" time="0.0062655">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; accepts optional date fields" time="0.0001792">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows retry button when error occurs" time="0.0109279">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; accepts only startDate" time="0.0001417">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; retry button resets error state" time="0.0083139">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; rejects invalid date format" time="0.0005075">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; calls onError callback when error occurs" time="0.0053964">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; provides default values" time="0.0005057">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; renders custom fallback when provided" time="0.0009291">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; coerces string values to numbers" time="0.0004527">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows page-level error message for page level" time="0.0061242">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects page = 0" time="0.0004651">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows component-level error message for component level" time="0.0055094">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects negative page" time="0.0002745">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; shows &quot;返回首页&quot; button for page-level errors" time="0.005868">
         </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects pageSize &gt; 100" time="0.0002145">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; accepts pageSize = 100 (boundary)" time="0.0001008">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects non-integer pageSize" time="0.0002454">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; accepts valid SKU" time="0.0002175">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; rejects empty string" time="0.0001813">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; rejects string &gt; 50 chars" time="0.0001271">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; accepts string of exactly 50 chars" time="0.000077">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; platformSchema &gt; accepts valid platforms" time="0.0001879">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; platformSchema &gt; rejects invalid platform" time="0.0001813">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockStatusSchema &gt; accepts valid statuses" time="0.0001949">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockStatusSchema &gt; rejects invalid status" time="0.0001546">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; prioritySchema &gt; accepts valid priorities" time="0.0001461">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; prioritySchema &gt; rejects invalid priority" time="0.0001156">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; categorySchema &gt; accepts valid categories" time="0.0002027">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; categorySchema &gt; rejects invalid category" time="0.0001353">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusSchema &gt; accepts valid statuses" time="0.0002207">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusSchema &gt; rejects invalid status" time="0.0000999">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; warehouseSchema &gt; accepts valid warehouses" time="0.0000982">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; warehouseSchema &gt; rejects invalid warehouse" time="0.0000853">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; validates positive adjustment (inbound)" time="0.0003805">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; validates negative adjustment (outbound)" time="0.0001384">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; rejects zero quantity" time="0.000204">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; rejects empty reason" time="0.0001388">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; rejects reason &gt; 200 chars" time="0.0001207">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; validates bulk update with valid data" time="0.000676">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; rejects empty updates array" time="0.0001695">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; rejects updates with &gt; 100 items" time="0.0005932">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; accepts updates with exactly 100 items" time="0.00043">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; validates update item with negative quantity is rejected" time="0.0002452">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; validates transfer between different warehouses" time="0.0003969">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; rejects transfer to same warehouse" time="0.0001493">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; rejects zero quantity" time="0.0001182">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; rejects negative quantity" time="0.0001098">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; validates status update with required fields" time="0.0004507">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; validates status update with all optional fields" time="0.0002239">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects empty tracking number" time="0.0001541">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects invalid status" time="0.000152">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects progress &gt; 100" time="0.0001337">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects progress &lt; 0" time="0.0001055">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects invalid ETA format" time="0.0001378">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; accepts progress at boundaries (0 and 100)" time="0.0001086">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; pending can transition to in_transit or delayed" time="0.0007598">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; delivered is terminal state" time="0.0005444">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; exception is terminal state" time="0.0000972">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; delayed can transition to in_transit, customs, or delivered" time="0.000217">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns true for valid transition" time="0.0000958">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns false for invalid transition" time="0.000053">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns false for unknown from status" time="0.0000466">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns false for transition from terminal state" time="0.0000455">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; validates note with required content" time="0.0004906">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; provides defaults for category and priority" time="0.0001147">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; rejects empty content" time="0.0001251">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; rejects content &gt; 2000 chars" time="0.0001276">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; accepts all valid categories" time="0.0002315">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; accepts all valid priorities" time="0.0001544">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; accepts optional author and sku" time="0.0000854">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; validates update with isResolved" time="0.000278">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; validates update with priority" time="0.0000681">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; rejects empty id" time="0.0001149">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; rejects invalid priority" time="0.0001112">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productSearchSchema &gt; validates search with minimum query length" time="0.000248">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productSearchSchema &gt; rejects single character query" time="0.0001357">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productSearchSchema &gt; accepts optional category" time="0.0000687">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; validates lookup by id" time="0.0002124">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; validates lookup by sku" time="0.0000751">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; validates lookup with both id and sku" time="0.0000602">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; rejects when neither id nor sku provided" time="0.0000907">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; rejects when both id and sku are empty/undefined" time="0.0000898">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; validates rating with all scores" time="0.0003177">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; validates rating with optional comments" time="0.000133">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; accepts boundary score of 0" time="0.0000948">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; accepts boundary score of 5" time="0.0001183">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; rejects score &gt; 5" time="0.0001418">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; rejects negative score" time="0.000139">
-        </testcase>
-        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; rejects comments &gt; 500 chars" time="0.0001856">
+        <testcase classname="src/components/error/GlobalErrorBoundary.test.tsx" name="GlobalErrorBoundary &gt; does not show &quot;返回首页&quot; button for non-page-level errors" time="0.0053496">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/services/inventory.service.test.ts" timestamp="2026-05-02T17:03:53.614Z" hostname="qaswe12340" tests="20" failures="0" errors="0" skipped="0" time="0.0038449">
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;critical&quot; when quantity &lt;= 50% of safety stock" time="0.0010762">
+    <testsuite name="src/lib/engine/deterministic.test.ts" timestamp="2026-05-09T17:51:16.575Z" hostname="qaswe12340" tests="18" failures="0" errors="0" skipped="0" time="0.0154497">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; produces same sequence for same seed" time="0.0021924">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;warning&quot; when quantity &lt;= safety stock but &gt; 50%" time="0.000132">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; produces different sequences for different seeds" time="0.0003196">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;overstock&quot; when quantity &gt;= 3x safety stock" time="0.0000863">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; next() returns values in [0, 1)" time="0.0023377">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;healthy&quot; for normal stock levels" time="0.0001132">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; nextInt returns values in range" time="0.0017159">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; handles zero safety stock" time="0.0000933">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; chance returns boolean matching probability" time="0.0004345">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: exactly 50% of safety stock is critical" time="0.0000756">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; reset returns to original state" time="0.0002994">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: just above 50% of safety stock is warning" time="0.0000494">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; clone produces independent copy" time="0.000172">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: exactly safety stock is warning" time="0.0000631">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="DeterministicRandom &gt; pick selects from array" time="0.0013247">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: just above safety stock is healthy" time="0.0000764">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="seedFromString &gt; returns same seed for same string" time="0.0002113">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: exactly 3x safety stock is overstock" time="0.00009">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="seedFromString &gt; returns different seeds for different strings" time="0.0002935">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: just below 3x safety stock is healthy" time="0.0000595">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="seedFromDate &gt; returns consistent seed for same date" time="0.0033378">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; returns 0 when no sales records" time="0.0001092">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; records first round always" time="0.0004149">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; computes safety stock from sales records" time="0.0001247">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; records inflection points only (≥ 5% change)" time="0.0001583">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; computes higher safety stock with more variable sales" time="0.0001032">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; caps at maxSize" time="0.0001207">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; respects service level parameter" time="0.0001007">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SlidingWindow &gt; reset clears all snapshots" time="0.0001107">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; respects lead time parameter" time="0.0000469">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SimulationContext &gt; creates reproducible runs with same seed" time="0.0001494">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; uses default service level of 0.95" time="0.0000697">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SimulationContext &gt; tick records inflection points" time="0.0000713">
         </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; uses default lead time of 14 days" time="0.0000576">
-        </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; falls back to z=1.65 for unknown service levels" time="0.0000454">
-        </testcase>
-        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; rounds the result to integer" time="0.0000445">
+        <testcase classname="src/lib/engine/deterministic.test.ts" name="SimulationContext &gt; summarize returns correct metadata" time="0.000115">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/services/notes.service.test.ts" timestamp="2026-05-02T17:03:53.622Z" hostname="qaswe12340" tests="30" failures="0" errors="0" skipped="0" time="0.0112011">
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNoteCategory &gt; returns true for valid categories" time="0.0014157">
+    <testsuite name="src/lib/engine/feedback.test.ts" timestamp="2026-05-09T17:51:16.579Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0075236">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="FeedbackStore &gt; records entries and retrieves by auditId" time="0.0033692">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNoteCategory &gt; returns false for invalid category" time="0.000168">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="FeedbackStore &gt; respects maxSize bounded queue" time="0.0007569">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNotePriority &gt; returns true for valid priorities" time="0.0001924">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="FeedbackStore &gt; findByAuditId returns matching entry" time="0.0002271">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNotePriority &gt; returns false for invalid priority" time="0.0001002">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="FeedbackStore &gt; findByAuditId returns undefined for missing" time="0.0001075">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; NOTE_CATEGORIES &gt; contains all expected categories" time="0.0007672">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="FeedbackStore &gt; getRecent returns latest N in reverse order" time="0.0002622">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; NOTE_PRIORITIES &gt; contains all expected priorities" time="0.0002247">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="FeedbackStore &gt; exportAll returns a snapshot array" time="0.0002027">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; returns notes with default filters" time="0.0006283">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="getFeedbackStats &gt; returns zeros for empty store" time="0.0005054">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies SKU filter" time="0.0011433">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="getFeedbackStats &gt; computes correct acceptance rate" time="0.0002422">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies category filter" time="0.0002568">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="getFeedbackStats &gt; groups by engine" time="0.0001576">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies isResolved filter" time="0.0002817">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="recordOutcome &gt; attaches outcome to existing feedback" time="0.0001861">
         </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies priority filter" time="0.000294">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies custom limit and offset" time="0.0001144">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; computes unresolved count" time="0.0001069">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; creates a note with valid data" time="0.0005518">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error when content is empty" time="0.0008638">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error when content is only whitespace" time="0.0001904">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error when SKU does not exist" time="0.0001529">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; creates note without SKU" time="0.0002632">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; creates supply chain event on note creation" time="0.0001962">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; defaults category to general and priority to normal" time="0.0002127">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error for invalid category" time="0.000172">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error for invalid priority" time="0.0001419">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; resolves a note" time="0.0002915">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; creates event when resolving note" time="0.0002176">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; does not create event when note is already resolved" time="0.0001535">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; updates priority" time="0.0001428">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; throws error when note does not exist" time="0.0001567">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; throws error for invalid priority on update" time="0.0001737">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; deleteNote &gt; deletes an existing note" time="0.0001932">
-        </testcase>
-        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; deleteNote &gt; throws error when note does not exist" time="0.0001418">
+        <testcase classname="src/lib/engine/feedback.test.ts" name="recordOutcome &gt; does nothing for non-existent auditId" time="0.0004596">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/services/user.service.test.ts" timestamp="2026-05-02T17:03:53.631Z" hostname="qaswe12340" tests="17" failures="0" errors="0" skipped="0" time="0.0081464">
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUsers &gt; returns list of users without passwords" time="0.0025235">
+    <testsuite name="src/lib/engine/memory.test.ts" timestamp="2026-05-09T17:51:16.581Z" hostname="qaswe12340" tests="10" failures="0" errors="0" skipped="0" time="0.033438">
+        <testcase classname="src/lib/engine/memory.test.ts" name="AgentMemory key-value store &gt; set and get a value" time="0.001135">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUsers &gt; returns empty array when no users" time="0.0002014">
+        <testcase classname="src/lib/engine/memory.test.ts" name="AgentMemory key-value store &gt; returns null for missing key" time="0.0001457">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUserById &gt; returns user by id without password" time="0.0010537">
+        <testcase classname="src/lib/engine/memory.test.ts" name="AgentMemory key-value store &gt; returns null for expired key" time="0.0293297">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUserById &gt; returns null when user not found" time="0.000155">
+        <testcase classname="src/lib/engine/memory.test.ts" name="AgentMemory key-value store &gt; delete removes a key" time="0.0003378">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; createUser &gt; hashes password and creates user with correct role" time="0.0004693">
+        <testcase classname="src/lib/engine/memory.test.ts" name="AgentMemory key-value store &gt; namespaces isolate keys" time="0.0001594">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; createUser &gt; creates user with specified role" time="0.0003174">
+        <testcase classname="src/lib/engine/memory.test.ts" name="AgentMemory key-value store &gt; getNamespaces returns active namespaces" time="0.0006206">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; createUser &gt; defaults to viewer role when role not specified" time="0.0002634">
+        <testcase classname="src/lib/engine/memory.test.ts" name="SharedContext &gt; starts with all null sections" time="0.0001763">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; updateUser &gt; updates allowed fields" time="0.0002667">
+        <testcase classname="src/lib/engine/memory.test.ts" name="SharedContext &gt; updateShared writes to a section" time="0.0001515">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; updateUser &gt; updates only provided fields" time="0.0001804">
+        <testcase classname="src/lib/engine/memory.test.ts" name="SharedContext &gt; updateShared merges partial data" time="0.0001489">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; updateUser &gt; deactivates user via isActive field" time="0.0001861">
+        <testcase classname="src/lib/engine/memory.test.ts" name="TKV eviction &gt; evictExpired removes only expired entries" time="0.0002103">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; changePassword &gt; hashes new password and updates" time="0.0004043">
+    </testsuite>
+    <testsuite name="src/lib/engine/passport.test.ts" timestamp="2026-05-09T17:51:16.582Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0052906">
+        <testcase classname="src/lib/engine/passport.test.ts" name="createPassport &gt; generates a valid passport with all required fields" time="0.0029558">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; deactivateUser &gt; sets isActive to false" time="0.0001248">
+        <testcase classname="src/lib/engine/passport.test.ts" name="createPassport &gt; clamps confidence to [0, 1]" time="0.0001624">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates 3 users when no users exist" time="0.0002036">
+        <testcase classname="src/lib/engine/passport.test.ts" name="createPassport &gt; sorts alternatives by confidence descending" time="0.0001295">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; does not create users when users already exist" time="0.0001554">
+        <testcase classname="src/lib/engine/passport.test.ts" name="provenanceEntry &gt; creates an ok entry" time="0.000108">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates admin user with correct email and role" time="0.0002147">
+        <testcase classname="src/lib/engine/passport.test.ts" name="degradedProvenance &gt; creates a degraded entry" time="0.0000932">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates manager user with correct email and role" time="0.0001598">
+        <testcase classname="src/lib/engine/passport.test.ts" name="unavailableProvenance &gt; creates an unavailable entry" time="0.0001163">
         </testcase>
-        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates viewer user with correct email and role" time="0.0000994">
+        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns 1 when all sources are ok" time="0.0001108">
+        </testcase>
+        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns lower score when sources are degraded" time="0.000063">
+        </testcase>
+        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns significantly lower when critical source is unavailable" time="0.0000727">
+        </testcase>
+        <testcase classname="src/lib/engine/passport.test.ts" name="computeConfidence &gt; returns 0.5 for empty weights" time="0.0001008">
+        </testcase>
+        <testcase classname="src/lib/engine/passport.test.ts" name="serializeForFrontend &gt; strips internal trace fields and adds UI labels" time="0.0003283">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/engine/rag.test.ts" timestamp="2026-05-09T17:51:16.583Z" hostname="qaswe12340" tests="17" failures="0" errors="0" skipped="0" time="0.0469572">
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; returns empty array for empty query" time="0.0015347">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; returns results for short query" time="0.0044892">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; returns top-K results sorted by score descending" time="0.0039541">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; returns results with relevance labels" time="0.0049337">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; scores are in valid range" time="0.0059083">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; query matching tariff returns tariff-domain chunks" time="0.0028248">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; query matching compliance returns compliance-domain chunks" time="0.0028174">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; query matching production returns production-domain chunks" time="0.0031931">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; query matching ecommerce returns ecommerce-domain chunks" time="0.0038189">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; query matching safety returns safety-domain chunks" time="0.0031832">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="retrieveKnowledge &gt; query matching payment returns payment-domain chunks" time="0.0036987">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="augmentPrompt &gt; returns empty string for empty results" time="0.000186">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="augmentPrompt &gt; includes chunk titles and domains" time="0.0039911">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="getRAGDomains &gt; returns all domains including new ones" time="0.0005067">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="searchByDomain &gt; filters correctly by domain" time="0.0002251">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="searchByDomain &gt; returns empty array for unknown domain" time="0.000114">
+        </testcase>
+        <testcase classname="src/lib/engine/rag.test.ts" name="searchByDomain &gt; returns results for new production domain" time="0.0001373">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/engine/resilience.test.ts" timestamp="2026-05-09T17:51:16.584Z" hostname="qaswe12340" tests="17" failures="0" errors="0" skipped="0" time="0.0805663">
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withTimeout &gt; returns result when promise resolves before timeout" time="0.0015862">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withTimeout &gt; throws TimeoutError when promise exceeds timeout" time="0.013164">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withTimeout &gt; re-throws non-timeout errors" time="0.000584">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withPromiseTimeout &gt; works with plain promises" time="0.0002173">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; returns on first success" time="0.0005872">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; retries on failure" time="0.0445497">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; throws after exhausting retries" time="0.0151713">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withRetry &gt; respects shouldRetry filter" time="0.0002972">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; executes successfully when closed" time="0.0004494">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; opens after N consecutive failures" time="0.0004404">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; throws CircuitBreakerOpenError when open" time="0.0002323">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="CircuitBreaker &gt; can be manually reset" time="0.0002371">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="getCircuitBreaker &gt; returns same instance for same name" time="0.0001003">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; uses primary when it succeeds" time="0.0003171">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; falls back when primary fails" time="0.0002923">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; supports sync fallback" time="0.0001975">
+        </testcase>
+        <testcase classname="src/lib/engine/resilience.test.ts" name="withFallback &gt; throws when both primary and fallback fail" time="0.0003709">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/services/inventory.service.test.ts" timestamp="2026-05-09T17:51:16.585Z" hostname="qaswe12340" tests="20" failures="0" errors="0" skipped="0" time="0.0033644">
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;critical&quot; when quantity &lt;= 50% of safety stock" time="0.0009899">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;warning&quot; when quantity &lt;= safety stock but &gt; 50%" time="0.0001249">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;overstock&quot; when quantity &gt;= 3x safety stock" time="0.0000913">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; returns &quot;healthy&quot; for normal stock levels" time="0.0001134">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; handles zero safety stock" time="0.0000791">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: exactly 50% of safety stock is critical" time="0.0000708">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: just above 50% of safety stock is warning" time="0.0000468">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: exactly safety stock is warning" time="0.0000424">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: just above safety stock is healthy" time="0.0000664">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: exactly 3x safety stock is overstock" time="0.0000915">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeStockStatus &gt; boundary: just below 3x safety stock is healthy" time="0.0000519">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; returns 0 when no sales records" time="0.0000999">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; computes safety stock from sales records" time="0.000097">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; computes higher safety stock with more variable sales" time="0.0000875">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; respects service level parameter" time="0.0000786">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; respects lead time parameter" time="0.0000451">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; uses default service level of 0.95" time="0.0000593">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; uses default lead time of 14 days" time="0.0000478">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; falls back to z=1.65 for unknown service levels" time="0.0000394">
+        </testcase>
+        <testcase classname="src/lib/services/inventory.service.test.ts" name="Inventory Service &gt; computeSafetyStock &gt; rounds the result to integer" time="0.0000381">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/services/notes.service.test.ts" timestamp="2026-05-09T17:51:16.586Z" hostname="qaswe12340" tests="30" failures="0" errors="0" skipped="0" time="0.0121985">
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNoteCategory &gt; returns true for valid categories" time="0.0021029">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNoteCategory &gt; returns false for invalid category" time="0.0001723">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNotePriority &gt; returns true for valid priorities" time="0.0001738">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; isValidNotePriority &gt; returns false for invalid priority" time="0.0001044">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; NOTE_CATEGORIES &gt; contains all expected categories" time="0.0006938">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; NOTE_PRIORITIES &gt; contains all expected priorities" time="0.0001947">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; returns notes with default filters" time="0.0005949">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies SKU filter" time="0.0011416">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies category filter" time="0.0002699">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies isResolved filter" time="0.0002666">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies priority filter" time="0.0001899">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; applies custom limit and offset" time="0.0001039">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; getNotes &gt; computes unresolved count" time="0.0001067">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; creates a note with valid data" time="0.0005301">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error when content is empty" time="0.0008672">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error when content is only whitespace" time="0.0001741">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error when SKU does not exist" time="0.0001359">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; creates note without SKU" time="0.000227">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; creates supply chain event on note creation" time="0.0001897">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; defaults category to general and priority to normal" time="0.000178">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error for invalid category" time="0.000171">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; createNote &gt; throws error for invalid priority" time="0.0002392">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; resolves a note" time="0.0003414">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; creates event when resolving note" time="0.0002223">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; does not create event when note is already resolved" time="0.0001621">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; updates priority" time="0.0001716">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; throws error when note does not exist" time="0.000182">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; updateNote &gt; throws error for invalid priority on update" time="0.0001725">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; deleteNote &gt; deletes an existing note" time="0.0002223">
+        </testcase>
+        <testcase classname="src/lib/services/notes.service.test.ts" name="Notes Service &gt; deleteNote &gt; throws error when note does not exist" time="0.0001541">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/services/user.service.test.ts" timestamp="2026-05-09T17:51:16.588Z" hostname="qaswe12340" tests="17" failures="0" errors="0" skipped="0" time="0.0076339">
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUsers &gt; returns list of users without passwords" time="0.0022404">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUsers &gt; returns empty array when no users" time="0.0002082">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUserById &gt; returns user by id without password" time="0.0010564">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; getUserById &gt; returns null when user not found" time="0.0001596">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; createUser &gt; hashes password and creates user with correct role" time="0.0004461">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; createUser &gt; creates user with specified role" time="0.0003052">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; createUser &gt; defaults to viewer role when role not specified" time="0.0003015">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; updateUser &gt; updates allowed fields" time="0.0002909">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; updateUser &gt; updates only provided fields" time="0.000186">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; updateUser &gt; deactivates user via isActive field" time="0.0002018">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; changePassword &gt; hashes new password and updates" time="0.0002017">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; deactivateUser &gt; sets isActive to false" time="0.0001225">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates 3 users when no users exist" time="0.0001853">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; does not create users when users already exist" time="0.0001488">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates admin user with correct email and role" time="0.0001946">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates manager user with correct email and role" time="0.0001163">
+        </testcase>
+        <testcase classname="src/lib/services/user.service.test.ts" name="User Service &gt; seedDefaultAdmin &gt; creates viewer user with correct email and role" time="0.0000856">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/validators/index.test.ts" timestamp="2026-05-09T17:51:16.590Z" hostname="qaswe12340" tests="85" failures="0" errors="0" skipped="0" time="0.0182085">
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; DATE_REGEX &gt; matches valid YYYY-MM-DD format" time="0.0010523">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; DATE_REGEX &gt; rejects invalid date formats" time="0.0001901">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; validates valid date range" time="0.0007264">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; accepts optional date fields" time="0.0001285">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; accepts only startDate" time="0.0001022">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; dateRangeSchema &gt; rejects invalid date format" time="0.0002914">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; provides default values" time="0.0002894">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; coerces string values to numbers" time="0.0002405">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects page = 0" time="0.0002711">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects negative page" time="0.0001671">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects pageSize &gt; 100" time="0.0001435">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; accepts pageSize = 100 (boundary)" time="0.0000707">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; paginationSchema &gt; rejects non-integer pageSize" time="0.0001646">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; accepts valid SKU" time="0.0001417">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; rejects empty string" time="0.00011">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; rejects string &gt; 50 chars" time="0.0000896">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; skuSchema &gt; accepts string of exactly 50 chars" time="0.0000572">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; platformSchema &gt; accepts valid platforms" time="0.0001219">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; platformSchema &gt; rejects invalid platform" time="0.0001119">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockStatusSchema &gt; accepts valid statuses" time="0.0001016">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockStatusSchema &gt; rejects invalid status" time="0.0000774">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; prioritySchema &gt; accepts valid priorities" time="0.0000751">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; prioritySchema &gt; rejects invalid priority" time="0.0000697">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; categorySchema &gt; accepts valid categories" time="0.0001062">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; categorySchema &gt; rejects invalid category" time="0.0000628">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusSchema &gt; accepts valid statuses" time="0.0001116">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusSchema &gt; rejects invalid status" time="0.0000571">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; warehouseSchema &gt; accepts valid warehouses" time="0.0000543">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; warehouseSchema &gt; rejects invalid warehouse" time="0.000054">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; validates positive adjustment (inbound)" time="0.0002574">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; validates negative adjustment (outbound)" time="0.0000687">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; rejects zero quantity" time="0.0001327">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; rejects empty reason" time="0.0000896">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryAdjustmentSchema &gt; rejects reason &gt; 200 chars" time="0.0000766">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; validates bulk update with valid data" time="0.0004409">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; rejects empty updates array" time="0.000123">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; rejects updates with &gt; 100 items" time="0.0005988">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; accepts updates with exactly 100 items" time="0.000387">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; inventoryBulkUpdateSchema &gt; validates update item with negative quantity is rejected" time="0.0002467">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; validates transfer between different warehouses" time="0.0003062">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; rejects transfer to same warehouse" time="0.0001184">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; rejects zero quantity" time="0.0000965">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; stockTransferSchema &gt; rejects negative quantity" time="0.0000802">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; validates status update with required fields" time="0.0003265">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; validates status update with all optional fields" time="0.000144">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects empty tracking number" time="0.0001101">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects invalid status" time="0.0000995">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects progress &gt; 100" time="0.0001356">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects progress &lt; 0" time="0.0001234">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; rejects invalid ETA format" time="0.0001427">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; shipmentStatusUpdateSchema &gt; accepts progress at boundaries (0 and 100)" time="0.0001436">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; pending can transition to in_transit or delayed" time="0.0007666">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; delivered is terminal state" time="0.0003754">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; exception is terminal state" time="0.0000711">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; VALID_STATUS_TRANSITIONS &gt; delayed can transition to in_transit, customs, or delivered" time="0.0001688">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns true for valid transition" time="0.0001019">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns false for invalid transition" time="0.0000436">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns false for unknown from status" time="0.0000424">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; isValidStatusTransition &gt; returns false for transition from terminal state" time="0.0000399">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; validates note with required content" time="0.0006401">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; provides defaults for category and priority" time="0.0001472">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; rejects empty content" time="0.0002023">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; rejects content &gt; 2000 chars" time="0.0002118">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; accepts all valid categories" time="0.0002108">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; accepts all valid priorities" time="0.0001478">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; createNoteSchema &gt; accepts optional author and sku" time="0.0000836">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; validates update with isResolved" time="0.0003421">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; validates update with priority" time="0.0000612">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; rejects empty id" time="0.0000872">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; updateNoteSchema &gt; rejects invalid priority" time="0.0000773">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productSearchSchema &gt; validates search with minimum query length" time="0.0002971">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productSearchSchema &gt; rejects single character query" time="0.0001444">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productSearchSchema &gt; accepts optional category" time="0.000063">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; validates lookup by id" time="0.0002139">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; validates lookup by sku" time="0.0000657">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; validates lookup with both id and sku" time="0.0000519">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; rejects when neither id nor sku provided" time="0.000083">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; productDetailSchema &gt; rejects when both id and sku are empty/undefined" time="0.0000962">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; validates rating with all scores" time="0.0004433">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; validates rating with optional comments" time="0.0001858">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; accepts boundary score of 0" time="0.0001666">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; accepts boundary score of 5" time="0.000189">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; rejects score &gt; 5" time="0.000351">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; rejects negative score" time="0.0003032">
+        </testcase>
+        <testcase classname="src/lib/validators/index.test.ts" name="Validators &gt; supplierRatingSchema &gt; rejects comments &gt; 500 chars" time="0.000267">
         </testcase>
     </testsuite>
 </testsuites>

@@ -12,6 +12,7 @@
 
 import { db } from '@/lib/db';
 import { DeterministicRandom, seedFromString } from '@/lib/engine/deterministic';
+import { agentMemory } from '@/lib/engine/memory';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -335,7 +336,15 @@ export async function runSandbox(options?: {
     (1 - state.totalRevenueLost / Math.max(state.totalRevenueLost + 100000, 1)) * 30  // Less loss = better
   );
 
-  return {
+  const resilienceScoreFinal = Math.min(resilienceScore, 100);
+  const survivalRateFinal = Math.round(productsNeverStockedOut / Math.max(totalProducts, 1) * 100);
+  const recommendationText = resilienceScoreFinal >= 70
+    ? '供应链韧性良好，可承受中度冲击'
+    : resilienceScoreFinal >= 40
+      ? '供应链存在脆弱点，建议增加安全库存和供应商多元化'
+      : '供应链韧性不足，需要系统性加固（多源供应商 + 替代路线 + 安全库存提升）';
+
+  const report = {
     config: { rounds: totalRounds, scenario },
     agents,
     rounds: roundResults,
@@ -346,16 +355,24 @@ export async function runSandbox(options?: {
       totalDelays: state.totalDelays,
       avgDemand: Math.round(roundResults.reduce((s, r) => s + r.demand, 0) / totalRounds),
       maxSingleRoundLoss: maxLoss,
-      resilienceScore: Math.min(resilienceScore, 100),
+      resilienceScore: resilienceScoreFinal,
       worstRound,
-      survivalRate: Math.round(productsNeverStockedOut / Math.max(totalProducts, 1) * 100),
-      recommendation: resilienceScore >= 70
-        ? '供应链韧性良好，可承受中度冲击'
-        : resilienceScore >= 40
-          ? '供应链存在脆弱点，建议增加安全库存和供应商多元化'
-          : '供应链韧性不足，需要系统性加固（多源供应商 + 替代路线 + 安全库存提升）',
+      survivalRate: survivalRateFinal,
+      recommendation: recommendationText,
     },
   };
+
+  // Write to shared agent memory
+  agentMemory.updateShared('sandbox', {
+    lastRun: new Date().toISOString(),
+    scenario: scenario || 'baseline',
+    resilienceScore: resilienceScoreFinal,
+    survivalRate: survivalRateFinal,
+    totalStockouts: state.stockoutEvents,
+    totalDelays: state.totalDelays,
+    summary: recommendationText,
+  });
+  return report;
 }
 
 export { SCENARIOS };

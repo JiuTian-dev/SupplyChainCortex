@@ -8,6 +8,7 @@
  */
 
 import { executeTool } from '@/lib/mcp/tools';
+import { agentMemory } from '@/lib/engine/memory';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -381,11 +382,20 @@ export async function executeWorkflow(
   // Clean unreplaced template vars
   summary = summary.replace(/\{[^}]+\}/g, '（数据暂缺）');
 
+  // Write to shared agent memory (read sandbox context for cross-agent awareness)
+  const sandboxCtx = agentMemory.getSharedContext().sandbox;
+  agentMemory.updateShared('mcpOrchestrator', {
+    lastRun: new Date().toISOString(),
+    lastWorkflowId: workflow.id,
+    lastSummary: summary,
+    success: stepResults.every(s => s.status === 'success'),
+  });
+
   return {
     workflowId: workflow.id,
     workflowName: workflow.name,
     steps: stepResults,
-    sharedContext,
+    sharedContext: { ...sharedContext, sandboxContext: sandboxCtx },
     summary,
     totalDuration: Date.now() - startTime,
   };
