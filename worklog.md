@@ -150,4 +150,4 @@
 
 ### 版本
 - 当前版本：v0.7.4
-- Git 仓库：`https://github.com/a1b1c1dnn/supply-mcp-tool.git` main 分支
+- Git 仓库：`https://github.com/JiuTian-dev/SupplyChainCortex.git` main 分支
