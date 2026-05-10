@@ -159,16 +159,20 @@ export function DecisionCenter() {
   const [decisions, setDecisions] = useState<DecisionItem[]>([]);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackState>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [agentContext, setAgentContext] = useState<Record<string, unknown> | null>(null);
 
   const fetchDecisions = useCallback(async () => {
     try {
-      // Fetch BOTH cascade risk + dynamic decision graph in parallel
-      const [cascadeRes, decisionRes] = await Promise.all([
+      // Fetch cascade risk + decision graph + agent memory in parallel
+      const [cascadeRes, decisionRes, memRes] = await Promise.all([
         fetch('/api/cascade-risk?scenario=auto&includeForwardProjection=true&includeCounterfactuals=true'),
         fetch('/api/decision-graph?mode=dynamic&scenario=auto'),
+        fetch('/api/agent-memory'),
       ]);
       const risk = await cascadeRes.json();
       const dynamic = await decisionRes.json();
+      const memory = await memRes.json().catch(() => ({}));
+      setAgentContext(memory.shared || null);
 
       const passport = risk.passport;
       const items: DecisionItem[] = [];
@@ -325,6 +329,30 @@ export function DecisionCenter() {
           <RefreshCw className="h-3 w-3 mr-1" />刷新决策
         </Button>
       </div>
+
+      {/* Cross-agent context ribbon */}
+      {agentContext && (
+        <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+          {(agentContext as Record<string, Record<string, unknown> | null>).cascadeRisk && (
+            <span className="px-1.5 py-0.5 rounded bg-orange-50 dark:bg-orange-950/30">
+              级联风险: {((agentContext as Record<string, Record<string, unknown>>).cascadeRisk).affectedNodes as number} 节点受影响
+            </span>
+          )}
+          {(agentContext as Record<string, Record<string, unknown> | null>).sandbox && (
+            <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/30">
+              沙箱: 韧性 {((agentContext as Record<string, Record<string, unknown>>).sandbox).resilienceScore as number}分
+            </span>
+          )}
+          {(agentContext as Record<string, Record<string, unknown> | null>).mcpOrchestrator && (
+            <span className="px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-950/30">
+              工作流: {((agentContext as Record<string, Record<string, unknown>>).mcpOrchestrator).lastWorkflowId as string}
+            </span>
+          )}
+          {!agentContext.cascadeRisk && !agentContext.sandbox && (
+            <span>等待 Agent 数据...</span>
+          )}
+        </div>
+      )}
 
       {decisions.length === 0 ? (
         <Card className="border-dashed">
