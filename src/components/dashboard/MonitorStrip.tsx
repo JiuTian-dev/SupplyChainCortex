@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Activity, Globe, AlertTriangle, DollarSign,
   TrendingDown, TrendingUp, ChevronDown, RefreshCw,
+  Package, Ship,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,8 @@ interface MonitorSnapshot {
   exchangeRate: { usdCny: number; deviation: number };
   portRisks: { total: number; high: number; medium: number; normal: number };
   inventoryHealth: { criticalSkus: number; warningSkus: number; healthyRate: number };
+  commodity: { trend: string; avgChangePct: number; topMover: string };
+  freight: { trend: string; avgRate: number; routeCount: number };
   estimatedLoss: number;
   estimatedSaving: number;
   updatedAt: string;
@@ -35,12 +38,16 @@ export function MonitorStrip() {
 
   const fetchSnapshot = useCallback(async () => {
     try {
-      const [dashRes, cascadeRes] = await Promise.all([
+      const [dashRes, cascadeRes, commodityRes, freightRes] = await Promise.all([
         fetch('/api/dashboard?action=summary'),
         fetch('/api/cascade-risk?scenario=auto'),
+        fetch('/api/commodity'),
+        fetch('/api/freight'),
       ]);
       const dash = await dashRes.json();
       const risk = await cascadeRes.json();
+      const commodity = await commodityRes.json().catch(() => ({}));
+      const freight = await freightRes.json().catch(() => ({}));
 
       const portRisks = risk?.sourceNodes?.reduce(
         (acc: { high: number; medium: number; normal: number }, n: { riskScore: number }) => {
@@ -62,6 +69,16 @@ export function MonitorStrip() {
           warningSkus: 0,
           healthyRate: dash?.healthScore ?? 100,
         },
+        commodity: {
+          trend: commodity?.overallTrend || 'stable',
+          avgChangePct: commodity?.avgChangePct || 0,
+          topMover: commodity?.affectedMaterials?.[0] || '—',
+        },
+        freight: {
+          trend: freight?.trend || 'stable',
+          avgRate: freight?.avgRate40GP || 0,
+          routeCount: freight?.rates?.length || 0,
+        },
         estimatedLoss: risk?.summary?.totalRisk ?? 0,
         estimatedSaving: risk?.counterfactuals?.[0]?.riskReduction ? risk.counterfactuals[0].riskReduction * 100000 : 0,
         updatedAt: new Date().toISOString(),
@@ -72,49 +89,10 @@ export function MonitorStrip() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const doFetch = async () => {
-      try {
-        const [dashRes, cascadeRes] = await Promise.all([
-          fetch('/api/dashboard?action=summary'),
-          fetch('/api/cascade-risk?scenario=auto'),
-        ]);
-        if (cancelled) return;
-        const dash = await dashRes.json();
-        const risk = await cascadeRes.json();
-        const portRisks = risk?.sourceNodes?.reduce(
-          (acc: { high: number; medium: number; normal: number }, n: { riskScore: number }) => {
-            if (n.riskScore >= 70) acc.high++;
-            else if (n.riskScore >= 40) acc.medium++;
-            else acc.normal++;
-            return acc;
-          }, { high: 0, medium: 0, normal: 0 }
-        ) ?? { high: 0, medium: 0, normal: 0 };
-        if (!cancelled) {
-          setSnapshot({
-            exchangeRate: {
-              usdCny: risk?.passport?.dataProvenance?.find((p: any) => p.source === 'fx:frankfurter') ? 7.25 : 7.25,
-              deviation: 0,
-            },
-            portRisks: { total: portRisks.high + portRisks.medium + portRisks.normal, ...portRisks },
-            inventoryHealth: {
-              criticalSkus: dash?.healthBreakdown?.inventory ?? 0,
-              warningSkus: 0,
-              healthyRate: dash?.healthScore ?? 100,
-            },
-            estimatedLoss: risk?.summary?.totalRisk ?? 0,
-            estimatedSaving: risk?.counterfactuals?.[0]?.riskReduction ? risk.counterfactuals[0].riskReduction * 100000 : 0,
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      } catch {
-        // Degraded — show last known state
-      }
-    };
-    doFetch();
-    const i = setInterval(doFetch, 30000);
-    return () => { cancelled = true; clearInterval(i); };
-  }, []);
+    fetchSnapshot();
+    const i = setInterval(fetchSnapshot, 30000);
+    return () => clearInterval(i);
+  }, [fetchSnapshot]);
 
   if (!snapshot) return null;
 
@@ -132,6 +110,10 @@ export function MonitorStrip() {
         <span className="font-mono">汇率: {snapshot.exchangeRate.usdCny.toFixed(2)}</span>
         <span className="text-muted-foreground">|</span>
         <span className="font-mono">库存健康: {snapshot.inventoryHealth.healthyRate}%</span>
+        <span className="text-muted-foreground">|</span>
+        <span className="font-mono">商品: {snapshot.commodity.trend === 'rising' ? '↑' : '→'} {snapshot.commodity.avgChangePct}%</span>
+        <span className="text-muted-foreground">|</span>
+        <span className="font-mono">运费: ${snapshot.freight.avgRate}/40GP</span>
         <Button variant="ghost" size="sm" className="ml-auto h-5 text-xs" onClick={() => setCollapsed(false)}>
           <ChevronDown className="h-3 w-3" />
         </Button>
@@ -158,7 +140,7 @@ export function MonitorStrip() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {/* Exchange Rate */}
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><Globe className="h-3 w-3" />汇率 USD/CNY</div>
@@ -190,6 +172,22 @@ export function MonitorStrip() {
             <div className="text-[10px] text-muted-foreground">
               {snapshot.inventoryHealth.criticalSkus > 0 ? `${snapshot.inventoryHealth.criticalSkus} SKU 缺货风险` : '库存水平正常'}
             </div>
+          </div>
+
+          {/* Commodity Prices (FRED) */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><Package className="h-3 w-3" />大宗商品</div>
+            <div className={`text-lg font-bold font-mono ${snapshot.commodity.trend === 'rising' ? 'text-red-600 dark:text-red-400' : snapshot.commodity.trend === 'falling' ? 'text-green-600 dark:text-green-400' : ''}`}>
+              {snapshot.commodity.trend === 'rising' ? '↑' : snapshot.commodity.trend === 'falling' ? '↓' : '→'} {snapshot.commodity.avgChangePct > 0 ? '+' : ''}{snapshot.commodity.avgChangePct}%
+            </div>
+            <div className="text-[10px] text-muted-foreground">{snapshot.commodity.topMover || '价格稳定'}</div>
+          </div>
+
+          {/* Freight Rates */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><Ship className="h-3 w-3" />海运运费</div>
+            <div className="text-lg font-bold font-mono">${snapshot.freight.avgRate}</div>
+            <div className="text-[10px] text-muted-foreground">{snapshot.freight.routeCount} 条航线 · {snapshot.freight.trend}</div>
           </div>
 
           {/* Estimated Loss */}
