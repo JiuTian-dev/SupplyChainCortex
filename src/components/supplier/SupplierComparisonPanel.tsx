@@ -368,7 +368,7 @@ export function SupplierComparisonPanel({ suppliers, supplierPerformance }: Supp
         animatedIn && 'opacity-100 translate-y-0',
         !animatedIn && 'opacity-0 translate-y-4',
       )}
-      style={{ '--delay': '150ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-3 bg-muted/30">
         <CardTitle className="text-base font-semibold flex items-center gap-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>

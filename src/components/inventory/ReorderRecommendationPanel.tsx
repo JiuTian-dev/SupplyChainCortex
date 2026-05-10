@@ -138,7 +138,7 @@ export function ReorderRecommendationPanel() {
   return (
     <Card
       className="card-dashboard border-l-[4px] border-l-orange-400"
-      style={{ '--delay': '350ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-2 bg-orange-50 dark:bg-orange-950/20">
         <div className="flex items-center justify-between flex-wrap gap-2">

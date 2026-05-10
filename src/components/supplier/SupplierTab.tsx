@@ -280,7 +280,7 @@ export function SupplierTab() {
       {!!supplierPerformance && !!(supplierPerformance as Record<string, unknown>).suppliers && (
         <>
           {/* ==================== 绩效分析雷达图 + 排名 ==================== */}
-          <Card className="card-dashboard hover:translate-y-[-2px] hover:shadow-lg hover:shadow-orange-500/5 hover:border-orange-200 dark:hover:border-orange-800 transition-all duration-300 ease-out" style={{ '--delay': '0ms' } as React.CSSProperties}>
+          <Card className="card-dashboard hover:translate-y-[-2px] hover:shadow-lg hover:shadow-orange-500/5 hover:border-orange-200 dark:hover:border-orange-800 transition-all duration-300 ease-out">
             <CardHeader className="pb-2 bg-muted/30">
               <CardTitle className="text-base font-semibold flex items-center gap-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                 <Star className="h-4 w-4 text-orange-500" />

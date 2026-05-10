@@ -393,7 +393,7 @@ export function InventoryAlertTimeline() {
   };
 
   return (
-    <Card className="card-dashboard border-l-[4px] border-l-orange-400" style={{ '--delay': '350ms' } as React.CSSProperties}>
+    <Card className="card-dashboard border-l-[4px] border-l-orange-400">
       <CardHeader className="pb-3 bg-orange-50 dark:bg-orange-950/10">
         <div className="flex items-center justify-between">
           <div>

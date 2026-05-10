@@ -348,6 +348,63 @@
 .dark .pagination-btn:hover:not(:disabled) { background: oklch(0.25 0 0); }
 .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── Chart & Data Visualizations ──────────────────────────────────────────────── */
+
+/* Bar chart entrance */
+@keyframes bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.bar-grow-in {
+  transform-origin: bottom;
+  animation: bar-grow 0.4s ease-out;
+}
+
+/* Waterfall bar entrance */
+@keyframes waterfall-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.waterfall-bar-enter {
+  animation: waterfall-enter 0.3s ease-out forwards;
+}
+
+/* Number count animation */
+@keyframes number-count {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.number-count-anim {
+  animation: number-count 0.4s ease-out;
+}
+
+/* Geo pulse dot for supplier map */
+@keyframes geo-pulse {
+  0% { r: 2.5; opacity: 0.4; }
+  100% { r: 5; opacity: 0; }
+}
+.geo-pulse-dot {
+  animation: geo-pulse 1.5s ease-out infinite;
+}
+
+/* MCP connector pulse */
+@keyframes mcp-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.6); opacity: 0; }
+}
+.mcp-pulse-dot {
+  position: relative;
+}
+.mcp-pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.3;
+  animation: mcp-pulse 2s ease-in-out infinite;
+}
+
 .badge-pop {
   animation: badge-pop 0.3s ease-out;
 }

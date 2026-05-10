@@ -115,7 +115,7 @@ export function ExchangeRateMatrix() {
   return (
     <Card
       className="card-dashboard border-cyan-200 dark:border-cyan-900"
-      style={{ '--delay': '0ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

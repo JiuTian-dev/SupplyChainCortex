@@ -194,7 +194,7 @@ export function CostTab() {
         {/* 毛利率对比 */}
         <Card
           className="card-dashboard chart-container"
-          style={{ '--delay': '0ms' } as React.CSSProperties}
+         
         >
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">产品毛利率对比</CardTitle>
@@ -233,7 +233,7 @@ export function CostTab() {
         {/* 成本变动追踪 */}
         <Card
           className="card-dashboard chart-container border-l-[4px] border-l-rose-400"
-          style={{ '--delay': '50ms' } as React.CSSProperties}
+         
         >
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -294,7 +294,7 @@ export function CostTab() {
         {/* 成本结构 */}
         <Card
           className="card-dashboard chart-container"
-          style={{ '--delay': '100ms' } as React.CSSProperties}
+         
         >
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">成本结构分析</CardTitle>
@@ -343,7 +343,7 @@ export function CostTab() {
       {/* 成本明细表 */}
       <Card
         className="card-dashboard"
-        style={{ '--delay': '300ms' } as React.CSSProperties}
+       
       >
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center justify-between">

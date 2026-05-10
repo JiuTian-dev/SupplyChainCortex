@@ -78,7 +78,7 @@ export function SalesForecastEnhanced() {
 
   if (forecastQuery.isLoading) {
     return (
-      <Card className="card-dashboard" style={{ '--delay': '350ms' } as React.CSSProperties}>
+      <Card className="card-dashboard">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-orange-500" />
@@ -94,7 +94,7 @@ export function SalesForecastEnhanced() {
 
   return (
     <Card className="card-dashboard border-l-[4px] border-l-orange-400"
-      style={{ '--delay': '350ms' } as React.CSSProperties}>
+     >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>

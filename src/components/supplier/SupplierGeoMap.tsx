@@ -92,7 +92,7 @@ export function SupplierGeoMap() {
   return (
     <Card
       className="card-dashboard"
-      style={{ '--delay': '100ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">

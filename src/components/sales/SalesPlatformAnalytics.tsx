@@ -122,7 +122,7 @@ export function SalesPlatformAnalytics({
   return (
     <Card
       className="card-dashboard"
-      style={{ '--delay': '150ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center justify-between">

@@ -89,7 +89,7 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
   return (
     <Card
       className="card-dashboard"
-      style={{ '--delay': '150ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

@@ -256,7 +256,7 @@ export function CostOptimizationPanel() {
   return (
     <Card
       className="card-dashboard hover:shadow-lg transition-all duration-300"
-      style={{ '--delay': '350ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -365,7 +365,6 @@ export function CostOptimizationPanel() {
                 <div
                   key={`${suggestion.id}-${animationKey}`}
                   className="card-dashboard"
-                  style={{ '--delay': `${idx * 100}ms` } as React.CSSProperties}
                 >
                   <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(suggestion.id)}>
                     <Card className="border hover:shadow-md transition-all duration-200 group">

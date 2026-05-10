@@ -387,7 +387,7 @@ export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: I
   return (
     <Card
       className="card-dashboard"
-      style={{ '--delay': '300ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">

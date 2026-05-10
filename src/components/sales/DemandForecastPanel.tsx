@@ -106,7 +106,7 @@ export function DemandForecastPanel({ productSummaries }: DemandForecastPanelPro
   if (forecastQuery.isLoading && !forecastData) {
     return (
       <Card className="card-dashboard border-l-[4px] border-l-violet-400"
-        style={{ '--delay': '300ms' } as React.CSSProperties}>
+       >
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <LineChart className="h-4 w-4 text-violet-500" />
@@ -120,7 +120,7 @@ export function DemandForecastPanel({ productSummaries }: DemandForecastPanelPro
 
   return (
     <Card className="card-dashboard border-l-[4px] border-l-violet-400"
-      style={{ '--delay': '300ms' } as React.CSSProperties}>
+     >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>

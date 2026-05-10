@@ -187,7 +187,7 @@ export function CostWaterfallChart() {
   // Loading state
   if (costListQuery.isLoading || !avgData) {
     return (
-      <Card className="card-dashboard" style={{ '--delay': '200ms' } as React.CSSProperties}>
+      <Card className="card-dashboard">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">成本瀑布图</CardTitle>
           <CardDescription>成本构成瀑布分析</CardDescription>
@@ -202,7 +202,7 @@ export function CostWaterfallChart() {
   return (
     <Card
       className="card-dashboard"
-      style={{ '--delay': '200ms' } as React.CSSProperties}
+     
     >
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

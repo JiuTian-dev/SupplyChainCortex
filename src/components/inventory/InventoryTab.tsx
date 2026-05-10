@@ -245,7 +245,7 @@ export function InventoryTab() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* ABC 分类 */}
-        <Card className="card-dashboard chart-container" style={{ '--delay': '0ms' } as React.CSSProperties}>
+        <Card className="card-dashboard chart-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">ABC 分类分布</CardTitle>
             <CardDescription>基于销售额贡献的产品分级</CardDescription>
@@ -281,7 +281,7 @@ export function InventoryTab() {
         </Card>
 
         {/* 周转天数分布 */}
-        <Card className="sm:col-span-2 lg:col-span-2 card-dashboard chart-container" style={{ '--delay': '100ms' } as React.CSSProperties}>
+        <Card className="sm:col-span-2 lg:col-span-2 card-dashboard chart-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">产品周转天数</CardTitle>
             <CardDescription>周转天数越短代表库存效率越高 | 红色虚线 = 90天滞销线</CardDescription>
@@ -311,7 +311,7 @@ export function InventoryTab() {
 
       {/* 滞销产品预警 */}
       {slowMoving.length > 0 && (
-        <Card className="card-dashboard border-amber-200 bg-amber-50 dark:bg-amber-950/20" style={{ '--delay': '200ms' } as React.CSSProperties}>
+        <Card className="card-dashboard border-amber-200 bg-amber-50 dark:bg-amber-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2 text-amber-700">
               <AlertTriangle className="h-4 w-4" />
@@ -338,7 +338,7 @@ export function InventoryTab() {
       )}
 
       {/* 库存库龄分布 */}
-      <Card className="card-dashboard chart-container border-l-[4px] border-l-emerald-400" style={{ '--delay': '250ms' } as React.CSSProperties}>
+      <Card className="card-dashboard chart-container border-l-[4px] border-l-emerald-400">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Layers className="h-4 w-4 text-emerald-500" />
@@ -394,7 +394,7 @@ export function InventoryTab() {
       </Card>
 
       {/* 仓库容量热力图 */}
-      <Card className="card-dashboard border-l-[4px] border-l-violet-400" style={{ '--delay': '250ms' } as React.CSSProperties}>
+      <Card className="card-dashboard border-l-[4px] border-l-violet-400">
         <CardHeader className="pb-2 bg-muted/30">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -719,7 +719,7 @@ export function InventoryTab() {
 
       {/* 采购计划 */}
       {procurementData && (procurementData as any)?.data?.items && (procurementData as any).data.items.length > 0 && (
-        <Card className="card-dashboard border-l-[4px] border-l-amber-400" style={{ '--delay': '300ms' } as React.CSSProperties}>
+        <Card className="card-dashboard border-l-[4px] border-l-amber-400">
           <CardHeader className="pb-2 bg-amber-50 dark:bg-amber-950/20">
             <CardTitle className="text-base font-semibold flex items-center gap-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
               <ShoppingCart className="h-4 w-4 text-amber-500" />
@@ -934,7 +934,7 @@ export function InventoryTab() {
       </Dialog>
 
       {/* 搜索和筛选 + 库存明细 */}
-      <Card className="card-dashboard" style={{ '--delay': '300ms' } as React.CSSProperties}>
+      <Card className="card-dashboard">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="text-base font-semibold">库存明细</CardTitle>

@@ -106,7 +106,7 @@ export function SupplyChainScoreCard() {
 
   return (
     <Card className={`card-dashboard ${gradeBg}`}
-      style={{ '--delay': '0ms' } as React.CSSProperties}>
+     >
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Shield className="h-4 w-4 text-orange-500" />

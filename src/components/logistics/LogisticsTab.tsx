@@ -412,7 +412,7 @@ export function LogisticsTab() {
       {/* 物流路线图 */}
       <Card
         className="card-dashboard"
-        style={{ '--delay': '0ms' } as React.CSSProperties}
+       
       >
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -465,7 +465,7 @@ export function LogisticsTab() {
       {/* 货运追踪列表 */}
       <Card
         className="card-dashboard"
-        style={{ '--delay': '200ms' } as React.CSSProperties}
+       
       >
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -531,7 +531,7 @@ export function LogisticsTab() {
       {/* 到货预测分析 */}
       <Card
         className="card-dashboard border-l-[4px] border-l-cyan-400"
-        style={{ '--delay': '250ms' } as React.CSSProperties}
+       
       >
         <CardHeader className="pb-2 bg-muted/30">
           <div className="flex items-center justify-between">
