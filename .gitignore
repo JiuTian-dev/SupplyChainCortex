@@ -63,3 +63,5 @@ server.log
 /db/custom.db
 *.tar
 mcp-card-*.png.idea/
+.idea/
+.chat-history/
