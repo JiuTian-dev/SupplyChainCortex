@@ -1046,18 +1046,20 @@ export async function getCascadeRisk(options?: {
   });
 
   // Write to shared agent memory for cross-agent context
-  agentMemory.updateShared('cascadeRisk', {
-    lastRun: new Date().toISOString(),
-    overallRisk: sourceNodes.reduce((sum, n) => sum + (n.riskScore || 0), 0) / Math.max(sourceNodes.length, 1),
-    affectedNodes: affectedNodes.length,
-    maxDepth: maxDepth,
-    scenario: scenario || 'auto',
-    topRisks: (topAffectedProducts || []).slice(0, 5).map(p => ({
-      nodeId: p.sku || p.productName,
-      riskScore: typeof p.impactScore === 'number' ? p.impactScore : 0,
-      label: p.productName,
-    })),
-  });
+  if (fusedSources.length > 0) {
+    agentMemory.updateShared('cascadeRisk', {
+      lastRun: new Date().toISOString(),
+      overallRisk: fusedSources.reduce((sum, n) => sum + (n.riskScore || 0), 0) / Math.max(fusedSources.length, 1),
+      affectedNodes: affectedNodes.length,
+      maxDepth: maxDepth,
+      scenario: scenario,
+      topRisks: (topAffectedProducts || []).slice(0, 5).map(p => ({
+        nodeId: p.sku || p.productName,
+        riskScore: typeof p.impactScore === 'number' ? p.impactScore : 0,
+        label: p.productName,
+      })),
+    });
+  }
 
   return report;
 }
