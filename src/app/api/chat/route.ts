@@ -9,6 +9,7 @@ import { withChatRateLimit } from '@/lib/api-protection';
 import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
+import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
 import {
   chatCompletionStream,
   chatCompletion,
@@ -133,6 +134,7 @@ async function handlePost(request: NextRequest) {
   const model = (body.model as string) || getDefaultModel(provider);
   const apiKey = body.apiKey as string | undefined;
   const history = (body.history as ChatMessage[]) || [];
+  const webSearchEnabled = body.webSearch === true;
 
   if (!message) {
     return apiError('请输入消息内容');
@@ -151,10 +153,10 @@ async function handlePost(request: NextRequest) {
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   if (stream) {
-    if (hasApiKey) return handleHybridStream(message, history, provider, model, apiKey);
+    if (hasApiKey) return handleHybridStream(message, history, provider, model, apiKey, webSearchEnabled);
     return handleLocalModeStream(message);
   }
-  if (hasApiKey) return handleHybrid(message, history, provider, model, apiKey);
+  if (hasApiKey) return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
   return handleLocalMode(message);
 }
 
@@ -187,18 +189,27 @@ async function executeMatchedTools(message: string): Promise<{
 }
 
 async function handleHybrid(
-  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string,
+  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string, webSearchEnabled?: boolean,
 ): Promise<NextResponse> {
   const { toolResults, toolsUsed } = await executeMatchedTools(message);
   const dataContext = toolResults.map(r => r.result).join('\n\n');
   const ragResults = retrieveKnowledge(message, 2);
   const ragContext = augmentPrompt(message, ragResults);
 
+  // Web search (if enabled)
+  let webContext = '';
+  if (webSearchEnabled) {
+    const searchResult = await webSearch(message);
+    if (searchResult.results.length > 0) {
+      webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
+    }
+  }
+
   try {
     const summaryMsg: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...history.slice(-6),  // last 3 user-assistant exchanges
-      { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}\n请综合分析。` },
+      { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}${webContext}\n请综合分析。` },
     ];
 
     const llmResult = await chatCompletion({
@@ -230,7 +241,7 @@ async function handleHybrid(
 }
 
 function handleHybridStream(
-  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string,
+  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string, webSearchEnabled?: boolean,
 ): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -254,13 +265,24 @@ function handleHybridStream(
         const ragResults = retrieveKnowledge(message, 2);
         const ragContext = augmentPrompt(message, ragResults);
 
+        // Web search (if enabled)
+        let webContext = '';
+        if (webSearchEnabled) {
+          const searchResult = await webSearch(message);
+          if (searchResult.results.length > 0) {
+            webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
+            enqueue('tool_call', { tool: 'web_search' });
+            enqueue('tool_result', { tool: 'web_search', result: `搜索完成: ${searchResult.results.length} 条结果` });
+          }
+        }
+
         // Try LLM summarization
         let llmFailed = false;
         try {
           const summaryMsg: ChatMessage[] = [
             { role: 'system', content: SYSTEM_PROMPT },
             ...history.slice(-6),
-            { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}\n请综合分析。` },
+            { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}${webContext}\n请综合分析。` },
           ];
 
           let fullText = '';

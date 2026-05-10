@@ -45,6 +45,7 @@ export function ChatPanel() {
   const [selectedModel, setSelectedModel] = useState<string>('deepseek-chat');
   const [apiKey, setApiKey] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [scanningOllama, setScanningOllama] = useState(false);
@@ -213,7 +214,7 @@ export function ChatPanel() {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined }),
+        body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, webSearch: webSearchEnabled }),
         signal: abortController.signal,
       });
 
@@ -361,6 +362,7 @@ export function ChatPanel() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${webSearchEnabled ? 'bg-green-500/30 text-green-400' : ''}`} onClick={() => { setWebSearchEnabled(!webSearchEnabled); if (!webSearchEnabled) toast.success('联网搜索已开启'); else toast.success('联网搜索已关闭'); }} aria-label="联网搜索"><Globe className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">{webSearchEnabled ? '联网搜索: 开' : '联网搜索: 关'}</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`} onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
               {messages.length > 0 && (
                 <>
