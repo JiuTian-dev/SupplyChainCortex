@@ -22,31 +22,31 @@ describe('sensitivityAnalysis', () => {
   const samplePropagation = [
     { nodeId: 'n1', label: 'Port Shanghai', type: 'PORT', riskScore: 80, initialRisk: 80, propagatedRisk: 68, path: ['shanghai'], depth: 0, metadata: {} },
     { nodeId: 'n2', label: 'Shipment A', type: 'SHIPMENT', riskScore: 60, initialRisk: 0, propagatedRisk: 51, path: ['shanghai', 'ship-a'], depth: 1, metadata: {} },
-  ];
+  ] as Record<string, unknown>[];
 
   it('returns one result per edge type', () => {
-    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation });
+    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation as unknown as Record<string, unknown>[] });
     expect(results.length).toBe(Object.keys(baseAttenuation).length);
   });
 
   it('each result contains parameter and perturbations array', () => {
-    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation });
+    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation as unknown as Record<string, unknown>[] });
     for (const r of results) {
       expect(r.parameter).toBeTruthy();
       expect(Array.isArray(r.perturbations)).toBe(true);
-      expect(r.perturbations.length).toBeGreaterThan(0);
+      expect((r.perturbations as unknown[]).length).toBeGreaterThan(0);
     }
   });
 
   it('handles empty propagation', () => {
     const results = sensitivityAnalysis({ baseAttenuation, propagation: [] });
     for (const r of results) {
-      expect(r.perturbations.length).toBeGreaterThan(0);
+      expect((r.perturbations as unknown[]).length).toBeGreaterThan(0);
     }
   });
 
   it('handles empty baseAttenuation', () => {
-    const results = sensitivityAnalysis({ baseAttenuation: {} as Record<string, number>, propagation: samplePropagation });
+    const results = sensitivityAnalysis({ baseAttenuation: {} as Record<string, number>, propagation: samplePropagation as any });
     expect(results).toEqual([]);
   });
 });
@@ -82,7 +82,7 @@ describe('runCounterfactual', () => {
     const alternatives = [
       { name: 'Reroute via Busan', targetNode: 'SKU001', action: 'Reroute', riskReduction: 0.4 },
     ];
-    const results = await runCounterfactual(baseReport, alternatives);
+    const results = await runCounterfactual(baseReport as any, alternatives);
     expect(results.length).toBe(1);
     expect(results[0].scenario).toBe('Reroute via Busan');
     expect(results[0].improvement).toBeGreaterThan(0);
@@ -91,12 +91,12 @@ describe('runCounterfactual', () => {
   });
 
   it('handles empty alternatives array', async () => {
-    const results = await runCounterfactual(baseReport, []);
+    const results = await runCounterfactual(baseReport as any, []);
     expect(results).toEqual([]);
   });
 
   it('handles report with zero affected nodes', async () => {
-    const results = await runCounterfactual(emptyReport, [
+    const results = await runCounterfactual(emptyReport as any, [
       { name: 'test', targetNode: 'x', action: 'y', riskReduction: 0.5 },
     ]);
     expect(results.length).toBe(1);
