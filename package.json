@@ -14,6 +14,7 @@
     "db:switch:pg": "bun run scripts/switch-db.ts postgresql",
     "db:switch:mysql": "bun run scripts/switch-db.ts mysql",
     "db:switch:sqlite": "bun run scripts/switch-db.ts sqlite",
+    "db:tariff-seed": "bun run prisma/tariff-seed.ts",
     "db:verify": "bun run scripts/verify-migration.ts",
     "db:seed": "bun run prisma/seed.ts",
     "test": "vitest run",
