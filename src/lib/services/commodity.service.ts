@@ -1,14 +1,13 @@
 /**
- * Commodity Price Service — free data sources for raw material prices.
+ * Commodity Price Service — raw material prices for small appliance manufacturing.
  *
- * Key materials for small appliance manufacturing:
- *   Copper (motors, wiring)  ·  Aluminum (housings, heat sinks)
- *   Steel (frames, blades)   ·  Plastic resin (housings, components)
+ * Key materials: Copper (motors/wiring), Aluminum (housings), Steel (frames),
+ *                Plastic resin (housings), Silicon steel (motor laminations)
  *
- * Free data sources:
- *   - World Bank Commodity Market Outlook (Pink Sheet) — monthly, no API key
- *   - DB CostRecord trend — real-time BOM cost changes
- *   - Static baseline fallback
+ * Data source priority:
+ *   1. commodities-api.com (free tier: 1000 req/month, set COMMODITIES_API_KEY in .env)
+ *   2. DB CostRecord trend — real-time BOM cost change detection
+ *   3. Static baseline — 2026 Q1 global averages
  */
 
 import { db } from '@/lib/db';
@@ -18,9 +17,9 @@ import { db } from '@/lib/db';
 export interface CommodityPrice {
   name: string;
   code: string;
-  price: number;        // USD per metric ton
+  price: number;
   unit: string;
-  changePct: number;    // month-over-month
+  changePct: number;
   source: 'api' | 'db' | 'static';
   updatedAt: string;
 }
@@ -34,28 +33,56 @@ export interface CommodityReport {
   updatedAt: string;
 }
 
-// ─── Static Baseline (USD/metric ton, 2026 Q1 averages) ────────────────────────
+// ─── Static Baseline (USD/metric ton, 2026 Q1) ──────────────────────────────────
 
 const BASELINE: Record<string, { price: number; name: string; unit: string }> = {
   COPPER:    { price: 8950, name: '铜 (Cu)',          unit: 'USD/吨' },
   ALUMINUM:  { price: 2450, name: '铝 (Al)',          unit: 'USD/吨' },
   STEEL_HRC: { price: 720,  name: '热轧钢卷 (HRC)',    unit: 'USD/吨' },
   PLASTIC:   { price: 1150, name: 'ABS 塑料粒子',      unit: 'USD/吨' },
-  SILICON:   { price: 3200, name: '硅钢片 (电机用)',    unit: 'USD/吨' },
+};
+
+// Commodities-API.com symbol mapping
+const API_SYMBOLS: Record<string, string> = {
+  COPPER:   'XCU',
+  ALUMINUM: 'XAL',
 };
 
 // ─── Price Fetch ────────────────────────────────────────────────────────────────
 
-async function fetchWorldBankCommodity(code: string): Promise<number | null> {
+async function fetchFromCommoditiesAPI(): Promise<CommodityPrice[] | null> {
+  const apiKey = process.env.COMMODITIES_API_KEY;
+  if (!apiKey) return null;
+
   try {
-    const url = `https://api.worldbank.org/v2/country/WLD/indicator/${code}?format=json&per_page=3`;
+    const symbols = Object.values(API_SYMBOLS).join(',');
+    const url = `https://commodities-api.com/api/latest?access_key=${apiKey}&base=USD&symbols=${symbols}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
-    const data = await res.json() as [unknown, Array<{ value: string | number } | null> | null];
-    const records = data?.[1];
-    if (!records || records.length === 0) return null;
-    const latest = records.find(r => r != null && r.value != null);
-    return latest ? Number(latest.value) : null;
+    const data = await res.json() as {
+      success: boolean;
+      data?: { rates?: Record<string, number> };
+    };
+    if (!data.success || !data.data?.rates) return null;
+
+    const prices: CommodityPrice[] = [];
+    for (const [code, apiSymbol] of Object.entries(API_SYMBOLS)) {
+      const baseline = BASELINE[code];
+      if (!baseline) continue;
+      const price = data.data.rates[apiSymbol];
+      if (typeof price !== 'number') continue;
+      const changePct = baseline.price > 0 ? ((price - baseline.price) / baseline.price) * 100 : 0;
+      prices.push({
+        name: baseline.name,
+        code,
+        price: Math.round(price * 100) / 100,
+        unit: baseline.unit,
+        changePct: Math.round(changePct * 10) / 10,
+        source: 'api',
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    return prices.length > 0 ? prices : null;
   } catch {
     return null;
   }
@@ -89,20 +116,23 @@ async function fetchFromDB(): Promise<CommodityPrice[]> {
 // ─── Main Export ─────────────────────────────────────────────────────────────────
 
 export async function getCommodityPrices(): Promise<CommodityReport> {
-  const commodities: CommodityPrice[] = [];
+  let commodities: CommodityPrice[] = [];
 
-  // Attempt World Bank API for copper (indicator: CM.MKT.TRNR doesn't map directly;
-  // World Bank commodity codes use a separate PMA dataset. Skip for now, use DB + static.)
-  //
-  // Future: subscribe to free commodity API or scrape World Bank Pink Sheet
+  // Priority 1: commodities-api.com
+  const apiPrices = await fetchFromCommoditiesAPI();
+  if (apiPrices && apiPrices.length > 0) {
+    commodities = apiPrices;
+  }
 
-  // Primary: DB-derived BOM cost changes
-  try {
-    const dbPrices = await fetchFromDB();
-    commodities.push(...dbPrices);
-  } catch { /* fall through to static */ }
+  // Priority 2: DB BOM analysis
+  if (commodities.length === 0) {
+    try {
+      const dbPrices = await fetchFromDB();
+      commodities.push(...dbPrices);
+    } catch { /* fall through */ }
+  }
 
-  // Static baselines (if no DB data)
+  // Priority 3: static baseline
   if (commodities.length === 0) {
     for (const [code, info] of Object.entries(BASELINE)) {
       commodities.push({
@@ -131,5 +161,3 @@ export async function getCommodityPrices(): Promise<CommodityReport> {
     updatedAt: new Date().toISOString(),
   };
 }
-
-// No caching wrapper needed — DB queries are already cached at the query level.

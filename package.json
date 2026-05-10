@@ -15,6 +15,7 @@
     "db:switch:mysql": "bun run scripts/switch-db.ts mysql",
     "db:switch:sqlite": "bun run scripts/switch-db.ts sqlite",
     "db:tariff-seed": "bun run prisma/tariff-seed.ts",
+    "db:tariff-scrape": "bun run scripts/scrape-ustr-tariffs.ts",
     "db:verify": "bun run scripts/verify-migration.ts",
     "db:seed": "bun run prisma/seed.ts",
     "test": "vitest run",
