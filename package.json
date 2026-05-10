@@ -19,6 +19,7 @@
     "db:scfi-scrape": "bun run scripts/scrape-scfi-freight.ts",
     "db:carbon-scrape": "bun run scripts/scrape-eu-carbon.ts",
     "db:cpsc-scrape": "bun run scripts/scrape-cpsc-recalls.ts",
+    "db:amazon-scrape": "bun run scripts/scrape-amazon-competitors.ts",
     "db:verify": "bun run scripts/verify-migration.ts",
     "db:seed": "bun run prisma/seed.ts",
     "test": "vitest run",

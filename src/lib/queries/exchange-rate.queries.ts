@@ -30,7 +30,7 @@ export interface ExchangeRateSnapshot {
 // ─── Config ──────────────────────────────────────────────────────────────────────
 
 const BASE_URL = 'https://api.frankfurter.app';
-const TARGET_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'KRW'];
+const TARGET_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'KRW', 'AUD'];
 
 // ─── Core ────────────────────────────────────────────────────────────────────────
 

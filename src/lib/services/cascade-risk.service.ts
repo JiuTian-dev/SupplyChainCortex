@@ -824,9 +824,8 @@ export async function getCascadeRisk(options?: {
     }
   }
 
-  // Exchange rate source — with 6s timeout and static fallback
+  // Multi-currency exchange rate source — 6s timeout with static fallback
   if (scenario === 'exchange_shock' || scenario === 'auto') {
-    let liveUsdRate: number | null = null;
     fxResult = await withFallback(
       async () => {
         const live = await withPromiseTimeout(getLatestRates('CNY'), 6000);
@@ -836,18 +835,41 @@ export async function getCascadeRisk(options?: {
       'exchange-rates',
     );
     if (fxResult.degraded) degradedSources.push('exchange-rates');
-    if (fxResult.data?.rates?.USD) liveUsdRate = 1 / fxResult.data.rates.USD;
-    const staticRate = getExchangeRate('USD');
-    const currentRate = liveUsdRate ?? staticRate?.rate ?? 7.25;
-    const deviation = Math.abs(currentRate - 7.25) / 7.25;
 
-    if (deviation > 0.01 || scenario === 'exchange_shock') {
+    // Check all trading currencies (USD/EUR/GBP/JPY/KRW/AUD)
+    const CURRENCY_BASELINES: Record<string, { baseline: number; label: string }> = {
+      USD: { baseline: 7.25, label: '美元' },
+      EUR: { baseline: 7.85, label: '欧元' },
+      GBP: { baseline: 9.15, label: '英镑' },
+      JPY: { baseline: 0.048, label: '日元' },
+      KRW: { baseline: 0.0054, label: '韩元' },
+      AUD: { baseline: 4.85, label: '澳元' },
+    };
+
+    let maxDeviation = 0;
+    let worstCurrency = '';
+    let worstRate = 0;
+
+    for (const [code, info] of Object.entries(CURRENCY_BASELINES)) {
+      const liveRate = fxResult.data?.rates?.[code] ? 1 / fxResult.data.rates[code] : null;
+      const staticRate = getExchangeRate(code)?.rate;
+      const currentRate = liveRate ?? staticRate ?? info.baseline;
+      const deviation = Math.abs(currentRate - info.baseline) / info.baseline;
+
+      if (deviation > maxDeviation) {
+        maxDeviation = deviation;
+        worstCurrency = code;
+        worstRate = currentRate;
+      }
+    }
+
+    if (maxDeviation > 0.01 || scenario === 'exchange_shock') {
       for (const [, node] of nodes) {
         if (node.type === 'SUPPLIER') {
           anomalySources.push({
             nodeId: node.id,
-            riskScore: Math.min(Math.round(deviation * 100 * 5), 90),
-            cause: `汇率: 1 USD = ${currentRate.toFixed(2)} CNY (偏离${(deviation * 100).toFixed(1)}%)`,
+            riskScore: Math.min(Math.round(maxDeviation * 100 * 5), 90),
+            cause: `汇率: 1 ${worstCurrency} = ${worstRate.toFixed(worstCurrency === 'JPY' || worstCurrency === 'KRW' ? 4 : 2)} CNY (偏离${(maxDeviation * 100).toFixed(1)}%)`,
             category: 'exchange',
           });
           break;
