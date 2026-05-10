@@ -20,26 +20,35 @@ export function SandboxReplay() {
   const [lastSeed, setLastSeed] = useState('');
   const [liveParams, setLiveParams] = useState<Record<string, number>>({});
   const [liveLoaded, setLiveLoaded] = useState(false);
+  const [autoResult, setAutoResult] = useState<Record<string, unknown> | null>(null);
+  const [baselineResult, setBaselineResult] = useState<Record<string, unknown> | null>(null);
 
-  // Load live commodity/freight data for the "当前趋势" baseline
+  // Load live commodity/freight data for "当前趋势" baseline, then auto-run
   useEffect(() => {
-    const loadLive = async () => {
+    const loadAndRun = async () => {
       try {
         const [commodity, freight] = await Promise.all([
           fetch('/api/commodity').then(r => r.json()).catch(() => ({})),
           fetch('/api/freight').then(r => r.json()).catch(() => ({})),
         ]);
         const copperChange = (commodity?.commodities?.find((c: Record<string, unknown>) => c.code === 'COPPER')?.changePct as number) || 0;
-        const freightChange = (freight?.rates?.[0]?.changePct as number) || 0;
         setLiveParams({
           copperChange: Math.round(copperChange * 10) / 10,
           freightTrend: freight?.trend === 'rising' ? 1 : freight?.trend === 'falling' ? -1 : 0,
           avgFreightRate: freight?.avgRate40GP || 0,
         });
         setLiveLoaded(true);
-      } catch { /* use defaults */ }
+
+        // Auto-run digital twin: current trend vs baseline
+        const [trendRes, baseRes] = await Promise.all([
+          fetch('/api/sandbox?scenario=auto&rounds=30&seed=digital_twin').then(r => r.json()),
+          fetch('/api/sandbox?scenario=baseline&rounds=30&seed=digital_twin').then(r => r.json()),
+        ]);
+        setAutoResult(trendRes);
+        setBaselineResult(baseRes);
+      } catch { /* degrade silently */ }
     };
-    loadLive();
+    loadAndRun();
   }, []);
 
   const run = async (replaySeed?: string) => {
@@ -69,6 +78,33 @@ export function SandboxReplay() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* 数字孪生 — auto-run results */}
+        {autoResult && baselineResult && (
+          <div className="grid grid-cols-3 gap-2 text-xs bg-muted/20 rounded-lg p-2">
+            <div className="text-center">
+              <div className="text-muted-foreground">当前韧性</div>
+              <div className="text-lg font-bold text-orange-600">{((autoResult as Record<string,Record<string,unknown>>)?.summary as Record<string,number>)?.resilienceScore || '—'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-muted-foreground">基准韧性</div>
+              <div className="text-lg font-bold text-green-600">{((baselineResult as Record<string,Record<string,unknown>>)?.summary as Record<string,number>)?.resilienceScore || '—'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-muted-foreground">差值</div>
+              {(() => {
+                const current = ((autoResult as Record<string,Record<string,unknown>>)?.summary as Record<string,number>)?.resilienceScore || 0;
+                const baseline = ((baselineResult as Record<string,Record<string,unknown>>)?.summary as Record<string,number>)?.resilienceScore || 0;
+                const delta = current - baseline;
+                return (
+                  <div className={`text-lg font-bold ${delta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {delta >= 0 ? '+' : ''}{delta}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={scenario} onValueChange={setScenario}>
             <SelectTrigger className="h-7 text-xs w-36"><SelectValue /></SelectTrigger>

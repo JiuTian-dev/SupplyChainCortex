@@ -160,19 +160,23 @@ export function DecisionCenter() {
   const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [agentContext, setAgentContext] = useState<Record<string, unknown> | null>(null);
+  const [feedbackStats, setFeedbackStats] = useState<Record<string, number> | null>(null);
 
   const fetchDecisions = useCallback(async () => {
     try {
-      // Fetch cascade risk + decision graph + agent memory in parallel
-      const [cascadeRes, decisionRes, memRes] = await Promise.all([
+      // Fetch cascade risk + decision graph + agent memory + feedback in parallel
+      const [cascadeRes, decisionRes, memRes, fbRes] = await Promise.all([
         fetch('/api/cascade-risk?scenario=auto&includeForwardProjection=true&includeCounterfactuals=true'),
         fetch('/api/decision-graph?mode=dynamic&scenario=auto'),
         fetch('/api/agent-memory'),
+        fetch('/api/engine-feedback'),
       ]);
       const risk = await cascadeRes.json();
       const dynamic = await decisionRes.json();
       const memory = await memRes.json().catch(() => ({}));
+      const fbData = await fbRes.json().catch(() => ({}));
       setAgentContext(memory.shared || null);
+      setFeedbackStats(fbData.stats || null);
 
       const passport = risk.passport;
       const items: DecisionItem[] = [];
@@ -329,6 +333,22 @@ export function DecisionCenter() {
           <RefreshCw className="h-3 w-3 mr-1" />刷新决策
         </Button>
       </div>
+
+      {/* Decision feedback loop stats */}
+      {feedbackStats && (feedbackStats as Record<string, number>).total > 0 && (
+        <div className="flex flex-wrap gap-3 text-xs bg-muted/20 rounded-lg px-3 py-2">
+          <span className="font-medium text-muted-foreground">决策闭环:</span>
+          <span>累计 {(feedbackStats as Record<string, number>).total} 条</span>
+          <span className="text-green-600 dark:text-green-400">
+            采纳率 {Math.round((feedbackStats as Record<string, number>).acceptanceRate * 100)}%
+          </span>
+          {(feedbackStats as Record<string, number>).accepted > 0 && (
+            <span className="text-muted-foreground">
+              ✓ {Math.round((feedbackStats as Record<string, number>).accepted * 100) / 100} · ✗ {(feedbackStats as Record<string, number>).rejected || 0}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Cross-agent context ribbon */}
       {agentContext && (

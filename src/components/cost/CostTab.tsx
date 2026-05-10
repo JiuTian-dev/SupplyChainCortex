@@ -234,6 +234,50 @@ export function CostTab() {
       {/* 主要结算货币对 CNY 实时汇率矩阵 */}
       <ExchangeRateMatrix />
 
+      {/* 交叉影响矩阵 — 外部因素对产品毛利率的敏感度 */}
+      <Card className="card-dashboard">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">外部因素敏感度矩阵</CardTitle>
+          <CardDescription>铜/运费/汇率变动对各产品毛利率的影响估算（基于 BOM 结构）</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-[10px]">产品</TableHead>
+                  <TableHead className="text-right text-[10px]">铜价 +10%</TableHead>
+                  <TableHead className="text-right text-[10px]">运费 +15%</TableHead>
+                  <TableHead className="text-right text-[10px]">CNY 升值 5%</TableHead>
+                  <TableHead className="text-right text-[10px]">综合影响</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {costs.slice(0, 6).map((c: CostRecord) => {
+                  const copperShare = c.rawMaterial / Math.max(c.totalLanded, 1);
+                  const freightShare = c.logistics / Math.max(c.totalLanded, 1);
+                  const cnyShare = (c.rawMaterial + c.labor) / Math.max(c.totalLanded, 1);
+                  const copperImpact = Math.round(copperShare * 10 * 0.3 * 100) / 100;
+                  const freightImpact = Math.round(freightShare * 15 * 100) / 100;
+                  const fxImpact = Math.round(cnyShare * 5 * 100) / 100;
+                  const totalImpact = Math.round((copperImpact + freightImpact + fxImpact) * 10) / 10;
+                  const severityColor = totalImpact >= 4 ? 'text-red-600' : totalImpact >= 2.5 ? 'text-amber-600' : 'text-muted-foreground';
+                  return (
+                    <TableRow key={c.sku} className="text-xs">
+                      <TableCell className="font-medium">{c.productName.length > 8 ? c.productName.slice(0, 8) + '…' : c.productName}</TableCell>
+                      <TableCell className="text-right">{copperImpact > 0 ? '−' : ''}{copperImpact}pp</TableCell>
+                      <TableCell className="text-right">−{freightImpact}pp</TableCell>
+                      <TableCell className="text-right">−{fxImpact}pp</TableCell>
+                      <TableCell className={`text-right font-semibold ${severityColor}`}>−{totalImpact}pp</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* 毛利率对比 */}
         <Card
