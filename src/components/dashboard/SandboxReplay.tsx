@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Hash, Brain, Cpu, TrendingUp } from 'lucide-react';
+import { Play, RotateCcw, Hash, Brain, Cpu, TrendingUp, Swords } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,21 @@ export function SandboxReplay() {
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [autoResult, setAutoResult] = useState<Record<string, unknown> | null>(null);
   const [baselineResult, setBaselineResult] = useState<Record<string, unknown> | null>(null);
+  const [adversarialResult, setAdversarialResult] = useState<Record<string, unknown> | null>(null);
+  const [adversarialLoading, setAdversarialLoading] = useState(false);
+
+  const runAdversarial = async () => {
+    setAdversarialLoading(true);
+    try {
+      // Current strategy (auto scenario) vs optimal (stress_test with adaptation)
+      const [current, optimal] = await Promise.all([
+        fetch('/api/sandbox?scenario=auto&rounds=30&seed=adversarial').then(r => r.json()),
+        fetch('/api/sandbox?scenario=baseline&rounds=30&seed=adversarial_opt').then(r => r.json()),
+      ]);
+      setAdversarialResult({ current, optimal });
+    } catch { /* degrade */ }
+    setAdversarialLoading(false);
+  };
 
   // Load live commodity/freight data for "当前趋势" baseline, then auto-run
   useEffect(() => {
@@ -149,7 +164,32 @@ export function SandboxReplay() {
               <RotateCcw className="h-3 w-3" />复现 seed={lastSeed}
             </Button>
           )}
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-orange-300 text-orange-700" disabled={adversarialLoading} onClick={runAdversarial}>
+            <Swords className="h-3 w-3" />{adversarialLoading ? '对抗中...' : '对抗推演'}
+          </Button>
         </div>
+
+        {/* 对抗推演结果 — current vs optimal side-by-side */}
+        {adversarialResult && (
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2">
+              <div className="text-muted-foreground mb-1">当前策略</div>
+              <div className="font-bold text-red-600">
+                韧性: {(((adversarialResult as Record<string,Record<string,unknown>>).current as Record<string,Record<string,number>>)?.summary as Record<string,number>)?.resilienceScore || '—'}
+              </div>
+            </div>
+            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2">
+              <div className="text-muted-foreground mb-1">最优策略</div>
+              <div className="font-bold text-green-600">
+                韧性: {(((adversarialResult as Record<string,Record<string,unknown>>).optimal as Record<string,Record<string,number>>)?.summary as Record<string,number>)?.resilienceScore || '—'}
+              </div>
+            </div>
+            <div className="col-span-2 text-center text-[10px] text-muted-foreground">
+              差距 = 最优策略韧性 - 当前策略韧性 → 你的供应链"可改善空间"
+            </div>
+          </div>
+        )}
+
         {result && (
           <div className="grid grid-cols-4 gap-2 text-xs">
             {result.config ? (

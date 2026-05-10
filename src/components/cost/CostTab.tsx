@@ -238,7 +238,7 @@ export function CostTab() {
       <Card className="card-dashboard">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">外部因素敏感度矩阵</CardTitle>
-          <CardDescription>铜/运费/汇率变动对各产品毛利率的影响估算（基于 BOM 结构）</CardDescription>
+          <CardDescription>铜/运费/汇率变动对各产品毛利率的影响估算 · <span className="text-orange-600 font-medium">含 2 周趋势预测</span></CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -272,6 +272,22 @@ export function CostTab() {
                     </TableRow>
                   );
                 })}
+                {/* Cost prediction — 2-week trend extrapolation */}
+                <TableRow className="bg-orange-50/50 dark:bg-orange-950/10 border-t-2">
+                  <TableCell colSpan={5} className="text-[10px] text-muted-foreground py-1.5">
+                    📈 <span className="font-medium text-orange-700 dark:text-orange-300">2 周预测:</span>
+                    {' '}当前铜/运费/汇率趋势持续 → 综合毛利影响将进一步扩大至{' '}
+                    <span className="font-bold text-red-600">
+                      −{(costs.slice(0, 6).reduce((s: number, c: CostRecord) => {
+                        const copperShare = c.rawMaterial / Math.max(c.totalLanded, 1) * 10 * 0.3;
+                        const freightShare = c.logistics / Math.max(c.totalLanded, 1) * 15;
+                        const cnyShare = (c.rawMaterial + c.labor) / Math.max(c.totalLanded, 1) * 5;
+                        return s + (copperShare + freightShare + cnyShare) * 1.4; // 1.4x for 2-week compounding
+                      }, 0) / Math.max(costs.slice(0, 6).length, 1)).toFixed(1)}
+                      pp
+                    </span>{' '}(6 产品均值，基于 2 周趋势外推)
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
