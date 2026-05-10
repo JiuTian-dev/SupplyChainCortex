@@ -54,6 +54,7 @@ prompt
 server.log
 # Skills directory
 /skills/
+/.agents/
 
 # Large files & artifacts (don't commit)
 /upload/
