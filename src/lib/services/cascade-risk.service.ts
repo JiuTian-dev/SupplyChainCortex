@@ -914,6 +914,35 @@ export async function getCascadeRisk(options?: {
     } catch { /* tariff engine unavailable */ }
   }
 
+  // Quality & returns risk — defect rates and return trends
+  if (scenario === 'auto') {
+    try {
+      const [defects, returns] = await Promise.all([
+        db.defectRecord.findMany({ orderBy: { createdAt: 'desc' }, take: 50 }),
+        db.returnRecord.findMany({ orderBy: { createdAt: 'desc' }, take: 50 }),
+      ]);
+      const totalDefects = defects.length;
+      const totalReturns = returns.length;
+      if (totalDefects + totalReturns > 0) {
+        const recentReturns = returns.filter(r => {
+          const d = new Date(r.createdAt);
+          const monthAgo = new Date(); monthAgo.setDate(monthAgo.getDate() - 30);
+          return d > monthAgo;
+        }).length;
+        const riskScore = recentReturns > 3 ? 55 : totalDefects > 10 ? 40 : 25;
+        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+        if (productNode && (totalDefects > 5 || totalReturns > 2)) {
+          anomalySources.push({
+            nodeId: productNode.id,
+            riskScore,
+            cause: `质量风险: ${totalDefects} 条缺陷记录, ${totalReturns} 条退货 (近30天 ${recentReturns} 条)`,
+            category: 'compliance',
+          });
+        }
+      }
+    } catch { /* DB tables unavailable */ }
+  }
+
   // Inventory health risk — low stock / high turnover / dead stock
   if (scenario === 'auto') {
     try {
@@ -972,31 +1001,24 @@ export async function getCascadeRisk(options?: {
     } catch { /* DB unavailable */ }
   }
 
-  // Commodity price risk — key materials for small appliance manufacturing
+  // Commodity price risk — DB trend + static baseline for small appliance BOM
   if (scenario === 'auto') {
     try {
-      const costChanges = await db.costRecord.findMany({
-        orderBy: { updatedAt: 'desc' }, take: 50,
-      });
-      if (costChanges.length >= 2) {
-        const recent = costChanges.slice(0, 10);
-        const older = costChanges.slice(-10);
-        const recentAvg = recent.reduce((s, c) => s + c.rawMaterial, 0) / recent.length;
-        const olderAvg = older.reduce((s, c) => s + c.rawMaterial, 0) / older.length;
-        const changePct = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0;
-        if (Math.abs(changePct) > 5) {
-          const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
-          if (productNode) {
-            anomalySources.push({
-              nodeId: productNode.id,
-              riskScore: Math.min(Math.round(Math.abs(changePct) * 2), 75),
-              cause: `原材料成本: BOM成本 ${changePct > 0 ? '上涨' : '下降'} ${Math.abs(changePct).toFixed(1)}%（原材料均价 ¥${recentAvg.toFixed(1)} vs ¥${olderAvg.toFixed(1)}）`,
-              category: 'exchange',
-            });
-          }
+      const { getCommodityPrices } = await import('@/lib/services/commodity.service');
+      const commodityReport = await getCommodityPrices();
+      if (commodityReport.affectedMaterials.length > 0 || Math.abs(commodityReport.avgChangePct) > 3) {
+        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+        if (productNode) {
+          const trend = commodityReport.overallTrend === 'rising' ? '上涨' : '下降';
+          anomalySources.push({
+            nodeId: productNode.id,
+            riskScore: Math.min(45 + Math.round(Math.abs(commodityReport.avgChangePct) * 2), 80),
+            cause: `原材料成本: BOM成本 ${trend} ${Math.abs(commodityReport.avgChangePct).toFixed(1)}%（${commodityReport.affectedMaterials.join('、') || '整体物料'}）`,
+            category: 'exchange',
+          });
         }
       }
-    } catch { /* DB unavailable */ }
+    } catch { /* commodity service unavailable — skip */ }
   }
 
   // Shipment delay risk — delayed shipments / carrier performance
