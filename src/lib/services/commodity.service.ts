@@ -36,11 +36,12 @@ export interface CommodityReport {
 
 // ─── Static Baseline (USD/metric ton, 2026 Q1) ──────────────────────────────────
 
+// Baseline updated: 2026-03 FRED data (PCOPPUSDM, PALUMUSDM, PSTEELUSDM)
 const BASELINE: Record<string, { price: number; name: string; unit: string }> = {
-  COPPER:    { price: 8950, name: '铜 (Cu)',          unit: 'USD/吨' },
-  ALUMINUM:  { price: 2450, name: '铝 (Al)',          unit: 'USD/吨' },
-  STEEL_HRC: { price: 720,  name: '热轧钢卷 (HRC)',    unit: 'USD/吨' },
-  PLASTIC:   { price: 1150, name: 'ABS 塑料粒子',      unit: 'USD/吨' },
+  COPPER:    { price: 12529, name: '铜 (Cu)',          unit: 'USD/吨' },
+  ALUMINUM:  { price: 3373,  name: '铝 (Al)',          unit: 'USD/吨' },
+  STEEL_HRC: { price: 698,   name: '热轧钢卷 (HRC)',    unit: 'USD/吨' },
+  PLASTIC:   { price: 1150,  name: 'ABS 塑料粒子',      unit: 'USD/吨' },
 };
 
 // FRED series mapping
