@@ -825,7 +825,7 @@ export async function getCascadeRisk(options?: {
   }
 
   // Exchange rate source — with 6s timeout and static fallback
-  if (scenario === 'exchange_shock' || (scenario === 'auto' && anomalySources.length < 2)) {
+  if (scenario === 'exchange_shock' || scenario === 'auto') {
     let liveUsdRate: number | null = null;
     fxResult = await withFallback(
       async () => {
@@ -857,7 +857,7 @@ export async function getCascadeRisk(options?: {
   }
 
   // Supplier source
-  if (scenario === 'supplier_failure' || (scenario === 'auto' && anomalySources.length < 2)) {
+  if (scenario === 'supplier_failure' || scenario === 'auto') {
     const supplierNodes = [...nodes.values()].filter(n => n.type === 'SUPPLIER');
     if (supplierNodes.length > 0) {
       const lowest = supplierNodes.reduce((a, b) => ((a.metadata.rating as number) || 3) < ((b.metadata.rating as number) || 3) ? a : b);
@@ -885,7 +885,7 @@ export async function getCascadeRisk(options?: {
   }
 
   // Tariff escalation source
-  if (scenario === 'tariff_escalation' || (scenario === 'auto' && anomalySources.length < 2)) {
+  if (scenario === 'tariff_escalation' || scenario === 'auto') {
     try {
       const allProducts = await db.product.findMany({ take: 500 });
       const allCosts = await db.costRecord.findMany({ take: 500 });
@@ -914,13 +914,122 @@ export async function getCascadeRisk(options?: {
     } catch { /* tariff engine unavailable */ }
   }
 
-  // Fallback: demo mode
+  // Inventory health risk — low stock / high turnover / dead stock
+  if (scenario === 'auto') {
+    try {
+      const inventoryItems = await db.inventory.findMany({ take: 200 });
+      const criticalItems = inventoryItems.filter(i =>
+        i.stockStatus === 'critical' || (i.quantity < (i.safetyStock || 50) * 0.7)
+      );
+      const deadStockItems = inventoryItems.filter(i => (i.turnoverDays || 0) > 180);
+      if (criticalItems.length > 0) {
+        const worst = criticalItems.sort((a, b) => (a.quantity / Math.max(a.safetyStock || 1, 1)) - (b.quantity / Math.max(b.safetyStock || 1, 1)))[0];
+        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT' && n.id === worst.sku);
+        if (productNode) {
+          anomalySources.push({
+            nodeId: productNode.id,
+            riskScore: Math.min(60 + criticalItems.length * 3, 90),
+            cause: `库存风险: ${criticalItems.length} 个 SKU 库存不足 (最严重: ${worst.sku} 仅剩 ${worst.quantity}/${worst.safetyStock})${deadStockItems.length > 0 ? `，${deadStockItems.length} 个 SKU 滞销>180天` : ''}`,
+            category: 'inventory',
+          });
+        }
+      } else if (deadStockItems.length > 0) {
+        const worst = deadStockItems.sort((a, b) => (b.turnoverDays || 0) - (a.turnoverDays || 0))[0];
+        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT' && n.id === worst.sku);
+        if (productNode) {
+          anomalySources.push({
+            nodeId: productNode.id,
+            riskScore: 45,
+            cause: `库存滞销: ${deadStockItems.length} 个 SKU 周转>180天 (最长 ${worst.sku} ${worst.turnoverDays}天)`,
+            category: 'inventory',
+          });
+        }
+      }
+    } catch { /* DB unavailable */ }
+  }
+
+  // Compliance expiry risk — certificates expiring within 90 days
+  if (scenario === 'auto') {
+    try {
+      const ninetyDaysFromNow = new Date();
+      ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+      const expiringCerts = await db.complianceCert.findMany({
+        where: { expiryDate: { lte: ninetyDaysFromNow }, status: { not: 'expired' } },
+        take: 50,
+      });
+      if (expiringCerts.length > 0) {
+        const urgent = expiringCerts.filter(c => new Date(c.expiryDate).getTime() - Date.now() < 30 * 24 * 3600 * 1000);
+        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+        if (productNode) {
+          anomalySources.push({
+            nodeId: productNode.id,
+            riskScore: urgent.length > 0 ? 65 : 40,
+            cause: `合规风险: ${expiringCerts.length} 份证书 90 天内到期${urgent.length > 0 ? ` (${urgent.length} 份 30 天内紧急)` : ''}`,
+            category: 'compliance',
+          });
+        }
+      }
+    } catch { /* DB unavailable */ }
+  }
+
+  // Commodity price risk — key materials for small appliance manufacturing
+  if (scenario === 'auto') {
+    try {
+      const costChanges = await db.costRecord.findMany({
+        orderBy: { updatedAt: 'desc' }, take: 50,
+      });
+      if (costChanges.length >= 2) {
+        const recent = costChanges.slice(0, 10);
+        const older = costChanges.slice(-10);
+        const recentAvg = recent.reduce((s, c) => s + c.rawMaterial, 0) / recent.length;
+        const olderAvg = older.reduce((s, c) => s + c.rawMaterial, 0) / older.length;
+        const changePct = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0;
+        if (Math.abs(changePct) > 5) {
+          const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+          if (productNode) {
+            anomalySources.push({
+              nodeId: productNode.id,
+              riskScore: Math.min(Math.round(Math.abs(changePct) * 2), 75),
+              cause: `原材料成本: BOM成本 ${changePct > 0 ? '上涨' : '下降'} ${Math.abs(changePct).toFixed(1)}%（原材料均价 ¥${recentAvg.toFixed(1)} vs ¥${olderAvg.toFixed(1)}）`,
+              category: 'exchange',
+            });
+          }
+        }
+      }
+    } catch { /* DB unavailable */ }
+  }
+
+  // Shipment delay risk — delayed shipments / carrier performance
+  if (scenario === 'auto') {
+    try {
+      const shipments = await db.shipmentItem.findMany({
+        where: { status: { in: ['in_transit', 'delayed', 'exception'] } },
+        take: 100,
+      });
+      const delayed = shipments.filter(s => s.status === 'delayed' || s.status === 'exception');
+      const avgDelay = delayed.length > 0 ? Math.round(delayed.reduce((s, sh) => s + (sh.delayDays || 0), 0) / delayed.length) : 0;
+      if (delayed.length > 0) {
+        const portNode = [...nodes.values()].find(n => n.type === 'PORT');
+        if (portNode) {
+          anomalySources.push({
+            nodeId: portNode.id,
+            riskScore: Math.min(45 + delayed.length * 4, 85),
+            cause: `物流延误: ${delayed.length}/${shipments.length} 票货运延误 (平均 ${avgDelay} 天)`,
+            category: 'logistics',
+          });
+        }
+      }
+    } catch { /* DB unavailable */ }
+  }
+
+  // Fallback: balanced summary mode
   if (anomalySources.length === 0) {
     const firstPort = [...nodes.values()].find(n => n.type === 'PORT');
-    if (firstPort) {
+    const firstProduct = [...nodes.values()].find(n => n.type === 'PRODUCT');
+    if (firstPort && firstProduct) {
       anomalySources.push({
-        nodeId: firstPort.id, riskScore: 50,
-        cause: '模拟: 港口天气风险 (演示)',
+        nodeId: firstPort.id, riskScore: 30,
+        cause: '综合评估: 当前供应链运行正常，无显著风险信号',
         category: 'weather',
       });
     }
