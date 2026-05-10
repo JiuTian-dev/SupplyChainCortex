@@ -5,7 +5,8 @@
  *                Plastic resin (housings), Silicon steel (motor laminations)
  *
  * Data source priority:
- *   1. commodities-api.com (free tier: 1000 req/month, set COMMODITIES_API_KEY in .env)
+ *   1. FRED (St. Louis Fed) — free API, register at fred.stlouisfed.org for key
+ *      Set FRED_API_KEY in .env. Series: PCOPPUSDM, PALUMUSDM, PSTEELUSDM
  *   2. DB CostRecord trend — real-time BOM cost change detection
  *   3. Static baseline — 2026 Q1 global averages
  */
@@ -42,41 +43,42 @@ const BASELINE: Record<string, { price: number; name: string; unit: string }> = 
   PLASTIC:   { price: 1150, name: 'ABS 塑料粒子',      unit: 'USD/吨' },
 };
 
-// Commodities-API.com symbol mapping
-const API_SYMBOLS: Record<string, string> = {
-  COPPER:   'XCU',
-  ALUMINUM: 'XAL',
+// FRED series mapping
+const FRED_SERIES: Record<string, { id: string; baseline: { price: number; name: string; unit: string } }> = {
+  COPPER:   { id: 'PCOPPUSDM',   baseline: BASELINE.COPPER },
+  ALUMINUM: { id: 'PALUMUSDM',   baseline: BASELINE.ALUMINUM },
+  STEEL_HRC:{ id: 'PSTEELUSDM',  baseline: BASELINE.STEEL_HRC },
 };
 
 // ─── Price Fetch ────────────────────────────────────────────────────────────────
 
-async function fetchFromCommoditiesAPI(): Promise<CommodityPrice[] | null> {
-  const apiKey = process.env.COMMODITIES_API_KEY;
+async function fetchFromFRED(): Promise<CommodityPrice[] | null> {
+  const apiKey = process.env.FRED_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const symbols = Object.values(API_SYMBOLS).join(',');
-    const url = `https://commodities-api.com/api/latest?access_key=${apiKey}&base=USD&symbols=${symbols}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const data = await res.json() as {
-      success: boolean;
-      data?: { rates?: Record<string, number> };
-    };
-    if (!data.success || !data.data?.rates) return null;
-
     const prices: CommodityPrice[] = [];
-    for (const [code, apiSymbol] of Object.entries(API_SYMBOLS)) {
-      const baseline = BASELINE[code];
-      if (!baseline) continue;
-      const price = data.data.rates[apiSymbol];
-      if (typeof price !== 'number') continue;
-      const changePct = baseline.price > 0 ? ((price - baseline.price) / baseline.price) * 100 : 0;
+    for (const [code, series] of Object.entries(FRED_SERIES)) {
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&api_key=${apiKey}&file_type=json&limit=1&sort_order=desc`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json() as {
+        observations?: Array<{ value: string }>;
+      };
+      const latest = data.observations?.[0];
+      if (!latest || latest.value === '.') continue;
+      const price = parseFloat(latest.value);
+      if (isNaN(price) || price <= 0) continue;
+
+      const changePct = series.baseline.price > 0
+        ? ((price - series.baseline.price) / series.baseline.price) * 100
+        : 0;
+
       prices.push({
-        name: baseline.name,
+        name: series.baseline.name,
         code,
         price: Math.round(price * 100) / 100,
-        unit: baseline.unit,
+        unit: series.baseline.unit,
         changePct: Math.round(changePct * 10) / 10,
         source: 'api',
         updatedAt: new Date().toISOString(),
@@ -118,8 +120,8 @@ async function fetchFromDB(): Promise<CommodityPrice[]> {
 export async function getCommodityPrices(): Promise<CommodityReport> {
   let commodities: CommodityPrice[] = [];
 
-  // Priority 1: commodities-api.com
-  const apiPrices = await fetchFromCommoditiesAPI();
+  // Priority 1: FRED (St. Louis Fed) — free, no credit card
+  const apiPrices = await fetchFromFRED();
   if (apiPrices && apiPrices.length > 0) {
     commodities = apiPrices;
   }
