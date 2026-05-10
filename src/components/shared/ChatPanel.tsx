@@ -13,6 +13,7 @@ import {
   MessageSquare, X, Send, Bot, User, Sparkles, ChevronDown,
   Package, DollarSign, TrendingUp, Ship, Building2, Shield, BarChart3,
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
+  Download, Upload,
   Wifi, GripVertical, RefreshCw, Play, CircleDot, Loader2, Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -143,6 +144,44 @@ export function ChatPanel() {
     setThinking(false); setStreamingToolCalls([]); setIsLoading(false);
     clearStoredMessages();
     toast.success('聊天记录已清除');
+  }, []);
+
+  // Server-side conversation save/load
+  const [convList, setConvList] = useState<Array<{ id: string; title: string; messageCount: number }>>([]);
+  const [showConvList, setShowConvList] = useState(false);
+
+  const saveToServer = useCallback(async () => {
+    if (messages.length === 0) { toast.error('无对话可保存'); return; }
+    try {
+      const title = messages.find(m => m.role === 'user')?.content.slice(0, 30) || '新对话';
+      const res = await fetch('/api/chat-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, messages: messages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp })) }),
+      });
+      if (res.ok) toast.success('对话已保存到服务器');
+    } catch { toast.error('保存失败'); }
+  }, [messages]);
+
+  const loadFromServer = useCallback(async (id: string) => {
+    try {
+      const res = await fetch('/api/chat-history?id=' + id);
+      if (!res.ok) { toast.error('加载失败'); return; }
+      const conv = await res.json();
+      setMessages(conv.messages.slice(-20));
+      saveMessages(conv.messages.slice(-20));
+      setShowConvList(false);
+      toast.success('对话已加载');
+    } catch { toast.error('加载失败'); }
+  }, []);
+
+  const loadConvList = useCallback(async () => {
+    try {
+      const res = await fetch('/api/chat-history');
+      const list = await res.json();
+      setConvList(list);
+      setShowConvList(true);
+    } catch { toast.error('获取列表失败'); }
   }, []);
 
   // Send message with SSE streaming
@@ -324,7 +363,11 @@ export function ChatPanel() {
               </DropdownMenu>
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`} onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
               {messages.length > 0 && (
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={clearMessages} aria-label="清除历史"><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">清除历史</TooltipContent></Tooltip>
+                <>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={saveToServer} aria-label="保存对话"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">保存到服务器</TooltipContent></Tooltip>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={loadConvList} aria-label="加载对话"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">加载历史对话</TooltipContent></Tooltip>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={clearMessages} aria-label="清除历史"><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">清除历史</TooltipContent></Tooltip>
+                </>
               )}
               <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={() => setIsOpen(false)} aria-label="关闭聊天面板"><X className="h-4 w-4" /></Button>
             </div>
@@ -444,6 +487,22 @@ export function ChatPanel() {
               {isLoading && messages[messages.length - 1]?.role === 'user' && <TypingIndicator thinking={thinking} />}
             </div>
           </div>
+          {/* Conversation list popup */}
+          {showConvList && (
+            <div className="absolute top-12 right-2 z-50 bg-card border rounded-lg shadow-lg p-2 w-56 max-h-48 overflow-y-auto">
+              <div className="text-[10px] text-muted-foreground mb-1 px-1">已保存的对话</div>
+              {convList.length === 0 ? (
+                <div className="text-xs text-muted-foreground px-1 py-2">暂无</div>
+              ) : convList.map(c => (
+                <button key={c.id} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted/50 flex justify-between" onClick={() => loadFromServer(c.id)}>
+                  <span className="truncate">{c.title}</span>
+                  <span className="text-muted-foreground shrink-0">{c.messageCount}条</span>
+                </button>
+              ))}
+              <button className="w-full text-center text-[10px] text-muted-foreground mt-1 hover:text-foreground" onClick={() => setShowConvList(false)}>关闭</button>
+            </div>
+          )}
+
           {messages.length > 0 && !isLoading && (
             <div className="px-3 pb-2 flex gap-1 overflow-x-auto"><div className="flex gap-1">{QUICK_ACTIONS.map((a) => <Button key={a.label} variant="ghost" size="sm" className="text-[10px] h-6 px-2 shrink-0" onClick={() => handleQuickAction(a.message)}>{a.label}</Button>)}</div></div>
           )}

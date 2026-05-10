@@ -151,10 +151,10 @@ async function handlePost(request: NextRequest) {
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   if (stream) {
-    if (hasApiKey) return handleHybridStream(message, provider, model, apiKey);
+    if (hasApiKey) return handleHybridStream(message, history, provider, model, apiKey);
     return handleLocalModeStream(message);
   }
-  if (hasApiKey) return handleHybrid(message, provider, model, apiKey);
+  if (hasApiKey) return handleHybrid(message, history, provider, model, apiKey);
   return handleLocalMode(message);
 }
 
@@ -187,7 +187,7 @@ async function executeMatchedTools(message: string): Promise<{
 }
 
 async function handleHybrid(
-  message: string, provider: string, model: string, apiKey?: string,
+  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string,
 ): Promise<NextResponse> {
   const { toolResults, toolsUsed } = await executeMatchedTools(message);
   const dataContext = toolResults.map(r => r.result).join('\n\n');
@@ -196,14 +196,8 @@ async function handleHybrid(
 
   try {
     const summaryMsg: ChatMessage[] = [
-      { role: 'system', content: `你是跨境小家电供应链决策专家。综合分析实时数据+知识库+你的专业知识。
-
-回答规则:
-1. 解读数据含义（1-2句）
-2. 专业知识分析: 行业对标、风险研判、优化建议（2-4句）
-3. 可执行行动建议（1-2句）
-4. 专业但平易近人，结合行业特征（季节性/平台竞争/关税/物流不确定性）
-5. 如数据揭示风险明确警告，数据正常则指出优化空间` },
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...history.slice(-6),  // last 3 user-assistant exchanges
       { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}\n请综合分析。` },
     ];
 
@@ -236,7 +230,7 @@ async function handleHybrid(
 }
 
 function handleHybridStream(
-  message: string, provider: string, model: string, apiKey?: string,
+  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string,
 ): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -264,7 +258,8 @@ function handleHybridStream(
         let llmFailed = false;
         try {
           const summaryMsg: ChatMessage[] = [
-            { role: 'system', content: `你是跨境小家电供应链决策专家。综合分析实时数据+知识库+专业知识。规则: ①解读数据→②专业分析(行业对标/风险研判/优化建议)→③可执行行动建议。` },
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...history.slice(-6),
             { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}\n请综合分析。` },
           ];
 
