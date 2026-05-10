@@ -1,37 +1,58 @@
 'use client';
 
-import { useState } from 'react';
-import { Play, RotateCcw, Hash, Brain, Cpu } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Play, RotateCcw, Hash, Brain, Cpu, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Toggle } from '@/components/ui/toggle';
 
-const SCENARIOS = ['baseline', 'trade_war', 'typhoon_season', 'perfect_storm'] as const;
+const SCENARIOS = ['当前趋势', 'baseline', 'stress_test'] as const;
 
 export function SandboxReplay() {
-  const [scenario, setScenario] = useState<string>('perfect_storm');
+  const [scenario, setScenario] = useState<string>('当前趋势');
   const [rounds, setRounds] = useState(50);
   const [seed, setSeed] = useState('42');
   const [mode, setMode] = useState<'rule' | 'llm' | 'compare'>('rule');
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastSeed, setLastSeed] = useState('');
+  const [liveParams, setLiveParams] = useState<Record<string, number>>({});
+  const [liveLoaded, setLiveLoaded] = useState(false);
+
+  // Load live commodity/freight data for the "当前趋势" baseline
+  useEffect(() => {
+    const loadLive = async () => {
+      try {
+        const [commodity, freight] = await Promise.all([
+          fetch('/api/commodity').then(r => r.json()).catch(() => ({})),
+          fetch('/api/freight').then(r => r.json()).catch(() => ({})),
+        ]);
+        const copperChange = (commodity?.commodities?.find((c: Record<string, unknown>) => c.code === 'COPPER')?.changePct as number) || 0;
+        const freightChange = (freight?.rates?.[0]?.changePct as number) || 0;
+        setLiveParams({
+          copperChange: Math.round(copperChange * 10) / 10,
+          freightTrend: freight?.trend === 'rising' ? 1 : freight?.trend === 'falling' ? -1 : 0,
+          avgFreightRate: freight?.avgRate40GP || 0,
+        });
+        setLiveLoaded(true);
+      } catch { /* use defaults */ }
+    };
+    loadLive();
+  }, []);
 
   const run = async (replaySeed?: string) => {
     setLoading(true);
     const s = replaySeed || seed;
     setLastSeed(s);
     try {
+      // Map scenario names to API params
+      const scenarioParam = scenario === '当前趋势' ? 'auto' : scenario;
       const baseUrl = mode === 'rule'
-        ? '/api/sandbox'
-        : `/api/sandbox-llm?mode=${mode}`;
-      const url = mode === 'rule'
-        ? `${baseUrl}?scenario=${scenario}&rounds=${rounds}&seed=${s}`
-        : `${baseUrl}&rounds=${rounds}&seed=${s}`;
-      const res = await fetch(url);
+        ? `/api/sandbox?scenario=${scenarioParam}&rounds=${rounds}&seed=${s}`
+        : `/api/sandbox-llm?mode=${mode}&rounds=${rounds}&seed=${s}`;
+      const res = await fetch(baseUrl);
       const data = await res.json();
       setResult(data);
     } catch {
@@ -52,11 +73,18 @@ export function SandboxReplay() {
           <Select value={scenario} onValueChange={setScenario}>
             <SelectTrigger className="h-7 text-xs w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {SCENARIOS.map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+              <SelectItem value="当前趋势"><span className="flex items-center gap-1"><TrendingUp className="h-3 w-3 text-orange-500" />当前趋势</span></SelectItem>
+              <SelectItem value="baseline">基准（无冲击）</SelectItem>
+              <SelectItem value="stress_test">压力测试（极端）</SelectItem>
             </SelectContent>
           </Select>
           <Input type="number" value={rounds} onChange={e => setRounds(Number(e.target.value))} className="h-7 text-xs w-16" min={10} max={200} />
           <span className="text-xs text-muted-foreground">轮</span>
+          {scenario === '当前趋势' && liveLoaded && (
+            <Badge variant="outline" className="text-[9px] h-5 gap-1 font-normal">
+              🟡 铜 {(liveParams.copperChange as number) > 0 ? '+' : ''}{liveParams.copperChange}% · 运费 ${liveParams.avgFreightRate}
+            </Badge>
+          )}
           <Input value={seed} onChange={e => setSeed(e.target.value)} className="h-7 text-xs w-20 font-mono" placeholder="seed" />
           {/* Mode toggle */}
           <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">

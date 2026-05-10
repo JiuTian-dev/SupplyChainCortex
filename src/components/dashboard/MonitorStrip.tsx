@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Activity, Globe, AlertTriangle, DollarSign,
-  TrendingDown, TrendingUp, ChevronDown, RefreshCw,
+  TrendingDown, TrendingUp, RefreshCw,
   Package, Ship,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 import { createMetricsFormatter } from '@/lib/dashboard/metrics';
-import type { RiskLevel } from '@/lib/dashboard/config';
 
 interface MonitorSnapshot {
   exchangeRate: { usdCny: number; deviation: number };
@@ -34,7 +33,6 @@ export function MonitorStrip() {
   const config = useDashboardConfigStore(s => s.config);
   const m = createMetricsFormatter(config);
   const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
 
   const fetchSnapshot = useCallback(async () => {
     try {
@@ -96,46 +94,36 @@ export function MonitorStrip() {
 
   if (!snapshot) return null;
 
-  const riskLevel: RiskLevel = snapshot.portRisks.high > 3 ? 'critical'
-    : snapshot.portRisks.high > 1 ? 'high'
-    : snapshot.portRisks.medium > 2 ? 'medium'
-    : 'low';
+  // Supply Chain Health Score (0-100, weighted across all data sources)
+  const healthScore = Math.round(
+    Math.max(0, Math.min(100,
+      100
+      - Math.min(snapshot.portRisks.high * 6 + snapshot.portRisks.medium * 3, 25)  // port risks: -25 max
+      - Math.max(0, 100 - snapshot.inventoryHealth.healthyRate) * 0.2             // inventory: -20 max
+      - (snapshot.commodity.trend === 'rising' ? 12 : snapshot.commodity.trend === 'falling' ? 5 : 0) // commodity: -12 max
+      - (snapshot.freight.trend === 'rising' ? 8 : 0)                             // freight: -8 max
+      - (snapshot.estimatedLoss > snapshot.estimatedSaving && snapshot.estimatedLoss > 0 ? 15 : 0) // loss>saving: -15
+    ))
+  );
 
-  if (collapsed) {
-    return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur border-b px-4 py-1.5 flex items-center gap-4 text-xs">
-        <Activity className="h-3 w-3 text-green-500 animate-pulse" />
-        <span className="font-mono">风险: {snapshot.portRisks.high}高危</span>
-        <span className="text-muted-foreground">|</span>
-        <span className="font-mono">汇率: {snapshot.exchangeRate.usdCny.toFixed(2)}</span>
-        <span className="text-muted-foreground">|</span>
-        <span className="font-mono">库存健康: {snapshot.inventoryHealth.healthyRate}%</span>
-        <span className="text-muted-foreground">|</span>
-        <span className="font-mono">商品: {snapshot.commodity.trend === 'rising' ? '↑' : '→'} {snapshot.commodity.avgChangePct}%</span>
-        <span className="text-muted-foreground">|</span>
-        <span className="font-mono">运费: ${snapshot.freight.avgRate}/40GP</span>
-        <Button variant="ghost" size="sm" className="ml-auto h-5 text-xs" onClick={() => setCollapsed(false)}>
-          <ChevronDown className="h-3 w-3" />
-        </Button>
-      </div>
-    );
-  }
+  const scoreColor = healthScore >= 80 ? 'text-green-600' : healthScore >= 60 ? 'text-amber-600' : 'text-red-600';
+  const scoreBg = healthScore >= 80 ? 'bg-green-50 dark:bg-green-950/30' : healthScore >= 60 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-red-50 dark:bg-red-950/30';
 
   return (
     <Card className="border-0 border-b rounded-none bg-gradient-to-r from-slate-50 to-white dark:from-slate-950 dark:to-background">
       <div className="px-6 py-3">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full animate-pulse ${riskLevel === 'critical' ? 'bg-red-500' : riskLevel === 'high' ? 'bg-orange-500' : 'bg-green-500'}`} />
-            <h2 className="text-sm font-semibold">供应链实时监控</h2>
+          <div className="flex items-center gap-3">
+            <div className={`rounded-lg px-2.5 py-1 ${scoreBg}`}>
+              <span className={`text-lg font-bold font-mono ${scoreColor}`}>{healthScore}</span>
+              <span className="text-[10px] text-muted-foreground ml-1">/100</span>
+            </div>
+            <h2 className="text-sm font-semibold">供应链健康监控</h2>
             <Badge variant="outline" className="text-[10px]">{snapshot.updatedAt.slice(11, 19)}</Badge>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={fetchSnapshot}>
               <RefreshCw className="h-3 w-3 mr-1" />刷新
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setCollapsed(true)}>
-              收起
             </Button>
           </div>
         </div>

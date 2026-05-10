@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import {
   DollarSign, TrendingUp, AlertTriangle,
-  Download, PieChart,
+  Download, PieChart, Ship, Globe, Package,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -114,6 +114,25 @@ function CostBreakdownChart({ sku, costs }: { sku: string; costs: CostRecord[] }
   );
 }
 
+// ==================== Banner Helpers ====================
+function pillStyle(trend: string) {
+  const base = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ';
+  if (trend === 'rising') return base + 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400';
+  if (trend === 'falling') return base + 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-400';
+  return base + 'border-border bg-muted/30 text-muted-foreground';
+}
+
+function CommodityBanner({ data }: { data: Record<string, unknown> }) {
+  const trend = (data?.overallTrend as string) || 'stable';
+  const pct = data?.avgChangePct as number || 0;
+  return <span className={pillStyle(trend)}><Package className="h-3 w-3" />商品 {pct > 0 ? '+' : ''}{pct}%</span>;
+}
+
+function FreightBanner({ data }: { data: Record<string, unknown> }) {
+  const trend = (data?.trend as string) || 'stable';
+  return <span className={pillStyle(trend)}><Ship className="h-3 w-3" />运费 ${data?.avgRate40GP as number || 0}/40GP</span>;
+}
+
 // ==================== Main CostTab Component ====================
 export function CostTab() {
   // React Query hooks
@@ -123,6 +142,23 @@ export function CostTab() {
   // Zustand store
   const selectedProduct = useUIStore((s) => s.selectedProduct);
   const setSelectedProduct = useUIStore((s) => s.setSelectedProduct);
+
+  // Cost trend banner — live commodity/freight/carbon data
+  const [costTrend, setCostTrend] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => {
+    const fetchTrend = async () => {
+      try {
+        const [commodity, freight] = await Promise.all([
+          fetch('/api/commodity').then(r => r.json()).catch(() => ({})),
+          fetch('/api/freight').then(r => r.json()).catch(() => ({})),
+        ]);
+        setCostTrend({ commodity, freight });
+      } catch { /* degrade silently */ }
+    };
+    fetchTrend();
+    const i = setInterval(fetchTrend, 120000);
+    return () => clearInterval(i);
+  }, []);
 
   // Derive cost data from React Query responses
   const costData = useMemo(() => {
@@ -162,6 +198,14 @@ export function CostTab() {
 
   return (
     <div className="space-y-6">
+      {/* 成本趋势横幅 — 大宗商品 · 运费 */}
+      {costTrend && (
+        <div className="flex flex-wrap gap-2 text-[11px]">
+          <CommodityBanner data={costTrend.commodity as Record<string, unknown>} />
+          <FreightBanner data={costTrend.freight as Record<string, unknown>} />
+        </div>
+      )}
+
       {/* 成本概览卡片 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <MetricCard
