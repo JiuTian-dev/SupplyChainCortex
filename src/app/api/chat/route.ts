@@ -253,73 +253,109 @@ function handleHybridStream(
       try {
         enqueue('thinking', { status: 'analyzing' });
 
-        const { toolResults, toolsUsed } = await executeMatchedTools(message);
+        // Build tool definitions for native function calling
+        const toolSchemas = getToolSchemas();
+        const tools = toolSchemas.map(t => ({
+          type: 'function' as const,
+          function: { name: t.name, description: t.description, parameters: t.parameters || { type: 'object', properties: {} } },
+        }));
 
-        // Send tool calls and results
-        for (const r of toolResults) {
-          enqueue('tool_call', { tool: r.tool });
-          enqueue('tool_result', { tool: r.tool, result: r.result });
-        }
-
-        const dataContext = toolResults.map(r => r.result).join('\n\n');
+        // RAG + web search context
         const ragResults = retrieveKnowledge(message, 2);
         const ragContext = augmentPrompt(message, ragResults);
 
-        // Web search (if enabled)
         let webContext = '';
         if (webSearchEnabled) {
           const searchResult = await webSearch(message);
           if (searchResult.results.length > 0) {
             webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
             enqueue('tool_call', { tool: 'web_search' });
-            enqueue('tool_result', { tool: 'web_search', result: `搜索完成: ${searchResult.results.length} 条结果` });
+            enqueue('tool_result', { tool: 'web_search', result: '完成' });
           }
         }
 
-        // Try LLM summarization
-        let llmFailed = false;
-        try {
-          const summaryMsg: ChatMessage[] = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...history.slice(-6),
-            { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}${webContext}\n请综合分析。` },
-          ];
+        // Build LLM messages
+        const llmMessages: ChatMessage[] = [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...history.slice(-6),
+          { role: 'user', content: `${message}\n\n${ragContext}${webContext}` },
+        ];
 
-          let fullText = '';
+        // Function calling loop — up to 3 rounds (multi-step tool chain)
+        const MAX_ROUNDS = 3;
+        const toolsUsed: string[] = [];
+        let accumulatedContent = '';
+
+        for (let round = 0; round < MAX_ROUNDS; round++) {
+          let toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
+          let roundContent = '';
+
           for await (const chunk of chatCompletionStream({
-            provider, model, messages: summaryMsg, stream: true, apiKey,
-            maxTokens: 4000, temperature: 0.7,
+            provider, model, messages: llmMessages, stream: true, apiKey,
+            maxTokens: 4000, temperature: 0.7, tools,
           })) {
             if (chunk.type === 'token' && chunk.content) {
-              fullText += chunk.content;
-              enqueue('token', { content: chunk.content });
+              roundContent += chunk.content;
+              if (!toolCalls.length) enqueue('token', { content: chunk.content });
+            }
+            if (chunk.type === 'tool_call' && chunk.toolCall) {
+              toolCalls.push({ id: crypto.randomUUID(), function: chunk.toolCall });
             }
             if (chunk.type === 'done') break;
-            if (chunk.type === 'error') {
-              llmFailed = true;
-              break;
-            }
           }
 
-          if (!llmFailed && fullText) {
-            enqueue('done', { toolsUsed, mode: 'hybrid', complete: true });
+          // No tool calls → final answer done
+          if (toolCalls.length === 0) {
+            accumulatedContent += roundContent;
+            enqueue('done', { toolsUsed, rounds: round + 1 });
             controller.close();
             return;
           }
-        } catch { llmFailed = true; }
 
-        // Fallback: stream the tool results
-        const fallback = toolResults.map(r => r.result).join('\n\n') +
-          '\n\n---\n💡 AI 总结生成失败，以上为查询到的原始数据。';
-        for (const word of fallback.split(/(\s+)/)) {
-          enqueue('token', { content: word });
-          await new Promise(r => setTimeout(r, 10));
+          // Execute tool calls and collect results
+          const toolOutputs: Array<{ role: 'tool'; tool_call_id: string; content: string }> = [];
+          for (const tc of toolCalls) {
+            const name = tc.function.name;
+            let params: Record<string, unknown> = {};
+            try { params = JSON.parse(tc.function.arguments); } catch { /* use empty */ }
+            toolsUsed.push(name);
+            enqueue('tool_call', { tool: name, params: params.action || Object.keys(params)[0] });
+
+            try {
+              const data = await executeTool(name, params);
+              const formatted = formatToolResult(name, params.action as string || '', data);
+              toolOutputs.push({ role: 'tool', tool_call_id: tc.id, content: formatted.slice(0, 2000) });
+              enqueue('tool_result', { tool: name, result: formatted.slice(0, 300) });
+            } catch (err) {
+              toolOutputs.push({ role: 'tool', tool_call_id: tc.id, content: `错误: ${(err as Error).message}` });
+            }
+          }
+
+          // Feed tool results back into conversation for next round
+          llmMessages.push({
+            role: 'assistant', content: roundContent,
+            tool_calls: toolCalls.map(tc => ({
+              id: tc.id, type: 'function' as const,
+              function: { name: tc.function.name, arguments: tc.function.arguments },
+            })),
+          } as ChatMessage);
+          llmMessages.push(...toolOutputs.map(r => ({
+            role: r.role, content: r.content, tool_call_id: r.tool_call_id,
+          } as ChatMessage)));
         }
 
-        enqueue('done', { toolsUsed, mode: 'local-fallback', complete: true });
+        // Max rounds — force final summary
+        llmMessages.push({ role: 'user', content: '请基于以上工具调用结果，给出最终综合分析。' });
+        for await (const chunk of chatCompletionStream({
+          provider, model, messages: llmMessages, stream: true, apiKey,
+          maxTokens: 4000, temperature: 0.7,
+        })) {
+          if (chunk.type === 'token' && chunk.content) enqueue('token', { content: chunk.content });
+        }
+        enqueue('done', { toolsUsed, rounds: MAX_ROUNDS });
+
       } catch (err) {
-        enqueue('token', { content: `处理出错: ${(err as Error).message}` });
-        enqueue('done', { complete: true, error: (err as Error).message });
+        enqueue('error', { message: (err as Error).message || '处理失败' });
       }
       controller.close();
     },

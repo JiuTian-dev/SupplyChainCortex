@@ -15,6 +15,7 @@ import {
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
   Download, Upload,
   Wifi, GripVertical, RefreshCw, Play, CircleDot, Loader2, Check,
+  Square,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS, getProviderModels, getDefaultModel, type AIModel } from '@/lib/services/ai-providers.service';
@@ -46,6 +47,8 @@ export function ChatPanel() {
   const [apiKey, setApiKey] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [scanningOllama, setScanningOllama] = useState(false);
@@ -184,6 +187,24 @@ export function ChatPanel() {
       setShowConvList(true);
     } catch { toast.error('获取列表失败'); }
   }, []);
+
+  // File upload
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const text = await file.text();
+    const preview = text.slice(0, 500) + (text.length > 500 ? `\n... (${text.length} 字符)` : '');
+    setMessages(prev => [...prev, { id: `file-${Date.now()}`, role: 'user', content: `📎 ${file.name}\n\`\`\`\n${preview}\n\`\`\``, timestamp: new Date().toISOString() }]);
+    e.target.value = '';
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Export as Markdown
+  const exportMarkdown = useCallback(() => {
+    const md = messages.map(m => `### ${m.role === 'user' ? '🧑' : '🤖'} (${m.timestamp.slice(11, 19)})\n\n${m.content}\n`).join('\n---\n\n');
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`; a.click();
+    toast.success('已导出');
+  }, [messages]);
 
   // Send message with SSE streaming
   const sendMessage = useCallback(async (text: string) => {
@@ -364,6 +385,11 @@ export function ChatPanel() {
               </DropdownMenu>
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${webSearchEnabled ? 'bg-green-500/30 text-green-400' : ''}`} onClick={() => { setWebSearchEnabled(!webSearchEnabled); if (!webSearchEnabled) toast.success('联网搜索已开启'); else toast.success('联网搜索已关闭'); }} aria-label="联网搜索"><Globe className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">{webSearchEnabled ? '联网搜索: 开' : '联网搜索: 关'}</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`} onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt,.json" onChange={handleFileUpload} />
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={() => fileInputRef.current?.click()} aria-label="上传"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">上传 CSV</TooltipContent></Tooltip>
+              {messages.length > 0 && (
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={exportMarkdown} aria-label="导出"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">导出 MD</TooltipContent></Tooltip>
+              )}
               {messages.length > 0 && (
                 <>
                   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={saveToServer} aria-label="保存对话"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">保存到服务器</TooltipContent></Tooltip>
@@ -509,9 +535,19 @@ export function ChatPanel() {
             <div className="px-3 pb-2 flex gap-1 overflow-x-auto"><div className="flex gap-1">{QUICK_ACTIONS.map((a) => <Button key={a.label} variant="ghost" size="sm" className="text-[10px] h-6 px-2 shrink-0" onClick={() => handleQuickAction(a.message)}>{a.label}</Button>)}</div></div>
           )}
           <form onSubmit={handleSubmit} className="p-3 pt-2 border-t bg-background dark:bg-card border-border">
+            {(tokenUsage.input > 0) && (
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1 px-1">
+                <span>📊 输入 ~{tokenUsage.input.toLocaleString()}tk · 输出 ~{tokenUsage.output.toLocaleString()}tk</span>
+                <span>≈ ¥{((tokenUsage.input * 0.002 + tokenUsage.output * 0.008) / 1000).toFixed(3)}</span>
+              </div>
+            )}
             <div className="flex gap-2">
               <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入问题，如：当前库存情况..." className="flex-1 h-9 text-sm rounded-full border-orange-200 focus-visible:ring-orange-300 dark:border-orange-800" disabled={isLoading} maxLength={2000} />
-              <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="h-9 w-9 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shrink-0"><Send className="h-4 w-4" /></Button>
+              {isLoading ? (
+                <Button type="button" size="icon" className="h-9 w-9 rounded-full bg-red-500 hover:bg-red-600 text-white shrink-0 animate-pulse" onClick={() => { abortRef.current?.abort(); setIsLoading(false); setStreaming(false); }}><Square className="h-4 w-4" /></Button>
+              ) : (
+                <Button type="submit" size="icon" disabled={!input.trim()} className="h-9 w-9 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shrink-0"><Send className="h-4 w-4" /></Button>
+              )}
             </div>
           </form>
         </CardContent>

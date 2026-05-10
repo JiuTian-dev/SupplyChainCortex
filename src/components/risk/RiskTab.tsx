@@ -12,7 +12,6 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import { RiskMatrixHeatmap } from '@/components/risk/RiskMatrixHeatmap';
 import { WeatherRiskWidget } from '@/components/risk/WeatherRiskWidget';
-import { CascadeRiskPanel } from '@/components/risk/CascadeRiskPanel';
 import { DecisionPanel } from '@/components/risk/DecisionPanel';
 import { useRisk } from '@/hooks/use-supply-chain-data';
 import { useUIStore } from '@/stores/ui-store';
@@ -130,13 +129,13 @@ export function RiskTab() {
           ══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <WeatherRiskWidget />
-        <CascadeRiskPanel />
+        <DecisionPanel />
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          Layer 2: Decision Intelligence — "What should I do?"
+          Layer 2: Risk Matrix — "Where is the risk concentrated?"
           ══════════════════════════════════════════════════════════════════ */}
-      <DecisionPanel />
+      <RiskMatrixHeatmap />
 
       {/* ══════════════════════════════════════════════════════════════════
           Layer 3: Deep Dive — Simulation + Risk Matrix
@@ -301,7 +300,6 @@ export function RiskTab() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-        <RiskMatrixHeatmap />
         </CardContent>
       </Card>
     </div>

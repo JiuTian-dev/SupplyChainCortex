@@ -384,6 +384,48 @@ export function renderMarkdown(content: string): React.ReactNode[] {
       continue;
     }
 
+    // Markdown table: | col1 | col2 |
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
+      const isHeader = nextLine.includes('---') && nextLine.includes('|');
+
+      if (isHeader && i + 2 < lines.length) {
+        // Collect header + all data rows
+        const headerCells = line.split('|').filter(c => c.trim()).map(c => c.trim());
+        const dataRows: string[][] = [];
+        let j = i + 2;
+        while (j < lines.length && lines[j].trim().startsWith('|')) {
+          dataRows.push(lines[j].split('|').filter(c => c.trim()).map(c => c.trim()));
+          j++;
+        }
+
+        nodes.push(
+          <div key={`table-${i}`} className="overflow-x-auto my-2">
+            <table className="min-w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b-2 border-border">
+                  {headerCells.map((h, ci) => (
+                    <th key={ci} className="text-left px-2 py-1.5 font-semibold text-muted-foreground">{renderInline(h)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataRows.map((row, ri) => (
+                  <tr key={ri} className="border-b border-border/50">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-2 py-1">{renderInline(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        i = j - 1; // skip processed rows
+        continue;
+      }
+    }
+
     // Empty lines → line break with spacing
     if (line.trim() === '') {
       nodes.push(<div key={`br-${i}`} className="h-1" />);

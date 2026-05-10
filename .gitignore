@@ -62,4 +62,4 @@ server.log
 /screenshots/
 /db/custom.db
 *.tar
-mcp-card-*.png
+mcp-card-*.png.idea/

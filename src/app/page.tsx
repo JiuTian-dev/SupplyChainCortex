@@ -17,6 +17,8 @@ const LogisticsTab = dynamic(() => import('@/components/logistics/LogisticsTab')
 const SalesTab = dynamic(() => import('@/components/sales/SalesTab').then(m => ({ default: m.SalesTab })), { loading: () => <LazyLoader type="chart" /> });
 const SupplierTab = dynamic(() => import('@/components/supplier/SupplierTab').then(m => ({ default: m.SupplierTab })), { loading: () => <LazyLoader type="tab" /> });
 const RiskTab = dynamic(() => import('@/components/risk/RiskTab').then(m => ({ default: m.RiskTab })), { loading: () => <LazyLoader type="chart" /> });
+const CascadeRiskPanel = dynamic(() => import('@/components/risk/CascadeRiskPanel').then(m => ({ default: m.CascadeRiskPanel })), { loading: () => <LazyLoader type="chart" /> });
+const DecisionPanel = dynamic(() => import('@/components/risk/DecisionPanel').then(m => ({ default: m.DecisionPanel })), { loading: () => <LazyLoader type="chart" /> });
 
 import { MonitorStrip } from '@/components/dashboard/MonitorStrip';
 import { DecisionCenter } from '@/components/dashboard/DecisionCenter';
@@ -231,9 +233,9 @@ function HomePageContent() {
           <TabsContent value="analysis" className="tab-fade-in">
             <SectionErrorBoundary sectionName="风险传播分析">
               <div className="space-y-4">
-                <PassportPanel />
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                  <div className="xl:col-span-2 space-y-6"><RiskTab /></div>
+                <CascadeRiskPanel />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <div className="space-y-6"><DecisionPanel /></div>
                   <div className="space-y-6"><CostTab /></div>
                 </div>
               </div>
