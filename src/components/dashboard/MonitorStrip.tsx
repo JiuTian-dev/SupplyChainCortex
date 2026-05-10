@@ -87,7 +87,7 @@ export function MonitorStrip() {
   }, []);
 
   useEffect(() => {
-    fetchSnapshot();
+    queueMicrotask(() => fetchSnapshot());
     const i = setInterval(fetchSnapshot, 30000);
     return () => clearInterval(i);
   }, [fetchSnapshot]);

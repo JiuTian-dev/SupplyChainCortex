@@ -185,7 +185,7 @@ export function SandboxReplay() {
               </div>
             </div>
             <div className="col-span-2 text-center text-[10px] text-muted-foreground">
-              差距 = 最优策略韧性 - 当前策略韧性 → 你的供应链"可改善空间"
+              差距 = 最优策略韧性 - 当前策略韧性 → 你的供应链「可改善空间」
             </div>
           </div>
         )}
