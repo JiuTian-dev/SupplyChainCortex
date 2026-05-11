@@ -829,7 +829,7 @@ export async function getCascadeRisk(options?: {
   // Weather source — with 8s timeout and graceful fallback
   if (scenario === 'weather_disruption' || scenario === 'auto') {
     weatherResult = await withFallback(
-      () => withPromiseTimeout(Promise.resolve(getAllPortsWeather()), 8000),
+      () => withPromiseTimeout(Promise.resolve(getAllPortsWeather()), 5000),
       () => ({ ports: [] }),
       'weather',
     );
@@ -854,7 +854,7 @@ export async function getCascadeRisk(options?: {
   if (scenario === 'exchange_shock' || scenario === 'auto') {
     fxResult = await withFallback(
       async () => {
-        const live = await withPromiseTimeout(getLatestRates('CNY'), 6000);
+        const live = await withPromiseTimeout(getLatestRates('CNY'), 4000);
         return live;
       },
       () => null,
@@ -962,52 +962,100 @@ export async function getCascadeRisk(options?: {
     } catch { /* tariff engine unavailable */ }
   }
 
-  // CBAM carbon cost enforcement
-  if (scenario === 'cbam_enforcement' || scenario === 'auto') {
-    try {
-      const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
-      const carbon = await fetchCarbonPrice();
-      if (carbon && carbon.price > 60) {
-        const euPorts = [...nodes.values()].filter(n => n.type === 'PORT' && (n.label.includes('汉堡') || n.label.includes('鹿特丹')));
-        for (const port of euPorts) {
-          anomalySources.push({
-            nodeId: port.id,
-            riskScore: carbon.price > 90 ? 65 : 40,
-            cause: `CBAM碳关税: EUA €${carbon.price}/t CO2 → EU出口成本增加`,
-            category: 'exchange',
-          });
+  // CBAM, commodity, competitor — run in parallel with strict timeouts
+  if (scenario === 'auto') {
+    const parallelResults = await Promise.allSettled([
+      // Carbon price (fast: ~50ms from Sina)
+      (async () => {
+        const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
+        const carbon = await Promise.race([
+          fetchCarbonPrice(),
+          new Promise<null>(r => setTimeout(() => r(null), 3000)),
+        ]);
+        if (carbon && carbon.price > 60) {
+          const euPorts = [...nodes.values()].filter(n => n.type === 'PORT' && (n.label.includes('汉堡') || n.label.includes('鹿特丹')));
+          for (const port of euPorts) {
+            anomalySources.push({
+              nodeId: port.id, riskScore: carbon.price > 90 ? 65 : 40,
+              cause: `CBAM碳关税: EUA €${carbon.price}/t CO2`,
+              category: 'exchange',
+            });
+          }
         }
-      }
-    } catch { /* carbon source unavailable */ }
-  }
+      })(),
 
-  // Commodity price shock — raw material cost pressure
-  if (scenario === 'commodity_shock' || scenario === 'auto') {
-    try {
-      const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
-      const commodities = await fetchDailyCommodities();
-      const bigMovers = commodities.filter(c => Math.abs(c.changePct) > 3);
-      if (bigMovers.length >= 2) {
-        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
-        if (productNode) {
-          const summary = bigMovers.map(c => `${c.name}: ${c.changePct > 0 ? '+' : ''}${c.changePct}%`).join(', ');
-          const avgChange = bigMovers.reduce((s, c) => s + Math.abs(c.changePct), 0) / bigMovers.length;
-          anomalySources.push({
-            nodeId: productNode.id,
-            riskScore: Math.min(Math.round(avgChange * 5), 85),
-            cause: `原材料价格波动: ${summary}`,
-            category: 'supplier',
-          });
+      // Commodity prices (fast: ~1.5s from Alpha Vantage + DCE/Sina)
+      (async () => {
+        const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
+        const commodities = await Promise.race([
+          fetchDailyCommodities(),
+          new Promise<typeof $0>(r => setTimeout(() => r([]), 4000)),
+        ]);
+        const bigMovers = commodities.filter(c => Math.abs(c.changePct) > 3);
+        if (bigMovers.length >= 2) {
+          const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+          if (productNode) {
+            const summary = bigMovers.map(c => `${c.name}: ${c.changePct > 0 ? '+' : ''}${c.changePct}%`).join(', ');
+            const avgChange = bigMovers.reduce((s, c) => s + Math.abs(c.changePct), 0) / bigMovers.length;
+            anomalySources.push({
+              nodeId: productNode.id,
+              riskScore: Math.min(Math.round(avgChange * 5), 85),
+              cause: `原材料价格波动: ${summary}`, category: 'supplier',
+            });
+          }
         }
-      }
-    } catch { /* commodities unavailable */ }
+      })(),
+    ]);
+
+    // Log degraded sources
+    if (parallelResults[0].status === 'rejected') degradedSources.push('carbon-price');
+    if (parallelResults[1].status === 'rejected') degradedSources.push('commodities');
+  } else {
+    // Non-auto scenarios: source-specific checks
+    if (scenario === 'cbam_enforcement') {
+      try {
+        const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
+        const carbon = await Promise.race([fetchCarbonPrice(), new Promise<null>(r => setTimeout(() => r(null), 3000))]);
+        if (carbon && carbon.price > 60) {
+          const euPorts = [...nodes.values()].filter(n => n.type === 'PORT' && (n.label.includes('汉堡') || n.label.includes('鹿特丹')));
+          for (const port of euPorts) {
+            anomalySources.push({
+              nodeId: port.id, riskScore: carbon.price > 90 ? 65 : 40,
+              cause: `CBAM碳关税: EUA €${carbon.price}/t CO2`, category: 'exchange',
+            });
+          }
+        }
+      } catch { /* carbon unavailable */ }
+    }
+    if (scenario === 'commodity_shock') {
+      try {
+        const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
+        const commodities = await Promise.race([fetchDailyCommodities(), new Promise<typeof $0>(r => setTimeout(() => r([]), 4000))]);
+        const bigMovers = commodities.filter(c => Math.abs(c.changePct) > 3);
+        if (bigMovers.length >= 2) {
+          const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+          if (productNode) {
+            const summary = bigMovers.map(c => `${c.name}: ${c.changePct > 0 ? '+' : ''}${c.changePct}%`).join(', ');
+            anomalySources.push({
+              nodeId: productNode.id,
+              riskScore: Math.min(Math.round(bigMovers.reduce((s, c) => s + Math.abs(c.changePct), 0) / bigMovers.length * 5), 85),
+              cause: `原材料价格波动: ${summary}`, category: 'supplier',
+            });
+          }
+        }
+      } catch { /* commodities unavailable */ }
+    }
   }
 
   // Competitor pricing pressure — Amazon price squeeze
-  if (scenario === 'competitor_pressure' || scenario === 'auto') {
+  // NOTE: Only runs in explicit scenario, NOT auto — Amazon scraping takes 20-30s
+  if (scenario === 'competitor_pressure') {
     try {
       const { fetchCompetitorPrices } = await import('@/lib/sources/amazon-competitor');
-      const competitors = await fetchCompetitorPrices();
+      const competitors = await withPromiseTimeout(
+        Promise.resolve(fetchCompetitorPrices()),
+        5000
+      );
       const valid = competitors.filter(c => c.competitorCount > 0);
       if (valid.length > 0) {
         const avgCompetitorPrice = valid.reduce((s, c) => s + c.avgPrice, 0) / valid.length;
@@ -1015,7 +1063,6 @@ export async function getCascadeRisk(options?: {
         const avgLandedCost = allCosts.length > 0
           ? allCosts.reduce((s, c) => s + c.totalLanded, 0) / allCosts.length
           : 0;
-        // Margin squeeze: competitor avg vs our landed cost
         if (avgLandedCost > 0 && avgCompetitorPrice > 0) {
           const squeezeRatio = avgLandedCost / avgCompetitorPrice;
           if (squeezeRatio > 0.7) {
@@ -1103,7 +1150,7 @@ export async function getCascadeRisk(options?: {
       const ninetyDaysFromNow = new Date();
       ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
       const expiringCerts = await db.complianceCert.findMany({
-        where: { expiryDate: { lte: ninetyDaysFromNow }, status: { not: 'expired' } },
+        where: { expiryDate: { lte: ninetyDaysFromNow.toISOString().split('T')[0] }, status: { not: 'expired' } },
         take: 50,
       });
       if (expiringCerts.length > 0) {
@@ -1193,8 +1240,8 @@ export async function getCascadeRisk(options?: {
   let forwardProjection: DayProjection[] | undefined;
   if (includeForwardProjection) {
     try {
-      const weather = await getAllPortsWeather().catch(() => null);
-      forwardProjection = await projectForward(propagation, weather);
+      // Reuse weatherResult from main fetch — don't call API twice
+      forwardProjection = await projectForward(propagation, weatherResult?.data || null);
     } catch { /* skip forward projection on error */ }
   }
 

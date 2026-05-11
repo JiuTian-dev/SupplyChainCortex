@@ -370,7 +370,10 @@ function evaluateCondition(condition: DecisionCondition, data: Record<string, un
 }
 
 /** Gather context data from real data sources */
-async function gatherContext(nodes: DecisionNode[]): Promise<{
+async function gatherContext(
+  nodes: DecisionNode[],
+  precomputedCascade?: Awaited<ReturnType<typeof getCascadeRisk>>,
+): Promise<{
   cascadeRisk?: Awaited<ReturnType<typeof getCascadeRisk>>;
   exchangeRates?: { rate: number; deviation: number };
   inventoryAlerts?: number;
@@ -379,7 +382,7 @@ async function gatherContext(nodes: DecisionNode[]): Promise<{
   const context: Record<string, unknown> = {};
 
   try {
-    const risk = await getCascadeRisk({ scenario: 'auto' });
+    const risk = precomputedCascade || await getCascadeRisk({ scenario: 'auto', includeForwardProjection: false, includeCounterfactuals: false });
     context.cascadeRisk = risk;
   } catch { /* skip */ }
 
@@ -481,8 +484,10 @@ export async function executeDecisionGraph(options?: {
   query?: string;
   domains?: DecisionDomain[];
   includeAll?: boolean;
+  /** Pre-computed cascade report — avoids duplicate getCascadeRisk call */
+  cascadeReport?: Awaited<ReturnType<typeof getCascadeRisk>>;
 }): Promise<DecisionReport> {
-  const { query = '', domains, includeAll = false } = options || {};
+  const { query = '', domains, includeAll = false, cascadeReport } = options || {};
 
   // Determine which domains to check
   let activeDomains: DecisionDomain[] = domains || [];
@@ -497,8 +502,8 @@ export async function executeDecisionGraph(options?: {
     if (activeDomains.length === 0 || includeAll) activeDomains = ['cross_domain', 'inventory', 'cost', 'logistics', 'tariff'];
   }
 
-  // Gather real-time context
-  const context = await gatherContext(DECISION_GRAPH);
+  // Gather real-time context — use pre-computed cascade report if available
+  const context = await gatherContext(DECISION_GRAPH, cascadeReport);
 
   // Filter relevant nodes
   const relevantNodes = DECISION_GRAPH

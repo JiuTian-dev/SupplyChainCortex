@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useCascadeRisk } from '@/hooks/use-cascade-risk';
 import {
   Lightbulb, ArrowRight, TrendingUp, Shield, Zap, DollarSign,
   Clock, Package, Building2, AlertTriangle, RefreshCw,
@@ -65,18 +66,27 @@ export function DecisionPanel() {
   const [error, setError] = useState(false);
   const [domain, setDomain] = useState('cross_domain');
 
+  // Reuse shared cascade risk hook — avoids duplicate API call
+  const { data: cascadeReport } = useCascadeRisk('auto');
+
   const fetchDecisions = (dom?: string) => {
     setLoading(true);
     setError(false);
-    fetch(`/api/decision-graph?domains=${dom || domain}&query=自动检测供应链状态`)
+    const doms = dom || domain;
+    fetch(`/api/decision-graph?domains=${doms}&query=自动检测供应链状态`)
       .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
       .then(data => { setReport(data); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   };
 
+  useEffect(() => {
+    setLoading(false);
+  }, []);
+
+  // Fetch decisions when cascade report is ready
   const initRef = useRef(false);
   useEffect(() => {
-    if (initRef.current) return;
+    if (!cascadeReport || initRef.current) return;
     initRef.current = true;
     let cancelled = false;
     fetch(`/api/decision-graph?domains=cross_domain&query=自动检测供应链状态`)
@@ -84,7 +94,7 @@ export function DecisionPanel() {
       .then(data => { if (!cancelled) { setReport(data); setLoading(false); } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, []);
+  }, [cascadeReport]);
 
   if (loading && !report) {
     return (

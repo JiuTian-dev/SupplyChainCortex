@@ -42,22 +42,23 @@ export async function getLatestRates(base = 'CNY'): Promise<ExchangeRateSnapshot
     cacheKey('fx', 'latest', base),
     async () => {
       const url = `${BASE_URL}/latest?from=${base}&to=${TARGET_CURRENCIES.join(',')}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) throw new Error(`Frankfurter API error: ${res.status}`);
       const data = (await res.json()) as ExchangeRates;
 
       const histDate = daysAgo(30);
       const trend: Record<string, { direction: 'up' | 'down' | 'stable'; change: number }> = {};
 
-      for (const currency of TARGET_CURRENCIES) {
-        try {
-          const histUrl = `${BASE_URL}/${histDate}?from=${base}&to=${currency}`;
-          const histRes = await fetch(histUrl, { signal: AbortSignal.timeout(5000) });
-          if (histRes.ok) {
-            const histData = (await histRes.json()) as ExchangeRates;
+      // Historical trend — non-blocking: if slow, return without it
+      try {
+        const histUrl = `${BASE_URL}/${histDate}?from=${base}&to=${TARGET_CURRENCIES.join(',')}`;
+        const histRes = await fetch(histUrl, { signal: AbortSignal.timeout(3000) });
+        if (histRes.ok) {
+          const histData = (await histRes.json()) as ExchangeRates;
+          for (const currency of TARGET_CURRENCIES) {
             const oldRate = histData.rates[currency];
             const newRate = data.rates[currency];
-            if (oldRate && newRate) {
+            if (oldRate && newRate && oldRate > 0) {
               const change = roundTo(((newRate - oldRate) / oldRate) * 100, 1);
               trend[currency] = {
                 direction: change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'stable',
@@ -65,8 +66,8 @@ export async function getLatestRates(base = 'CNY'): Promise<ExchangeRateSnapshot
               };
             }
           }
-        } catch { /* skip individual currency trend on failure */ }
-      }
+        }
+      } catch { /* trend unavailable — acceptable */ }
 
       // Fetch PBOC midpoints in parallel (not on critical path)
       let midpoints: Record<string, { midpoint: number; spread: number }> | undefined;
