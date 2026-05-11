@@ -75,10 +75,14 @@ export async function getLatestRates(base = 'CNY'): Promise<ExchangeRateSnapshot
         if (pboc) {
           midpoints = {};
           for (const mp of pboc.midpoints) {
-            const marketRate = data.rates[mp.currency];
-            if (marketRate) {
+            const ratePerCNY = data.rates[mp.currency]; // Frankfurter: foreign units per 1 CNY
+            if (ratePerCNY && ratePerCNY > 0) {
+              // Convert midpoint to CNY per 1 foreign unit
               const perUnitMid = mp.units > 1 ? mp.midpoint / mp.units : mp.midpoint;
-              const spread = Math.round(((marketRate - perUnitMid) / perUnitMid) * 10000) / 100;
+              // Market rate in same direction: CNY per 1 foreign unit = 1 / (foreign per CNY)
+              const marketPerForeign = 1 / ratePerCNY;
+              // spread: positive = market weaker than official (depreciation pressure)
+              const spread = Math.round(((marketPerForeign - perUnitMid) / perUnitMid) * 10000) / 100;
               midpoints[mp.currency] = { midpoint: perUnitMid, spread };
             }
           }

@@ -31,51 +31,61 @@ export interface PBOCReport {
 
 const ALAPI_BASE = 'https://v3.alapi.cn/api/china_exchange';
 
+const TARGET_PAIRS: { currency: string; from: string; to: string; units: number; name: string }[] = [
+  { currency: 'USD', from: 'USD', to: 'CNY', units: 1, name: '美元' },
+  { currency: 'EUR', from: 'EUR', to: 'CNY', units: 1, name: '欧元' },
+  { currency: 'GBP', from: 'GBP', to: 'CNY', units: 1, name: '英镑' },
+  { currency: 'JPY', from: 'JPY', to: 'CNY', units: 100, name: '日元' },
+  { currency: 'KRW', from: 'KRW', to: 'CNY', units: 100, name: '韩元' },
+  { currency: 'AUD', from: 'AUD', to: 'CNY', units: 1, name: '澳大利亚元' },
+];
+
 async function fetchFromALAPI(): Promise<PBOCReport | null> {
   const token = process.env.ALAPI_TOKEN;
   if (!token) return null;
 
   try {
-    const url = `${ALAPI_BASE}?token=${token}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const data = await res.json() as {
-      code: number;
-      data?: {
-        update_time?: string;
-        list?: Array<{
-          name: string;
-          price?: string;
-          fbuyPri?: string; // 现汇买入
-          fsellPri?: string; // 现汇卖出
-          middlePri?: string; // 中间价 (this is what we want)
-        }>;
-      };
-    };
-
-    if (data.code !== 200 || !data.data?.list) return null;
-
     const midpoints: PBOCMidpoint[] = [];
-    for (const item of data.data.list) {
-      const midpoint = parseFloat(item.middlePri || item.price || '0');
-      if (midpoint > 0 && isUsefulCurrency(item.name)) {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Sequential calls to respect rate limiting (API returns 429 if too fast)
+    for (const pair of TARGET_PAIRS) {
+      try {
+        const url = `${ALAPI_BASE}?token=${token}&from=${pair.from}&to=${pair.to}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) continue;
+        const data = await res.json() as {
+          success: boolean;
+          code: number;
+          data?: { result: number; rate: number; date: string };
+        };
+
+        // Rate limited — stop and return what we have
+        if (data.code === 429) break;
+
+        if (!data.success || !data.data?.rate) continue;
+
+        const rate = data.data.rate;
+        if (rate <= 0) continue;
+
+        // ALAPI returns rate per 1 unit. Convert to standard PBOC quoting:
+        // JPY/KRW quoted per 100 units, others per 1 unit
+        const midpoint = pair.units > 1 ? rate * pair.units : rate;
         midpoints.push({
-          currency: nameToCode(item.name),
-          name: item.name,
-          midpoint,
-          units: item.name.includes('日元') || item.name.includes('JPY') ? 100 : 1,
+          currency: pair.currency,
+          name: pair.name,
+          midpoint: Math.round(midpoint * 10000) / 10000,
+          units: pair.units,
         });
-      }
+
+        // Respect rate limit (free tier: ~5 req/min)
+        await new Promise(r => setTimeout(r, 1200));
+      } catch { continue; }
     }
 
     if (midpoints.length === 0) return null;
 
-    return {
-      date: data.data.update_time?.split(' ')[0] || new Date().toISOString().split('T')[0],
-      base: 'CNY',
-      midpoints,
-      source: 'ALAPI (SAFE)',
-    };
+    return { date: today, base: 'CNY', midpoints, source: 'ALAPI (SAFE)' };
   } catch {
     return null;
   }
