@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -162,13 +163,14 @@ export function DecisionCenter() {
   const [submitting, setSubmitting] = useState(false);
   const [agentContext, setAgentContext] = useState<Record<string, unknown> | null>(null);
   const [feedbackStats, setFeedbackStats] = useState<Record<string, number> | null>(null);
+  const [domain, setDomain] = useState('cross_domain');
 
   const fetchDecisions = useCallback(async () => {
     try {
       // Fetch cascade risk + decision graph + agent memory + feedback in parallel
       const [cascadeRes, decisionRes, memRes, fbRes] = await Promise.all([
         fetch('/api/cascade-risk?scenario=auto&includeForwardProjection=true&includeCounterfactuals=true'),
-        fetch('/api/decision-graph?mode=dynamic&scenario=auto'),
+        fetch(`/api/decision-graph?domains=${domain}&query=供应链决策`),
         fetch('/api/agent-memory'),
         fetch('/api/engine-feedback'),
       ]);
@@ -231,7 +233,7 @@ export function DecisionCenter() {
     } catch {
       // Degraded — show empty state
     }
-  }, []);
+  }, [domain]);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,7 +241,7 @@ export function DecisionCenter() {
       try {
         const [cascadeRes, decisionRes] = await Promise.all([
           fetch('/api/cascade-risk?scenario=auto&includeForwardProjection=true&includeCounterfactuals=true'),
-          fetch('/api/decision-graph?mode=dynamic&scenario=auto'),
+          fetch(`/api/decision-graph?domains=${domain}&query=供应链决策`),
         ]);
         const risk = await cascadeRes.json();
         const dynamic = await decisionRes.json();
@@ -295,7 +297,7 @@ export function DecisionCenter() {
     };
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [domain]);
 
   const handleFeedback = useCallback(async (id: string, action: 'accepted' | 'rejected', notes?: string) => {
     setSubmitting(true);
@@ -332,9 +334,23 @@ export function DecisionCenter() {
           <h2 className="text-lg font-semibold">决策执行中心</h2>
           <p className="text-xs text-muted-foreground">基于级联风险分析生成的可执行决策建议</p>
         </div>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={fetchDecisions}>
-          <RefreshCw className="h-3 w-3 mr-1" />刷新决策
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={domain} onValueChange={(v) => setDomain(v)}>
+            <SelectTrigger className="h-7 text-xs w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cross_domain">综合决策</SelectItem>
+              <SelectItem value="inventory">库存</SelectItem>
+              <SelectItem value="cost">成本/汇率</SelectItem>
+              <SelectItem value="logistics">物流</SelectItem>
+              <SelectItem value="tariff">关税/产地</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={fetchDecisions}>
+            <RefreshCw className="h-3 w-3 mr-1" />刷新
+          </Button>
+        </div>
       </div>
 
       {/* Decision feedback loop stats */}

@@ -21,7 +21,6 @@ import type { PanelDef } from '@/lib/dashboard/panel-registry';
 
 const MonitorStrip = dynamic(() => import('@/components/dashboard/MonitorStrip').then(m => ({ default: m.MonitorStrip })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
 const CascadeRiskPanel = dynamic(() => import('@/components/risk/CascadeRiskPanel').then(m => ({ default: m.CascadeRiskPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const DecisionPanel = dynamic(() => import('@/components/risk/DecisionPanel').then(m => ({ default: m.DecisionPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
 const DecisionCenter = dynamic(() => import('@/components/dashboard/DecisionCenter').then(m => ({ default: m.DecisionCenter })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
 const SandboxReplay = dynamic(() => import('@/components/dashboard/SandboxReplay').then(m => ({ default: m.SandboxReplay })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
 const InventoryTab = dynamic(() => import('@/components/inventory/InventoryTab').then(m => ({ default: m.InventoryTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
@@ -34,7 +33,6 @@ const RiskTab = dynamic(() => import('@/components/risk/RiskTab').then(m => ({ d
 const PANEL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   'monitor': MonitorStrip,
   'cascade-risk': CascadeRiskPanel,
-  'decision-graph': DecisionPanel,
   'decision-center': DecisionCenter,
   'sandbox': SandboxReplay,
   'inventory': InventoryTab,

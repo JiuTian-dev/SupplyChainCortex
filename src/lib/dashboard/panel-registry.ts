@@ -57,16 +57,10 @@ export const PANEL_REGISTRY: PanelDef[] = [
     defaultEnabled: true, loaderType: 'chart',
   },
   {
-    id: 'decision-graph', label: '决策建议', icon: Zap,
-    path: '@/components/risk/DecisionPanel',
+    id: 'decision-center', label: '决策中心', icon: Zap,
+    path: '@/components/dashboard/DecisionCenter',
     category: 'decision', tags: ['all', 'executive', 'ops'],
     defaultEnabled: true, loaderType: 'chart',
-  },
-  {
-    id: 'decision-center', label: '决策中心', icon: Settings,
-    path: '@/components/dashboard/DecisionCenter',
-    category: 'decision', tags: ['all', 'executive'],
-    defaultEnabled: false, loaderType: 'chart',
   },
   {
     id: 'sandbox', label: '沙箱推演', icon: Cpu,
