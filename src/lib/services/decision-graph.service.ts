@@ -407,45 +407,68 @@ async function gatherContext(nodes: DecisionNode[]): Promise<{
   return context;
 }
 
-/** Extract data values from context for a specific decision node */
-function extractDataForNode(node: DecisionNode, context: Record<string, unknown>): Record<string, unknown> {
+/** Extract data values from context for a specific decision node — uses real DB data */
+async function extractDataForNode(node: DecisionNode, context: Record<string, unknown>): Promise<Record<string, unknown>> {
   const data: Record<string, unknown> = {};
 
-  // Extract relevant fields based on the decision domain
   switch (node.domain) {
     case 'inventory': {
-      const invAlerts = (context.inventoryAlerts as number) || 0;
-      data.stockStatus = invAlerts > 3 ? 'critical' : invAlerts > 0 ? 'warning' : 'healthy';
-      data.quantity = invAlerts > 0 ? 50 : 200; // normalized
+      // Fetch real inventory counts grouped by status
+      const realInv = await db.inventory.groupBy({
+        by: ['stockStatus'],
+        _count: { stockStatus: true },
+      });
+      const statusMap = Object.fromEntries(realInv.map(r => [r.stockStatus, r._count.stockStatus]));
+      const critical = statusMap.critical || 0;
+      const warning = statusMap.warning || 0;
+      const total = Object.values(statusMap).reduce((a, b) => a + b, 0);
+
+      data.stockStatus = critical > 0 ? 'critical' : warning > 0 ? 'warning' : 'healthy';
+      data.quantity = total;
+      data.criticalCount = critical;
+      data.warningCount = warning;
       data.reorderPoint = 100;
       data.inTransit = (context.delayedShipments as number) || 0;
       break;
     }
     case 'cost': {
+      // Real FX + real margin from DB
       const fx = context.exchangeRates as { rate: number; deviation: number } | undefined;
       data.deviation = fx?.deviation ? fx.deviation / 100 : 0;
-      data.avgMargin = context.cascadeRisk
-        ? (context.cascadeRisk as unknown as unknown as Record<string, unknown>).propagation
-          ? 50 : 48
+
+      const realCosts = await db.costRecord.findMany({ take: 200 });
+      const avgMargin = realCosts.length > 0
+        ? Math.round(realCosts.reduce((s, c) => s + c.grossMargin, 0) / realCosts.length * 10) / 10
         : 48;
+      data.avgMargin = avgMargin;
       break;
     }
     case 'logistics': {
-      const delayed = (context.delayedShipments as number) || 0;
-      data.delayDays = delayed > 3 ? 6 : delayed > 0 ? 3 : 0;
-      data.status = delayed > 3 ? 'customs' : delayed > 0 ? 'delayed' : 'in_transit';
+      // Real delayed shipments with actual delay days
+      const realDelayed = await db.shipmentItem.findMany({
+        where: { status: { in: ['delayed', 'exception'] } },
+        orderBy: { delayDays: 'desc' },
+        take: 50,
+      });
+      const maxDelay = realDelayed.length > 0
+        ? Math.max(...realDelayed.map(s => s.delayDays))
+        : 0;
+      const avgDelay = realDelayed.length > 0
+        ? Math.round(realDelayed.reduce((s, sh) => s + sh.delayDays, 0) / realDelayed.length * 10) / 10
+        : 0;
+
+      data.delayDays = maxDelay;
+      data.avgDelayDays = avgDelay;
+      data.delayedCount = realDelayed.length;
+      data.status = maxDelay > 5 ? 'customs' : maxDelay > 0 ? 'delayed' : 'in_transit';
       break;
     }
     case 'cross_domain': {
-      const risk = context.cascadeRisk as unknown as unknown as Record<string, unknown> | undefined;
-      const sourceNodes = risk?.sourceNodes as Array<Record<string, unknown>> | undefined;
+      const risk = context.cascadeRisk as Record<string, unknown> | undefined;
+      const sourceNodes = (risk as any)?.sourceNodes as Array<Record<string, unknown>> | undefined;
       data.sourceCount = sourceNodes?.length || 0;
-      data.maxImpact = risk?.summary
-        ? ((risk.summary as unknown as unknown as Record<string, unknown>).topAffectedProducts as Array<{ impactScore: number }>)?.[0]?.impactScore || 0
-        : 0;
-      data.affectedCount = risk?.summary
-        ? ((risk.summary as unknown as unknown as Record<string, unknown>).affectedNodes as number) || 0
-        : 0;
+      data.maxImpact = (risk as any)?.summary?.totalMonthlyLoss || 0;
+      data.affectedCount = (risk as any)?.summary?.affectedNodes || 0;
       break;
     }
   }
@@ -486,7 +509,7 @@ export async function executeDecisionGraph(options?: {
   const paths: DecisionPath[] = [];
 
   for (const node of relevantNodes) {
-    const data = extractDataForNode(node, context as unknown as unknown as Record<string, unknown>);
+    const data = await extractDataForNode(node, context as unknown as Record<string, unknown>);
 
     // Evaluate conditions by priority (highest first)
     const sortedConditions = [...node.conditions].sort((a, b) => b.priority - a.priority);

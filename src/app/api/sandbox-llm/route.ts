@@ -1,15 +1,178 @@
 /**
- * LLM-Driven Multi-Agent Sandbox API.
+ * Multi-Agent Sandbox API — real data pipeline connected.
  *
- * GET /api/sandbox-llm?rounds=10        → run all 4 agents with LLM
- * GET /api/sandbox-llm?role=warehouse    → run single agent
- * GET /api/sandbox-llm?mode=compare      → compare LLM vs rule-based outputs
+ * GET /api/sandbox-llm?rounds=10        → run agents with real DB + live data
+ * GET /api/sandbox-llm?role=warehouse   → single agent view
+ * GET /api/sandbox-llm?mode=compare     → LLM vs rule-based
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/api-utils';
 import { runLLMAgent, runAllAgents } from '@/lib/engine/llm-agent';
-import { runSandbox } from '@/lib/services/agent-sandbox.service';
+import { db } from '@/lib/db';
+
+async function gatherRealState() {
+  const [
+    products, inventory, shipments, suppliers,
+    cascadeRisk, fx, carbon, commodity, freight,
+    recentAlerts, cpscRecalls,
+  ] = await Promise.all([
+    db.product.findMany({ take: 20, include: { inventory: true, cost: true } }),
+    db.inventory.findMany({ take: 30, orderBy: { quantity: 'asc' } }),
+    db.shipmentItem.findMany({ take: 20, orderBy: { updatedAt: 'desc' } }),
+    db.supplier.findMany({ where: { status: 'active' }, take: 10 }),
+
+    // Live cascade risk
+    (async () => {
+      try {
+        const { getCascadeRisk } = await import('@/lib/services/cascade-risk.service');
+        const r = await getCascadeRisk({ scenario: 'auto', includeForwardProjection: false, includeCounterfactuals: false });
+        return {
+          affectedNodes: r.summary?.affectedNodes || 0,
+          totalLoss: r.summary?.totalMonthlyLoss || 0,
+          sources: (r as any).sourceNodes?.map((s: any) => ({ cause: s.cause, riskScore: s.riskScore })) || [],
+        };
+      } catch { return { affectedNodes: 0, totalLoss: 0, sources: [] }; }
+    })(),
+
+    // Live FX
+    (async () => {
+      try {
+        const { getLatestRates } = await import('@/lib/queries/exchange-rate.queries');
+        const fx = await getLatestRates();
+        return { usdCny: fx.rates?.USD ? 1 / fx.rates.USD : 7.25, midpoint: fx.midpoints?.USD?.midpoint, spread: fx.midpoints?.USD?.spread };
+      } catch { return { usdCny: 7.25 }; }
+    })(),
+
+    // Live carbon
+    (async () => {
+      try {
+        const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
+        const c = await fetchCarbonPrice();
+        return c ? { euaPrice: c.price } : null;
+      } catch { return null; }
+    })(),
+
+    // Live commodities
+    (async () => {
+      try {
+        const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
+        return await fetchDailyCommodities();
+      } catch { return []; }
+    })(),
+
+    // Live freight
+    (async () => {
+      try {
+        const { getFreightRates } = await import('@/lib/services/freight.service');
+        return await getFreightRates();
+      } catch { return null; }
+    })(),
+
+    // Recent alerts
+    db.supplyChainEvent.findMany({
+      where: { type: 'alert', createdAt: { gte: new Date(Date.now() - 7 * 86400000) } },
+      orderBy: { createdAt: 'desc' }, take: 5,
+    }),
+
+    // Recent recalls
+    db.regulationChange.findMany({
+      where: { source: 'CCPIT/CPSC', createdAt: { gte: new Date(Date.now() - 30 * 86400000) } },
+      orderBy: { createdAt: 'desc' }, take: 5,
+    }),
+  ]);
+
+  // Build real inventory state
+  const inventoryState = inventory.map(i => ({
+    sku: i.sku,
+    productName: i.productName,
+    quantity: i.quantity,
+    safetyStock: i.safetyStock,
+    reorderPoint: i.reorderPoint,
+    stockStatus: i.stockStatus,
+    warehouse: i.warehouse,
+  }));
+
+  // Build real shipment state
+  const shipmentState = shipments.map(s => ({
+    trackingNumber: s.trackingNumber,
+    productName: s.productName,
+    origin: s.origin,
+    destination: s.destination,
+    status: s.status,
+    delayDays: s.delayDays,
+    riskLevel: s.riskLevel,
+    eta: s.eta,
+  }));
+
+  // Build real supplier state (with dynamic scoring if available)
+  const supplierState = suppliers.map(s => {
+    const ratingDetails = typeof s.ratingDetails === 'object' && s.ratingDetails
+      ? (s.ratingDetails as any)
+      : {};
+    return {
+      name: s.name,
+      code: s.code,
+      rating: s.rating,
+      leadTime: s.leadTime,
+      region: s.region,
+      category: s.category,
+      scoreBreakdown: ratingDetails.breakdown || '静态评分',
+    };
+  });
+
+  // Product cost summary
+  const productsWithCost = products
+    .filter(p => p.cost)
+    .map(p => ({
+      sku: p.sku,
+      name: p.name,
+      category: p.category,
+      totalLanded: p.cost!.totalLanded,
+      grossMargin: p.cost!.grossMargin,
+      stockQuantity: p.inventory?.quantity || 0,
+      stockStatus: p.inventory?.stockStatus || 'unknown',
+    }));
+
+  // Computed derived fields for LLM agent compatibility
+  const weatherSeverity = cascadeRisk.sources?.some((s: any) => s.cause?.includes('天气')) ? 40 : 15;
+  const tariffRate = 7.5; // default Section 301 List 3 rate
+  const marketDemand = inventoryState.length > 0 ? 100 : 80;
+  const stockoutEvents = inventoryState.filter(i => i.stockStatus === 'critical').length;
+  const totalDelays = shipmentState.filter(s => s.status === 'delayed' || s.status === 'exception').length;
+
+  return {
+    round: 1,
+    // Required by LLM agent interface
+    weatherSeverity,
+    exchangeRate: fx.usdCny,
+    tariffRate,
+    marketDemand,
+    stockoutEvents,
+    totalDelays,
+    // Extended real-time external data
+    fxMidpoint: fx.midpoint || 0,
+    fxSpread: fx.spread || 0,
+    carbonPrice: carbon?.euaPrice || 77,
+    // Commodity trends
+    commodityTrend: commodity.length > 0
+      ? commodity.map(c => ({ name: c.name, price: c.price, changePct: c.changePct }))
+      : [],
+    // Freight
+    freightAvgRate: freight?.avgRate40GP || 0,
+    freightTrend: freight?.trend || 'stable',
+    // Real DB data
+    inventory: inventoryState,
+    shipments: shipmentState,
+    suppliers: supplierState,
+    products: productsWithCost,
+    // Cascade risk summary
+    cascadeRisk,
+    // Context
+    recentAlerts: recentAlerts.map(a => ({ title: a.title, severity: a.severity, createdAt: a.createdAt })),
+    cpscRecalls: cpscRecalls.map(r => ({ title: r.title, impactLevel: r.impactLevel, date: r.createdAt })),
+  };
+}
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
@@ -17,73 +180,75 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const role = searchParams.get('role');
   const mode = searchParams.get('mode') || 'run';
 
-  // Initialize sandbox state
-  const sandboxResult = await runSandbox({
-    scenario: 'baseline',
-    rounds: Math.min(rounds, 20),
-    seed: searchParams.get('seed') || '42',
-  });
-
-  const state = {
-    round: rounds,
-    weatherSeverity: (sandboxResult as any).weatherSeverity || 20,
-    exchangeRate: (sandboxResult as any).exchangeRate || 7.25,
-    tariffRate: (sandboxResult as any).tariffRate || 7.5,
-    marketDemand: (sandboxResult as any).marketDemand || 100,
-    inventory: [
-      { sku: 'RC-4001', quantity: 200, safetyStock: 150, status: 'healthy' },
-      { sku: 'RC-4002', quantity: 80, safetyStock: 120, status: 'warning' },
-      { sku: 'RC-4003', quantity: 30, safetyStock: 100, status: 'critical' },
-    ],
-    shipments: [
-      { id: 'SH-001', delayDays: 2, status: 'in_transit', eta: 5 },
-      { id: 'SH-002', delayDays: 7, status: 'delayed', eta: 12 },
-    ],
-    suppliers: [
-      { name: '深圳供应商A', rating: 4.5, leadTime: 7 },
-      { name: '绍兴供应商B', rating: 3.2, leadTime: 14 },
-      { name: '越南供应商C', rating: 4.0, leadTime: 21 },
-    ],
-    stockoutEvents: (sandboxResult as any).stockoutEvents || 0,
-    totalDelays: (sandboxResult as any).totalDelays || 0,
-  };
+  const state = await gatherRealState();
 
   // ── Single agent mode ──────────────────────────────────────────────
   if (role && ['warehouse', 'supplier', 'forwarder', 'market'].includes(role)) {
-    const decision = await runLLMAgent({ role: role as any, state }, { serverSide: true });
+    const decision = await runLLMAgent({
+      role: role as any,
+      state: { ...state, round: Math.min(rounds, 20) } as any,
+    }, { serverSide: true });
+
+    // Log to audit
+    try {
+      await db.auditLog.create({
+        data: {
+          action: 'SIMULATE', entity: 'sandbox-agent', userId: 'system',
+          userName: `沙箱代理-${role}`, severity: 'info',
+          details: { role, action: decision.action, confidence: decision.confidence, fallback: decision.fallback },
+        },
+      });
+    } catch { /* non-critical */ }
+
     return NextResponse.json({
-      success: true,
-      mode: 'single',
-      role,
-      state: { round: state.round, weatherSeverity: state.weatherSeverity, exchangeRate: state.exchangeRate },
+      success: true, mode: 'single', role,
+      state: { round: state.round, exchangeRate: state.exchangeRate, cascadeRiskSummary: state.cascadeRisk },
       decision,
     });
   }
 
-  // ── Compare mode: LLM vs rule-based ────────────────────────────────
+  // ── Compare mode ────────────────────────────────────────────────────
   if (mode === 'compare') {
-    const llmDecisions = await runAllAgents(state, { serverSide: true });
+    const llmDecisions = await runAllAgents(state as any, { serverSide: true });
     return NextResponse.json({
-      success: true,
-      mode: 'compare',
-      state: { round: state.round, weatherSeverity: state.weatherSeverity },
+      success: true, mode: 'compare',
+      state: { round: state.round, exchangeRate: state.exchangeRate },
       decisions: llmDecisions,
-      note: 'fallback=true means LLM was unavailable and rule-based logic was used',
+      note: 'fallback=true means LLM unavailable, rule-based logic used',
     });
   }
 
   // ── All agents mode ─────────────────────────────────────────────────
-  const decisions = await runAllAgents(state);
+  const decisions = await runAllAgents(state as any);
+
+  // Persist simulation event
+  const summary = Object.entries(decisions).map(([r, d]) => ({
+    role: r, action: d.action, confidence: d.confidence, llm: !d.fallback,
+  }));
+  try {
+    await db.supplyChainEvent.create({
+      data: {
+        type: 'simulation',
+        title: `沙箱协作: ${summary.map(s => `${s.role}=${s.action}`).join(', ')}`,
+        description: JSON.stringify(summary),
+        icon: '🧪',
+        color: '#8b5cf6',
+        severity: 'info',
+      },
+    });
+  } catch { /* non-critical */ }
+
   return NextResponse.json({
-    success: true,
-    mode: 'all',
-    state: { round: state.round, weatherSeverity: state.weatherSeverity, exchangeRate: state.exchangeRate },
+    success: true, mode: 'all',
+    state: {
+      round: Math.min(rounds, 20),
+      exchangeRate: state.exchangeRate,
+      cascadeRiskSummary: state.cascadeRisk,
+      inventoryCount: state.inventory.length,
+      shipmentCount: state.shipments.length,
+      supplierCount: state.suppliers.length,
+    },
     decisions,
-    summary: Object.entries(decisions).map(([role, d]) => ({
-      role,
-      action: d.action,
-      confidence: d.confidence,
-      llmMode: !d.fallback,
-    })),
+    summary,
   });
 });
