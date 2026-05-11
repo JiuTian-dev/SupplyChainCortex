@@ -335,7 +335,7 @@ export const intelligenceTools: MCPTool[] = [
   // ── 22. web_search ───────────────────────────────────────────────────────
   {
     name: 'web_search',
-    description: '联网搜索最新公开信息：SCFI运价指数、LME铜铝钢价格、EU碳价、CPSC召回、关税政策变动、港口新闻等。用于获取实时外部数据，补充内部数据库。',
+    description: '联网搜索最新公开信息。搜索引擎覆盖Wikipedia英文百科+Google News英文新闻。支持中英文——中文查询请先翻译为英文关键词再搜索以获得最佳结果。用于获取SCFI运价、LME铜铝钢、EU碳价、CPSC召回、关税政策、港口新闻等实时外部数据。',
     parameters: {
       type: 'object',
       properties: {
