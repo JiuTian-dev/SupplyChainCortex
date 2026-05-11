@@ -125,7 +125,31 @@ function formatToolResult(tool: string, action: string, result: unknown): string
       }
       return `🌤 港口天气: 所有港口海况正常，无恶劣天气预警`;
     }
-    default: return `查询完成: ${JSON.stringify(data).substring(0, 400)}`;
+    case 'web_search': {
+      const ctx = data.formattedContext as string | undefined;
+      return `🔍 联网搜索结果 (${data.source}):\n${ctx || JSON.stringify(data.results).substring(0, 1000)}`;
+    }
+    case 'query_commodities': {
+      const summary = data.summary as string | undefined;
+      return `🧱 大宗商品: ${summary || `共${data.count}种商品`}`;
+    }
+    case 'query_scfis': {
+      if (data.error) return `📦 SCFIS: ${data.error}`;
+      return `📦 SCFIS运价: ${data.index}点, 约$${data.estimatedFreightUSD}/FEU, ${data.route}`;
+    }
+    case 'query_carbon_price': {
+      if (data.error) return `🌍 碳价: ${data.error}`;
+      return `🌍 EU碳价: €${data.euaPrice}/t CO2, ${data.cbamExample || ''}`;
+    }
+    case 'query_cpsc_recalls': {
+      if (data.message) return `⚠️ CPSC召回: ${data.message}`;
+      const risk = data.riskSummary as string | undefined;
+      return `⚠️ CPSC召回(${data.totalRecalls}条):\n${risk || ''}`;
+    }
+    case 'query_port_congestion': {
+      return `⚓ 港口拥堵: 全球${data.globalLevel}级, 热点: ${(data.affectedRoutes as string[])?.join(', ') || '无'}`;
+    }
+    default: return `查询完成: ${JSON.stringify(data).substring(0, 800)}`;
   }
 }
 
