@@ -22,10 +22,7 @@ export const riskThresholdsSchema = z.object({
   high: z.number().min(0).max(100).default(70),
 });
 
-export const panelsSchema = z.record(z.string(), z.boolean()).default({
-  monitor: true, 'cascade-risk': true, 'decision-graph': true,
-  inventory: true, cost: true, logistics: true, supplier: true, risk: true,
-});
+export const panelsSchema = z.record(z.string(), z.boolean());
 
 export const dashboardConfigSchema = z.object({
   currency: currencySchema.default('CNY'),
@@ -34,7 +31,11 @@ export const dashboardConfigSchema = z.object({
   riskThresholds: riskThresholdsSchema.default({ low: 15, medium: 40, high: 70 }),
   timeHorizon: timeHorizonSchema.default('30d'),
   aggregation: aggregationSchema.default('daily'),
-  panels: panelsSchema.default({ monitor: true, analysis: true, decision: true, simulation: true }),
+  panels: panelsSchema.default({
+    monitor: true, 'cascade-risk': true, 'decision-center': true, sandbox: false,
+    inventory: true, cost: true, logistics: true, supplier: true, risk: true,
+    sales: false, dashboard: false,
+  }),
   showCounterfactual: z.boolean().default(true),
   enableFeedbackTracking: z.boolean().default(true),
 });

@@ -78,6 +78,13 @@ export const useDashboardConfigStore = create<DashboardConfigState>((set, get) =
   hydrate: () => {
     if (get().hydrated) return;
     const stored = loadConfig();
+    // Migrate old panel IDs to new registry
+    if (stored.panels) {
+      const p = stored.panels as Record<string, boolean>;
+      if ('analysis' in p) { p['cascade-risk'] = p.analysis; delete p.analysis; }
+      if ('decision' in p) { p['decision-center'] = p.decision; delete p.decision; }
+      if ('simulation' in p) { p.sandbox = p.simulation; delete p.simulation; }
+    }
     set({ config: stored, hydrated: true });
   },
 }));
