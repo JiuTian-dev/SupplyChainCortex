@@ -77,44 +77,61 @@ async function fetchAVCommodity(
 // ─── SHFE Steel Rebar Futures (via Sina Finance) ─────────────────────────────────
 
 /**
- * Sina Finance provides free futures quotes in JSONP format.
- * SHFE rebar main contract symbol: RB0 (continuous)
+ * Sina Finance provides free futures quotes in GBK-encoded JSONP.
+ * SHFE rebar main contract: RB2610 (most active).
+ * Response: var hq_str_RB2610="螺纹钢2610,开盘,昨收,最高,最低,最新,买价,卖价,..."
  * Returns price in CNY/tonne.
  */
 async function fetchSteelRebarSHFE(): Promise<DailyCommodityPrice | null> {
   try {
-    // Sina futures API — free, no key
-    const url = 'https://hq.sinajs.cn/list=RB0';
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { Referer: 'https://finance.sina.com.cn' },
-    });
-    if (!res.ok) return null;
-    const text = await res.text();
+    // Try main contracts — fall through until one works
+    const symbols = ['RB2610', 'RB2605', 'RB2601', 'RB0'];
+    let result: DailyCommodityPrice | null = null;
 
-    // Parse: var hq_str_RB0="名称,价格,涨跌额,涨跌幅,昨收,..."
-    const match = text.match(/"([^"]+)"/);
-    if (!match) return null;
-    const fields = match[1].split(',');
-    if (fields.length < 4) return null;
+    for (const symbol of symbols) {
+      const url = `https://hq.sinajs.cn/list=${symbol}`;
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(8000),
+        headers: { Referer: 'https://finance.sina.com.cn' },
+      });
+      if (!res.ok) continue;
 
-    const name = fields[0];
-    const price = parseFloat(fields[1]); // current/latest price
-    const prevSettle = parseFloat(fields[4]); // previous settlement
+      // Sina uses GBK encoding for Chinese futures
+      const buffer = await res.arrayBuffer();
+      const text = new TextDecoder('gbk').decode(buffer);
 
-    if (isNaN(price) || price <= 0) return null;
+      // Parse: var hq_str_SYMBOL="name,open,prevClose,price,high,low,..."
+      const match = text.match(/"([^"]+)"/);
+      if (!match) continue;
+      const fields = match[1].split(',');
+      if (fields.length < 8) continue;
 
-    const changePct = prevSettle > 0 ? ((price - prevSettle) / prevSettle) * 100 : 0;
+      const name = fields[0];
+      // Sina futures field order (index 0-based):
+      // 0=name, 1=open, 2=prevClose, 3=price(bid), 4=high, 5=low, 6=ask, 7=volume, 8=turnover
+      const price = parseFloat(fields[3]);
+      const prevSettle = parseFloat(fields[2]);
 
-    return {
-      code: 'STEEL_HRC',
-      name: `螺纹钢 (${name})`,
-      price: Math.round(price * 100) / 100,
-      unit: '¥/吨',
-      date: new Date().toISOString().split('T')[0],
-      changePct: Math.round(changePct * 10) / 10,
-      source: 'SHFE/Sina',
-    };
+      if (isNaN(price) || price <= 0 || price > 100000) continue;
+
+      const changePct = prevSettle > 0 ? ((price - prevSettle) / prevSettle) * 100 : 0;
+
+      // SHFE rebar futures are quoted in CNY/tonne — reasonable range 2000-6000
+      if (price < 2000 || price > 6000) continue;
+
+      result = {
+        code: 'STEEL_HRC',
+        name: `螺纹钢 (${name})`,
+        price: Math.round(price * 100) / 100,
+        unit: '¥/吨',
+        date: new Date().toISOString().split('T')[0],
+        changePct: Math.round(changePct * 10) / 10,
+        source: 'SHFE/Sina',
+      };
+      break;
+    }
+
+    return result;
   } catch {
     return null;
   }
