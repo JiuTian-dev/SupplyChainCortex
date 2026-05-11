@@ -192,6 +192,9 @@ export function CascadeRiskPanel() {
                 <SelectItem value="port_congestion">港口拥堵</SelectItem>
                 <SelectItem value="exchange_shock">汇率冲击</SelectItem>
                 <SelectItem value="supplier_failure">供应商故障</SelectItem>
+                <SelectItem value="commodity_shock">原材料波动</SelectItem>
+                <SelectItem value="cbam_enforcement">CBAM 碳关税</SelectItem>
+                <SelectItem value="competitor_pressure">竞品价格挤压</SelectItem>
               </SelectContent>
             </Select>
             <RefreshCw className="h-3.5 w-3.5 text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => fetchReport()} />

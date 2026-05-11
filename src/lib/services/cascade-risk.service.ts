@@ -772,7 +772,7 @@ function propagate(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function getCascadeRisk(options?: {
-  scenario?: 'weather_disruption' | 'exchange_shock' | 'supplier_failure' | 'port_congestion' | 'tariff_escalation' | 'auto';
+  scenario?: 'weather_disruption' | 'exchange_shock' | 'supplier_failure' | 'port_congestion' | 'tariff_escalation' | 'cbam_enforcement' | 'commodity_shock' | 'competitor_pressure' | 'auto';
   sourcePort?: string;
   sourceSupplier?: string;
   fusionStrategy?: FusionStrategy;
@@ -934,6 +934,78 @@ export async function getCascadeRisk(options?: {
         }
       }
     } catch { /* tariff engine unavailable */ }
+  }
+
+  // CBAM carbon cost enforcement
+  if (scenario === 'cbam_enforcement' || scenario === 'auto') {
+    try {
+      const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
+      const carbon = await fetchCarbonPrice();
+      if (carbon && carbon.price > 60) {
+        const euPorts = [...nodes.values()].filter(n => n.type === 'PORT' && (n.label.includes('汉堡') || n.label.includes('鹿特丹')));
+        for (const port of euPorts) {
+          anomalySources.push({
+            nodeId: port.id,
+            riskScore: carbon.price > 90 ? 65 : 40,
+            cause: `CBAM碳关税: EUA €${carbon.price}/t CO2 → EU出口成本增加`,
+            category: 'exchange',
+          });
+        }
+      }
+    } catch { /* carbon source unavailable */ }
+  }
+
+  // Commodity price shock — raw material cost pressure
+  if (scenario === 'commodity_shock' || scenario === 'auto') {
+    try {
+      const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
+      const commodities = await fetchDailyCommodities();
+      const bigMovers = commodities.filter(c => Math.abs(c.changePct) > 3);
+      if (bigMovers.length >= 2) {
+        const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+        if (productNode) {
+          const summary = bigMovers.map(c => `${c.name}: ${c.changePct > 0 ? '+' : ''}${c.changePct}%`).join(', ');
+          const avgChange = bigMovers.reduce((s, c) => s + Math.abs(c.changePct), 0) / bigMovers.length;
+          anomalySources.push({
+            nodeId: productNode.id,
+            riskScore: Math.min(Math.round(avgChange * 5), 85),
+            cause: `原材料价格波动: ${summary}`,
+            category: 'supplier',
+          });
+        }
+      }
+    } catch { /* commodities unavailable */ }
+  }
+
+  // Competitor pricing pressure — Amazon price squeeze
+  if (scenario === 'competitor_pressure' || scenario === 'auto') {
+    try {
+      const { fetchCompetitorPrices } = await import('@/lib/sources/amazon-competitor');
+      const competitors = await fetchCompetitorPrices();
+      const valid = competitors.filter(c => c.competitorCount > 0);
+      if (valid.length > 0) {
+        const avgCompetitorPrice = valid.reduce((s, c) => s + c.avgPrice, 0) / valid.length;
+        const allCosts = await db.costRecord.findMany({ take: 50 });
+        const avgLandedCost = allCosts.length > 0
+          ? allCosts.reduce((s, c) => s + c.totalLanded, 0) / allCosts.length
+          : 0;
+        // Margin squeeze: competitor avg vs our landed cost
+        if (avgLandedCost > 0 && avgCompetitorPrice > 0) {
+          const squeezeRatio = avgLandedCost / avgCompetitorPrice;
+          if (squeezeRatio > 0.7) {
+            const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
+            if (productNode) {
+              anomalySources.push({
+                nodeId: productNode.id,
+                riskScore: squeezeRatio > 0.85 ? 75 : 50,
+                cause: `竞品价格挤压: 落地成本 $${avgLandedCost.toFixed(0)} vs 竞品均价 $${avgCompetitorPrice.toFixed(0)} (比率 ${(squeezeRatio * 100).toFixed(0)}%)`,
+                category: 'exchange',
+              });
+            }
+          }
+        }
+      }
+    } catch { /* competitor data unavailable */ }
   }
 
   // Quality & returns risk — defect rates and return trends

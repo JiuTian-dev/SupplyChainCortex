@@ -16,6 +16,7 @@
  */
 
 import { db } from '@/lib/db';
+import { fetchCarbonPrice, estimateCBAMCost } from '@/lib/sources/carbon-price';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -44,6 +45,10 @@ export interface TariffScenario {
     newRate: number;
     tradeAgreement: string;
   }>;
+  /** Enable CBAM carbon cost calculation for this scenario */
+  cbamEnabled?: boolean;
+  /** Percentage of free EUA allocation phased out (0-100). 2026=10%, 2030=50%, 2034=100% */
+  cbamPhaseOutPct?: number;
 }
 
 export interface TariffSimulationResult {
@@ -180,6 +185,83 @@ export async function getTariffOverview(): Promise<{
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Pre-defined 2026-relevant tariff scenarios */
+// ═══════════════════════════════════════════════════════════════════════════════
+// CBAM Carbon Cost — EU Carbon Border Adjustment Mechanism
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Product carbon footprint estimates (kg CO2 per kg product) for small appliances */
+const PRODUCT_CARBON_INTENSITY: Record<string, number> = { default: 2.5 };
+
+/**
+ * Compute CBAM cost for a product exported to EU.
+ * CBAM = EUA price × embodied emissions × (1 - free allocation %)
+ *
+ * 2026: 90% free allocation → pay 10% of embedded carbon
+ * 2030: 50% free → pay 50%
+ * 2034: 0% free → pay 100%
+ */
+export async function computeCBAMCost(params: {
+  productWeightKg: number;
+  carbonIntensity?: number; // kg CO2 per kg product, default 2.5
+  phaseOutPct?: number;     // % of free allocation phased out, default 10 (2026)
+}): Promise<{
+  euaPrice: number;
+  carbonCostEUR: number;
+  carbonCostCNY: number;   // approx, using PBOC midpoint
+  freeAllocationPct: number;
+  source: string;
+} | null> {
+  try {
+    const carbon = await fetchCarbonPrice();
+    if (!carbon) return null;
+
+    const intensity = params.carbonIntensity || PRODUCT_CARBON_INTENSITY.default;
+    const phaseOut = params.phaseOutPct ?? 10; // 2026 default: 10% phased out
+    const freePct = 100 - phaseOut;
+
+    // Embodied emissions = weight × carbon intensity (kg CO2)
+    const embodiedCO2 = (params.productWeightKg * intensity); // kg CO2
+
+    // CBAM cost = EUA × embodied × (phaseOut/100)
+    // EUA price is EUR/t CO2, embodied is kg → convert to tonnes
+    const carbonCostEUR = Math.round(carbon.price * (embodiedCO2 / 1000) * (phaseOut / 100) * 100) / 100;
+
+    // Approximate CNY cost using typical EUR/CNY rate ~8.0
+    const carbonCostCNY = Math.round(carbonCostEUR * 8.0 * 100) / 100;
+
+    return {
+      euaPrice: carbon.price,
+      carbonCostEUR,
+      carbonCostCNY,
+      freeAllocationPct: freePct,
+      source: carbon.source,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Get live CBAM scenario with current EUA price */
+export async function getLiveCBAMScenario(): Promise<{
+  euaPrice: number;
+  phaseOut2026: number;
+  phaseOut2030: number;
+  phaseOut2034: number;
+  source: string;
+}> {
+  const carbon = await fetchCarbonPrice();
+  const euaPrice = carbon?.price || 77; // fallback to typical price
+  return {
+    euaPrice,
+    phaseOut2026: 10,
+    phaseOut2030: 50,
+    phaseOut2034: 100,
+    source: carbon?.source || 'static',
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const TARIFF_SCENARIOS: TariffScenario[] = [
   {
     name: 'US Section 301 escalation',
@@ -188,8 +270,10 @@ export const TARIFF_SCENARIOS: TariffScenario[] = [
   },
   {
     name: 'EU CBAM full enforcement',
-    description: '欧盟碳边境税全面实施，家电碳排放成本 +5%',
+    description: '欧盟碳边境税全面实施，家电碳排放成本实时计算（EUA期货 + 产品碳足迹）',
     changes: [{ countryCode: 'EU', newRate: 7.7, tradeAgreement: 'CBAM-full' }],
+    cbamEnabled: true,
+    cbamPhaseOutPct: 10,
   },
   {
     name: 'RCEP tariff elimination',
@@ -245,12 +329,34 @@ export async function simulateTariffScenario(
     const newDuty = product.sellingPrice * (newRate / 100);
     const dutyDelta = newDuty - currentDuty;
 
-    const newTotalLanded = cost.totalLanded + dutyDelta;
+    // CBAM carbon cost (EU-bound products with cbamEnabled scenario)
+    let carbonCost = 0;
+    if (scenario.cbamEnabled && cost.destination === 'EU') {
+      const cbam = await computeCBAMCost({
+        productWeightKg: product.weight || 1.5,
+        phaseOutPct: scenario.cbamPhaseOutPct || 10,
+      });
+      if (cbam) {
+        carbonCost = cbam.carbonCostEUR; // EUR cost per unit
+      }
+    }
+
+    const newTotalLanded = cost.totalLanded + dutyDelta + carbonCost;
     const newMargin = ((product.sellingPrice - newTotalLanded) / product.sellingPrice) * 100;
 
-    if (Math.abs(newRate - currentTariff.rate) > 0.1) {
+    const hasTariffChange = Math.abs(newRate - currentTariff.rate) > 0.1;
+    const hasCarbonCost = carbonCost > 0.01;
+
+    if (hasTariffChange || hasCarbonCost) {
       let recommendation = '';
-      if (newMargin < 40) {
+      if (carbonCost > 0.01) {
+        recommendation = `CBAM 碳成本 €${carbonCost}/台（EUA €${scenario.cbamPhaseOutPct}% 付费比例）`;
+        if (newMargin < 40) {
+          recommendation += `，毛利率将降至 ${Math.round(newMargin)}%，建议评估低碳材料或提价`;
+        } else {
+          recommendation += `，影响可控`;
+        }
+      } else if (newMargin < 40) {
         recommendation = `毛利率将降至 ${Math.round(newMargin)}%，建议评估替代原产地（墨西哥/越南）或提价`;
       } else if (newMargin < 48) {
         recommendation = `毛利率降至 ${Math.round(newMargin)}%，建议关注并准备备选方案`;
@@ -266,7 +372,7 @@ export async function simulateTariffScenario(
         currentMargin: cost.grossMargin,
         newMargin: Math.round(newMargin * 10) / 10,
         marginChange: Math.round((newMargin - cost.grossMargin) * 10) / 10,
-        annualRevenueImpact: Math.round(dutyDelta * 100 * 12),
+        annualRevenueImpact: Math.round((dutyDelta + carbonCost) * 100 * 12),
         recommendation,
       });
     }

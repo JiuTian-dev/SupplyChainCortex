@@ -244,6 +244,7 @@ export async function simulateCostImpact(
   params: {
     exchangeRateChange?: number; freightChange?: number; rawMaterialChange?: number;
     tariffChange?: number; laborChange?: number; platformFeeChange?: number;
+    carbonPriceChange?: number; // EUA change in EUR/t
   }
 ): Promise<{
   simulatedTotalLanded: number; simulatedMargin: number; marginChange: number;
@@ -288,9 +289,25 @@ export async function simulateCostImpact(
   const newTariff = baseTariff * (1 + tariffChangePct);
   const newPlatformFee = (costRecord.platformFee || 0) * (1 + platformFeeChangePct);
 
+  // CBAM carbon cost for EU-bound products
+  let carbonCost = 0;
+  const carbonPriceChangePct = (params.carbonPriceChange ?? 0) / 100;
+  if (costRecord.destination === 'EU' && Math.abs(carbonPriceChangePct) > 0.001) {
+    try {
+      const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
+      const carbon = await fetchCarbonPrice();
+      if (carbon) {
+        const euPrice = carbon.price * (1 + carbonPriceChangePct);
+        // 1.5kg product, 2.5 kgCO2/kg intensity, 10% CBAM phase-out (2026)
+        const embodiedCo2 = (1.5 * 2.5) / 1000; // tonnes CO2
+        carbonCost = Math.round(euPrice * embodiedCo2 * 0.1 * 100) / 100;
+      }
+    } catch { /* carbon source unavailable */ }
+  }
+
   const effRate = currentFxRate * (1 + fxChangePct);
   const newCnyTotal = effRate > 0 ? (newRawMaterial + newLabor) / effRate : 0;
-  const newUsdTotal = newLogistics + newTariff + newPlatformFee;
+  const newUsdTotal = newLogistics + newTariff + newPlatformFee + carbonCost;
   const newTotalLanded = Math.round((newCnyTotal + newUsdTotal) * 100) / 100;
 
   const sellingPrice = costRecord.sellingPrice || 1;
@@ -697,7 +714,37 @@ export async function getCostOptimization(category?: string) {
   }, CACHE_TTL.LONG);
 }
 
-/** Get cost trend analysis with live FX awareness */
+/**
+ * Estimate commodity-driven BOM cost variation for a product category.
+ * Different product types have different material exposure:
+ * - 厨房电器 (kitchen): more steel + copper (motors, heating elements)
+ * - 清洁电器 (cleaning): more plastic + copper (motors, housings)
+ * - 个护电器 (personal care): more plastic + aluminum
+ * Returns a multiplier representing the relative change in raw material cost.
+ */
+function estimateBOMVariation(category: string, monthOffset: number, commodityTrend: Record<string, number>): number {
+  // Material weights by product category
+  const weights: Record<string, { cu: number; al: number; st: number; pp: number; pvc: number }> = {
+    '厨房电器': { cu: 0.30, al: 0.10, st: 0.40, pp: 0.15, pvc: 0.05 },
+    '清洁电器': { cu: 0.25, al: 0.05, st: 0.20, pp: 0.40, pvc: 0.10 },
+    '个护电器': { cu: 0.15, al: 0.20, st: 0.10, pp: 0.45, pvc: 0.10 },
+    '环境电器': { cu: 0.20, al: 0.15, st: 0.25, pp: 0.30, pvc: 0.10 },
+  };
+
+  const w = weights[category] || { cu: 0.25, al: 0.10, st: 0.25, pp: 0.30, pvc: 0.10 };
+
+  // Weighted commodity change (monthOffset months ago)
+  const change = (commodityTrend['COPPER'] || 0) * w.cu
+    + (commodityTrend['ALUMINUM'] || 0) * w.al
+    + (commodityTrend['STEEL_HRC'] || 0) * w.st
+    + (commodityTrend['PLASTIC_PP'] || 0) * w.pp
+    + (commodityTrend['PLASTIC_PVC'] || 0) * w.pvc;
+
+  // Scale: 1% commodity change ≈ 0.6% BOM change (labor + overhead dampen the effect)
+  return change * 0.006 * (1 + monthOffset * 0.1); // earlier months have less impact
+}
+
+/** Get cost trend analysis with live FX + commodity awareness */
 export async function getCostTrend(category?: string, months = 6) {
   const key = cacheKey('cost', 'trend', category || 'all', months);
 
@@ -710,18 +757,31 @@ export async function getCostTrend(category?: string, months = 6) {
       getLiveExchangeRates(),
     ]);
 
+    // Fetch live commodity trend data for BOM cost estimation
+    let commodityTrend: Record<string, number> = {};
+    try {
+      const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
+      const commodities = await fetchDailyCommodities();
+      for (const c of commodities) {
+        commodityTrend[c.code] = c.changePct;
+      }
+    } catch { /* use zero trend */ }
+
     const trends = costRecords.map((cost) => {
       const monthlyData: { month: string; totalLanded: number; grossMargin: number; rawMaterial: number; logistics: number; tariff: number }[] = [];
-      for (let m = months; m >= 1; m--) {
-        const hash = (cost.sku.charCodeAt(0) * 31 + cost.sku.charCodeAt(cost.sku.length - 1) * 17 + m * 7) % 100;
-        const costVariation = ((hash % 15) - 7) * 0.005;
-        const logisticsVariation = (((hash * 3) % 11) - 5) * 0.004;
-        const tariffVariation = (((hash * 7) % 9) - 4) * 0.003;
+      const cat = cost.product?.category || '厨房电器';
 
-        const rawMaterial = Math.round((cost.rawMaterial || 0) * (1 + costVariation * 0.8) * 100) / 100;
-        const logistics = Math.round((cost.logistics || 0) * (1 + logisticsVariation) * 100) / 100;
-        const tariff = Math.round((cost.tariff || 0) * (1 + tariffVariation) * 100) / 100;
-        const totalLanded = Math.round((cost.totalLanded || 0) * (1 + costVariation) * 100) / 100;
+      for (let m = months; m >= 1; m--) {
+        // Commodity-driven BOM variation replaces synthetic hash
+        const bomVar = estimateBOMVariation(cat, m, commodityTrend);
+
+        const logisticsVariation = 0; // logistics doesn't vary much month-to-month without SCFI data
+        const tariffVariation = 0;     // tariffs are policy-driven, not monthly
+
+        const rawMaterial = Math.round((cost.rawMaterial || 0) * (1 + bomVar) * 100) / 100;
+        const logistics = Math.round((cost.logistics || 0) * 100) / 100;
+        const tariff = Math.round((cost.tariff || 0) * 100) / 100;
+        const totalLanded = Math.round((cost.totalLanded || 0) * (1 + bomVar * 0.7) * 100) / 100;
         const sellingPrice = cost.sellingPrice || 1;
         const grossMargin = Math.round(((sellingPrice - totalLanded) / sellingPrice) * 1000) / 10;
 
