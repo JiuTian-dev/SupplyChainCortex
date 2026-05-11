@@ -1,161 +1,97 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
 import { QueryProvider } from '@/lib/query-provider';
-// ==================== Component Imports ====================
-import dynamic from 'next/dynamic';
+import { Separator } from '@/components/ui/separator';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Activity, Boxes, DollarSign, Ship, TrendingUp, Building2, Shield, Eye, Search, Zap, Calendar } from 'lucide-react';
+// ── TabbedSection (lightweight, always needed) ──────────────────────────────
+import { TabbedSection } from '@/components/dashboard/TabbedSection';
 
-const InventoryTab = dynamic(() => import('@/components/inventory/InventoryTab').then(m => ({ default: m.InventoryTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
-const CostTab = dynamic(() => import('@/components/cost/CostTab').then(m => ({ default: m.CostTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const LogisticsTab = dynamic(() => import('@/components/logistics/LogisticsTab').then(m => ({ default: m.LogisticsTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
-const SalesTab = dynamic(() => import('@/components/sales/SalesTab').then(m => ({ default: m.SalesTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const SupplierTab = dynamic(() => import('@/components/supplier/SupplierTab').then(m => ({ default: m.SupplierTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
-const RiskTab = dynamic(() => import('@/components/risk/RiskTab').then(m => ({ default: m.RiskTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const CascadeRiskPanel = dynamic(() => import('@/components/risk/CascadeRiskPanel').then(m => ({ default: m.CascadeRiskPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const DecisionPanel = dynamic(() => import('@/components/risk/DecisionPanel').then(m => ({ default: m.DecisionPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+// ── Panel registry + config ─────────────────────────────────────────────────
+import { PANEL_REGISTRY } from '@/lib/dashboard/panel-registry';
+import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 
-// Was static import — now dynamic (only loaded on tab switch, not in initial bundle)
-const MonitorStrip = dynamic(() => import('@/components/dashboard/MonitorStrip').then(m => ({ default: m.MonitorStrip })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const DecisionCenter = dynamic(() => import('@/components/dashboard/DecisionCenter').then(m => ({ default: m.DecisionCenter })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const SandboxReplay = dynamic(() => import('@/components/dashboard/SandboxReplay').then(m => ({ default: m.SandboxReplay })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const PassportPanel = dynamic(() => import('@/components/dashboard/PassportPanel').then(m => ({ default: m.PassportPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const ConfigToolbar = dynamic(() => import('@/components/dashboard/ConfigToolbar').then(m => ({ default: m.ConfigToolbar })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const initEnginePersistence = () => import('@/lib/engine/persistence').then(m => m.initEnginePersistence());
-
-// ==================== Dynamic Dialog/Sheet Imports ====================
-// Dialogs and sheets are rarely opened, so they are lazy loaded.
-// These are OK as dynamic imports because they only load on user interaction.
-
-const NotificationCenter = dynamic(
-  () => import('@/components/shared/NotificationCenter').then((m) => ({ default: m.NotificationCenter })),
-  { ssr: false }
-);
-
-const ProductDetailSheet = dynamic(
-  () => import('@/components/shared/ProductDetailSheet').then((m) => ({ default: m.ProductDetailSheet })),
-  { ssr: false }
-);
-
-const NotesPanel = dynamic(
-  () => import('@/components/shared/NotesPanel').then((m) => ({ default: m.NotesPanel })),
-  { ssr: false }
-);
-
-const CSVImportDialog = dynamic(
-  () => import('@/components/shared/CSVImportDialog').then((m) => ({ default: m.CSVImportDialog })),
-  { ssr: false }
-);
-
-const ChatPanel = dynamic(
-  () => import('@/components/shared/ChatPanel').then((m) => ({ default: m.ChatPanel })),
-  { ssr: false }
-);
-
-const AlertRulesDialog = dynamic(
-  () => import('@/components/shared/AlertRulesDialog').then((m) => ({ default: m.AlertRulesDialog })),
-  { ssr: false }
-);
-
-const ProductCompareDialog = dynamic(
-  () => import('@/components/shared/ProductCompareDialog').then((m) => ({ default: m.ProductCompareDialog })),
-  { ssr: false }
-);
-
-const LoginDialog = dynamic(
-  () => import('@/components/auth/LoginDialog').then((m) => ({ default: m.LoginDialog })),
-  { ssr: false }
-);
-
-const PasswordChangeDialog = dynamic(
-  () => import('@/components/auth/PasswordChangeDialog').then((m) => ({ default: m.PasswordChangeDialog })),
-  { ssr: false }
-);
-
-const UserManagementPanel = dynamic(
-  () => import('@/components/admin/UserManagementPanel').then((m) => ({ default: m.UserManagementPanel })),
-  { ssr: false }
-);
-
-// ==================== Static Imports (lightweight, always needed) ====================
-
-// Layout components - always visible
+// ── Layout (always visible, lightweight) ────────────────────────────────────
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-
-// Lightweight shared components - always visible or tiny
+import { SectionErrorBoundary, OfflineBanner, ErrorReportProvider } from '@/components/error';
+import { UserMenu } from '@/components/auth/UserMenu';
 import { GlobalSearch } from '@/components/shared/GlobalSearch';
 import { ScrollToTop } from '@/components/shared/ScrollToTop';
 import { QuickActions } from '@/components/shared/QuickActions';
 
-// Error boundaries
-import { SectionErrorBoundary, OfflineBanner, ErrorReportProvider } from '@/components/error';
-
-// Auth (UserMenu is lightweight and always visible)
-import { UserMenu } from '@/components/auth/UserMenu';
+// ── Stores & hooks ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth-store';
-
-// Hooks & stores
 import { useUIStore } from '@/stores/ui-store';
 import { useSSE } from '@/hooks/use-sse';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { useWebVitals } from '@/hooks/use-web-vitals';
 
-// ==================== Main Content ====================
+// ── Dynamic dialogs & overlays ──────────────────────────────────────────────
+const NotificationCenter = dynamic(() => import('@/components/shared/NotificationCenter').then(m => ({ default: m.NotificationCenter })), { ssr: false });
+const ProductDetailSheet = dynamic(() => import('@/components/shared/ProductDetailSheet').then(m => ({ default: m.ProductDetailSheet })), { ssr: false });
+const NotesPanel = dynamic(() => import('@/components/shared/NotesPanel').then(m => ({ default: m.NotesPanel })), { ssr: false });
+const CSVImportDialog = dynamic(() => import('@/components/shared/CSVImportDialog').then(m => ({ default: m.CSVImportDialog })), { ssr: false });
+const ChatPanel = dynamic(() => import('@/components/shared/ChatPanel').then(m => ({ default: m.ChatPanel })), { ssr: false });
+const LoginDialog = dynamic(() => import('@/components/auth/LoginDialog').then(m => ({ default: m.LoginDialog })), { ssr: false });
+const PasswordChangeDialog = dynamic(() => import('@/components/auth/PasswordChangeDialog').then(m => ({ default: m.PasswordChangeDialog })), { ssr: false });
+const UserManagementPanel = dynamic(() => import('@/components/admin/UserManagementPanel').then(m => ({ default: m.UserManagementPanel })), { ssr: false });
+
+// Lazy engine persistence init
+let engineInitPromise: Promise<void> | null = null;
+function initEngine() {
+  if (!engineInitPromise) {
+    engineInitPromise = import('@/lib/engine/persistence').then(m => m.initEnginePersistence());
+  }
+  return engineInitPromise;
+}
+
+// ── Main Page ───────────────────────────────────────────────────────────────
 
 function HomePageContent() {
-  // Engine persistence + auth check
-  useEffect(() => { initEnginePersistence(); }, []);
+  // Engine + auth
+  useEffect(() => { initEngine(); }, []);
   const { checkAuth } = useAuthStore();
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  useEffect(() => { checkAuth(); }, [checkAuth]);
 
-  // SSE real-time updates & auto-refresh hooks
+  // SSE + auto-refresh + web vitals
   useSSE();
-  const { refreshAll, isRefreshing } = useAutoRefresh();
-
-  // Web Vitals monitoring
+  const { refreshAll } = useAutoRefresh();
   useWebVitals();
 
-  // Decision layer tab state (monitor / analysis / decision / simulation)
+  // ── Tab state ────────────────────────────────────────────────────────────
   const [decisionTab, setDecisionTab] = useState('monitor');
+  const activeTab = useUIStore(s => s.activeTab);
+  const setActiveTab = useUIStore(s => s.setActiveTab);
+  const setShowScrollTop = useUIStore(s => s.setShowScrollTop);
+  const setScrollProgress = useUIStore(s => s.setScrollProgress);
+  const setSelectedInventorySku = useUIStore(s => s.setSelectedInventorySku);
+  const setInventoryDetail = useUIStore(s => s.setInventoryDetail);
 
-  // Operational tab state from Zustand
-  const activeTab = useUIStore((s) => s.activeTab);
-  const setActiveTab = useUIStore((s) => s.setActiveTab);
+  // ── Panel visibility from config ─────────────────────────────────────────
+  const panels = useDashboardConfigStore(s => s.config.panels);
 
-  // Scroll state setters
-  const setShowScrollTop = useUIStore((s) => s.setShowScrollTop);
-  const setScrollProgress = useUIStore((s) => s.setScrollProgress);
+  const decisionPanels = useMemo(() =>
+    PANEL_REGISTRY.filter(p => p.category === 'decision' && (panels[p.id] !== false)),
+  [panels]);
 
-  // Inventory detail setters (for notification center cross-tab navigation)
-  const setSelectedInventorySku = useUIStore((s) => s.setSelectedInventorySku);
-  const setInventoryDetail = useUIStore((s) => s.setInventoryDetail);
+  const opsPanels = useMemo(() =>
+    PANEL_REGISTRY.filter(p => p.category === 'ops' && (panels[p.id] !== false)),
+  [panels]);
 
-  // Product detail sheet state
+  // ── Dialog states ────────────────────────────────────────────────────────
   const [productDetailSku, setProductDetailSku] = useState<string | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
-
-  // Notes panel state
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesSku, setNotesSku] = useState<string | undefined>(undefined);
-
-  // CSV import dialog state
   const [csvImportOpen, setCSVImportOpen] = useState(false);
-
-  // Password change dialog state
   const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
-
-  // User management panel state
   const [userManagementOpen, setUserManagementOpen] = useState(false);
 
-  // Scroll listener for ScrollToTop visibility & progress
+  // ── Scroll ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
@@ -167,19 +103,14 @@ function HomePageContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [setShowScrollTop, setScrollProgress]);
 
-  // Cross-tab navigation from notification center
+  // ── Navigation callbacks ─────────────────────────────────────────────────
   const handleNavigate = useCallback((tab: string) => { setActiveTab(tab); }, [setActiveTab]);
-
   const handleViewProductDetail = useCallback((sku: string) => {
-    setProductDetailSku(sku);
-    setProductDetailOpen(true);
+    setProductDetailSku(sku); setProductDetailOpen(true);
   }, []);
-
   const handleOpenNotes = useCallback((sku?: string) => {
-    setNotesSku(sku);
-    setNotesOpen(true);
+    setNotesSku(sku); setNotesOpen(true);
   }, []);
-
   const handleViewInventoryDetail = useCallback(async (sku: string) => {
     setSelectedInventorySku(sku);
     try {
@@ -188,123 +119,78 @@ function HomePageContent() {
         fetch(`/api/inventory?action=safety_stock&sku=${sku}&serviceLevel=0.95`),
         fetch(`/api/inventory?action=reorder&sku=${sku}`),
       ]);
-      const [health, safety, reorder] = await Promise.all([
-        healthRes.json(),
-        safetyRes.json(),
-        reorderRes.json(),
-      ]);
+      const [health, safety, reorder] = await Promise.all([healthRes.json(), safetyRes.json(), reorderRes.json()]);
       setInventoryDetail({ health, safety, reorder });
-    } catch (err) {
-      if (process.env.NODE_ENV === 'development') console.error('获取库存详情失败:', err);
-    }
+    } catch { /* silent */ }
   }, [setSelectedInventorySku, setInventoryDetail]);
 
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <ErrorReportProvider>
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
-      <OfflineBanner />
-      <Header onRefresh={refreshAll} onOpenNotes={() => handleOpenNotes()} onOpenCSVImport={() => setCSVImportOpen(true)} userMenu={<UserMenu onOpenPasswordChange={() => setPasswordChangeOpen(true)} onOpenUserManagement={() => setUserManagementOpen(true)} />} />
+      <div className="min-h-screen flex flex-col overflow-x-hidden">
+        <OfflineBanner />
+        <Header
+          onRefresh={refreshAll}
+          onOpenNotes={() => handleOpenNotes()}
+          onOpenCSVImport={() => setCSVImportOpen(true)}
+          userMenu={
+            <UserMenu
+              onOpenPasswordChange={() => setPasswordChangeOpen(true)}
+              onOpenUserManagement={() => setUserManagementOpen(true)}
+            />
+          }
+        />
 
-      <ConfigToolbar />
+        <ConfigToolbarLazy />
 
-      <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-        {/* ── Decision Flow Tabs (Monitor → Analysis → Decision → Simulation) ── */}
-        <Tabs value={decisionTab} onValueChange={setDecisionTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 h-10 max-w-xl">
-            <TabsTrigger value="monitor" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
-              <Eye className="h-3.5 w-3.5" />监控
-            </TabsTrigger>
-            <TabsTrigger value="analysis" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
-              <Search className="h-3.5 w-3.5" />分析
-            </TabsTrigger>
-            <TabsTrigger value="decision" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
-              <Zap className="h-3.5 w-3.5" />决策
-            </TabsTrigger>
-            <TabsTrigger value="simulation" className="gap-1.5 text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
-              <Calendar className="h-3.5 w-3.5" />推演
-            </TabsTrigger>
-          </TabsList>
+        <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+          {/* ── Decision Flow ── */}
+          <TabbedSection
+            panels={decisionPanels}
+            activeTab={decisionTab}
+            onTabChange={setDecisionTab}
+          />
 
-          <TabsContent value="monitor" className="tab-fade-in">
-            <SectionErrorBoundary sectionName="实时监控">
-              <MonitorStrip />
-            </SectionErrorBoundary>
-          </TabsContent>
+          <Separator />
 
-          <TabsContent value="analysis" className="tab-fade-in">
-            <SectionErrorBoundary sectionName="风险传播分析">
-              <div className="space-y-4">
-                <CascadeRiskPanel />
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <div className="space-y-6"><DecisionPanel /></div>
-                  <div className="space-y-6"><CostTab /></div>
-                </div>
-              </div>
-            </SectionErrorBoundary>
-          </TabsContent>
+          {/* ── Operational Drill-down ── */}
+          <TabbedSection
+            panels={opsPanels}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        </main>
 
-          <TabsContent value="decision" className="tab-fade-in">
-            <SectionErrorBoundary sectionName="决策执行">
-              <DecisionCenter />
-            </SectionErrorBoundary>
-          </TabsContent>
+        <Footer />
 
-          <TabsContent value="simulation" className="tab-fade-in">
-            <SectionErrorBoundary sectionName="仿真推演">
-              <div className="space-y-4">
-                <SandboxReplay />
-                <SalesTab />
-              </div>
-            </SectionErrorBoundary>
-          </TabsContent>
-        </Tabs>
-
-        {/* ── Operational Drill-down Tabs ── */}
-        <Separator />
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6 h-9 max-w-xl">
-            <TabsTrigger value="inventory" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">库存</TabsTrigger>
-            <TabsTrigger value="cost" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">成本</TabsTrigger>
-            <TabsTrigger value="logistics" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">物流</TabsTrigger>
-            <TabsTrigger value="supplier" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">供应商</TabsTrigger>
-            <TabsTrigger value="risk" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">风险</TabsTrigger>
-            <TabsTrigger value="dashboard" className="gap-1 text-xs px-2 data-[state=active]:bg-primary/10">仪表盘</TabsTrigger>
-          </TabsList>
-          <TabsContent value="inventory" className="tab-fade-in"><SectionErrorBoundary sectionName="库存"><InventoryTab /></SectionErrorBoundary></TabsContent>
-          <TabsContent value="cost" className="tab-fade-in"><SectionErrorBoundary sectionName="成本"><CostTab /></SectionErrorBoundary></TabsContent>
-          <TabsContent value="logistics" className="tab-fade-in"><SectionErrorBoundary sectionName="物流"><LogisticsTab /></SectionErrorBoundary></TabsContent>
-          <TabsContent value="supplier" className="tab-fade-in"><SectionErrorBoundary sectionName="供应商"><SupplierTab /></SectionErrorBoundary></TabsContent>
-          <TabsContent value="risk" className="tab-fade-in"><SectionErrorBoundary sectionName="风险"><RiskTab /></SectionErrorBoundary></TabsContent>
-          <TabsContent value="dashboard" className="tab-fade-in"><SectionErrorBoundary sectionName="仪表盘"><SalesTab /></SectionErrorBoundary></TabsContent>
-        </Tabs>
-      </main>
-
-      <Footer />
-
-      {/* Shared dialogs & overlays - lazy loaded */}
-      <NotificationCenter onNavigate={handleNavigate} onViewInventoryDetail={handleViewInventoryDetail} />
-      <GlobalSearch onViewDetail={handleViewProductDetail} />
-      <AlertRulesDialog />
-      <ProductCompareDialog />
-      <ProductDetailSheet sku={productDetailSku} open={productDetailOpen} onOpenChange={setProductDetailOpen} />
-      <NotesPanel open={notesOpen} onOpenChange={setNotesOpen} initialSku={notesSku} onViewProduct={handleViewProductDetail} />
-      <CSVImportDialog open={csvImportOpen} onOpenChange={setCSVImportOpen} />
-      <ScrollToTop />
-      <QuickActions onRefresh={refreshAll} isRefreshing={isRefreshing} activeTab={activeTab} />
-      <ChatPanel />
-      <LoginDialog />
-      <PasswordChangeDialog open={passwordChangeOpen} onOpenChange={setPasswordChangeOpen} />
-      <UserManagementPanel open={userManagementOpen} onOpenChange={setUserManagementOpen} />
-    </div>
+        {/* ── Shared dialogs & overlays ── */}
+        <NotificationCenter onNavigate={handleNavigate} onViewInventoryDetail={handleViewInventoryDetail} />
+        <ProductDetailSheet sku={productDetailSku || ''} open={productDetailOpen} onOpenChange={setProductDetailOpen} />
+        <NotesPanel open={notesOpen} onOpenChange={setNotesOpen} initialSku={notesSku} />
+        <CSVImportDialog open={csvImportOpen} onOpenChange={setCSVImportOpen} />
+        <ChatPanel />
+        <LoginDialog />
+        <PasswordChangeDialog open={passwordChangeOpen} onOpenChange={setPasswordChangeOpen} />
+        <UserManagementPanel open={userManagementOpen} onOpenChange={setUserManagementOpen} />
+        <GlobalSearch />
+        <ScrollToTop />
+        <QuickActions onRefresh={refreshAll} isRefreshing={false} activeTab={activeTab} />
+      </div>
     </ErrorReportProvider>
   );
 }
 
-// ==================== Page Root ====================
+// ── Lazy ConfigToolbar (imports panel registry → moderate weight) ────────────
+const ConfigToolbarLazy = dynamic(
+  () => import('@/components/dashboard/ConfigToolbar').then(m => ({ default: m.ConfigToolbar })),
+  { ssr: false, loading: () => <div className="h-8 bg-muted/30 border-b" /> },
+);
 
-export default function HomePage() {
+// ── Root export ─────────────────────────────────────────────────────────────
+
+export default function Home() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light">
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryProvider>
         <HomePageContent />
       </QueryProvider>

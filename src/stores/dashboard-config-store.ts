@@ -21,7 +21,7 @@ interface DashboardConfigState {
   setCurrencyRate: (rate: number) => void;
   setRiskThresholds: (thresholds: DashboardConfig['riskThresholds']) => void;
   setTimeHorizon: (horizon: DashboardConfig['timeHorizon']) => void;
-  togglePanel: (panel: keyof DashboardConfig['panels']) => void;
+  togglePanel: (panel: string) => void;
   resetConfig: () => void;
   hydrate: () => void;
 }

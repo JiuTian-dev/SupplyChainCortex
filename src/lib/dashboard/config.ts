@@ -22,11 +22,9 @@ export const riskThresholdsSchema = z.object({
   high: z.number().min(0).max(100).default(70),
 });
 
-export const panelsSchema = z.object({
-  monitor: z.boolean().default(true),
-  analysis: z.boolean().default(true),
-  decision: z.boolean().default(true),
-  simulation: z.boolean().default(true),
+export const panelsSchema = z.record(z.string(), z.boolean()).default({
+  monitor: true, 'cascade-risk': true, 'decision-graph': true,
+  inventory: true, cost: true, logistics: true, supplier: true, risk: true,
 });
 
 export const dashboardConfigSchema = z.object({
@@ -47,7 +45,7 @@ export type DisplayUnit = z.infer<typeof unitSchema>;
 export type TimeHorizon = z.infer<typeof timeHorizonSchema>;
 export type Aggregation = z.infer<typeof aggregationSchema>;
 export type RiskThresholds = z.infer<typeof riskThresholdsSchema>;
-export type PanelVisibility = z.infer<typeof panelsSchema>;
+export type PanelVisibility = Record<string, boolean>;
 
 // ─── Defaults ────────────────────────────────────────────────────────────────────
 
