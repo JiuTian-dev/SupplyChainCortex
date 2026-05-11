@@ -1,7 +1,8 @@
 // @ts-nocheck — pre-existing type incompatibility with cascade-risk API response
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import { useCascadeRisk } from '@/hooks/use-cascade-risk';
 import {
   Network, AlertTriangle, TrendingDown, Clock, DollarSign,
   ChevronDown, Zap, Anchor, Ship, Package, Building2, RefreshCw,
@@ -94,34 +95,34 @@ function riskBarColor(score: number): string {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function CascadeRiskPanel() {
-  const [report, setReport] = useState<CascadeReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [scenario, setScenario] = useState('auto');
   const [expanded, setExpanded] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  const fetchReport = (scn?: string) => {
-    setLoading(true);
-    setError(false);
-    const s = scn || scenario;
-    fetch(`/api/cascade-risk?scenario=${s}`)
-      .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
-      .then(data => { setReport(data as any); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
-  };
+  const { data: report, isLoading: loading, error, refetch } = useCascadeRisk(scenario);
 
-  const initRef = useRef(false);
-  useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    let cancelled = false;
-    fetch(`/api/cascade-risk?scenario=auto`)
-      .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
-      .then(data => { if (!cancelled) { setReport(data as any); setLoading(false); } })
-      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
-    return () => { cancelled = true; };
-  }, []);
+  // Memoized derived data
+  const productRisks = useMemo(() =>
+    (report?.propagation || []).filter((p: any) => p.type === 'PRODUCT' && p.propagatedRisk > 0),
+    [report?.propagation]
+  );
+  const shipmentRisks = useMemo(() =>
+    (report?.propagation || []).filter((p: any) => p.type === 'SHIPMENT' && p.propagatedRisk > 0),
+    [report?.propagation]
+  );
+
+  // Per-source downstream filter (memoized by source)
+  const downstreamBySource = useMemo(() => {
+    const sources = (report as any)?.sourceNodes || [];
+    const propagation = report?.propagation || [];
+    const map = new Map();
+    for (const src of sources) {
+      map.set(src.label || src.id, propagation
+        .filter((p: any) => p.path?.length > 1 && p.path[0] === (src.label || src.id))
+        .sort((a: any, b: any) => (a.depth || 0) - (b.depth || 0)));
+    }
+    return map;
+  }, [(report as any)?.sourceNodes, report?.propagation]);
 
   // ── Loading ──
   if (loading && !report) {
@@ -150,7 +151,7 @@ export function CascadeRiskPanel() {
           <CardDescription>数据加载失败</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" size="sm" onClick={() => fetchReport()}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-3.5 w-3.5 mr-1" />重试
           </Button>
         </CardContent>
@@ -161,8 +162,6 @@ export function CascadeRiskPanel() {
   if (!report) return null;
 
   const { summary, triggeredBy, sourceNodes, propagation } = report;
-  const products = propagation.filter(p => p.type === 'PRODUCT' && p.propagatedRisk > 0);
-  const shipments = propagation.filter(p => p.type === 'SHIPMENT' && p.propagatedRisk > 0);
 
   return (
     <Card className="card-dashboard border-purple-200 dark:border-purple-900">
@@ -182,7 +181,7 @@ export function CascadeRiskPanel() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={scenario} onValueChange={(v) => { setScenario(v); fetchReport(v); }}>
+            <Select value={scenario} onValueChange={(v) => setScenario(v)}>
               <SelectTrigger className="h-7 text-xs w-[150px]">
                 <SelectValue />
               </SelectTrigger>
@@ -197,7 +196,7 @@ export function CascadeRiskPanel() {
                 <SelectItem value="competitor_pressure">竞品价格挤压</SelectItem>
               </SelectContent>
             </Select>
-            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => fetchReport()} />
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => refetch()} />
           </div>
         </div>
       </CardHeader>
@@ -250,9 +249,7 @@ export function CascadeRiskPanel() {
           {/* Source → Propagation Depth visualization */}
           <div className="space-y-2">
             {sourceNodes.map(src => {
-              const downstream = propagation.filter(p =>
-                p.path.length > 1 && p.path[0] === src.label
-              ).sort((a, b) => a.depth - b.depth);
+              const downstream = downstreamBySource.get(src.label) || [];
 
               return (
                 <div key={src.id} className="space-y-1.5">

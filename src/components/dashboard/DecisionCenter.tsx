@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCascadeRiskSummary } from '@/hooks/use-cascade-risk';
 import {
   Zap, Clock, Calendar, CheckCircle2, XCircle, ThumbsUp, ThumbsDown,
   ChevronRight, ExternalLink, MessageSquare, AlertTriangle, RefreshCw,
@@ -318,9 +319,11 @@ export function DecisionCenter() {
     setSubmitting(false);
   }, [decisions]);
 
-  const immediateItems = decisions.filter(d => d.priority === 'immediate');
-  const weekItems = decisions.filter(d => d.priority === 'this_week');
-  const monthItems = decisions.filter(d => d.priority === 'this_month');
+  const { immediateItems, weekItems, monthItems } = useMemo(() => ({
+    immediateItems: decisions.filter(d => d.priority === 'immediate'),
+    weekItems: decisions.filter(d => d.priority === 'this_week'),
+    monthItems: decisions.filter(d => d.priority === 'this_month'),
+  }), [decisions]);
 
   return (
     <div className="space-y-6">

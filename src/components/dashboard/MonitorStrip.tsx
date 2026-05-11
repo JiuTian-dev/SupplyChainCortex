@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useCascadeRiskSummary } from '@/hooks/use-cascade-risk';
 import {
   Activity, Globe, AlertTriangle, DollarSign,
   TrendingDown, TrendingUp, RefreshCw,
@@ -121,16 +122,16 @@ export function MonitorStrip() {
   if (!snapshot) return null;
 
   // Supply Chain Health Score (0-100, weighted across all data sources)
-  const healthScore = Math.round(
+  const healthScore = useMemo(() => Math.round(
     Math.max(0, Math.min(100,
       100
-      - Math.min(snapshot.portRisks.high * 6 + snapshot.portRisks.medium * 3, 25)  // port risks: -25 max
-      - Math.max(0, 100 - snapshot.inventoryHealth.healthyRate) * 0.2             // inventory: -20 max
-      - (snapshot.commodity.trend === 'rising' ? 12 : snapshot.commodity.trend === 'falling' ? 5 : 0) // commodity: -12 max
-      - (snapshot.freight.trend === 'rising' ? 8 : 0)                             // freight: -8 max
-      - (snapshot.estimatedLoss > snapshot.estimatedSaving && snapshot.estimatedLoss > 0 ? 15 : 0) // loss>saving: -15
+      - Math.min(snapshot.portRisks.high * 6 + snapshot.portRisks.medium * 3, 25)
+      - Math.max(0, 100 - snapshot.inventoryHealth.healthyRate) * 0.2
+      - (snapshot.commodity.trend === 'rising' ? 12 : snapshot.commodity.trend === 'falling' ? 5 : 0)
+      - (snapshot.freight.trend === 'rising' ? 8 : 0)
+      - (snapshot.estimatedLoss > snapshot.estimatedSaving && snapshot.estimatedLoss > 0 ? 15 : 0)
     ))
-  );
+  ), [snapshot]);
 
   const scoreColor = healthScore >= 80 ? 'text-green-600' : healthScore >= 60 ? 'text-amber-600' : 'text-red-600';
   const scoreBg = healthScore >= 80 ? 'bg-green-50 dark:bg-green-950/30' : healthScore >= 60 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-red-50 dark:bg-red-950/30';

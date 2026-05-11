@@ -11,21 +11,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Activity, Boxes, DollarSign, Ship, TrendingUp, Building2, Shield, Eye, Search, Zap, Calendar } from 'lucide-react';
 
-const InventoryTab = dynamic(() => import('@/components/inventory/InventoryTab').then(m => ({ default: m.InventoryTab })), { loading: () => <LazyLoader type="tab" /> });
-const CostTab = dynamic(() => import('@/components/cost/CostTab').then(m => ({ default: m.CostTab })), { loading: () => <LazyLoader type="chart" /> });
-const LogisticsTab = dynamic(() => import('@/components/logistics/LogisticsTab').then(m => ({ default: m.LogisticsTab })), { loading: () => <LazyLoader type="tab" /> });
-const SalesTab = dynamic(() => import('@/components/sales/SalesTab').then(m => ({ default: m.SalesTab })), { loading: () => <LazyLoader type="chart" /> });
-const SupplierTab = dynamic(() => import('@/components/supplier/SupplierTab').then(m => ({ default: m.SupplierTab })), { loading: () => <LazyLoader type="tab" /> });
-const RiskTab = dynamic(() => import('@/components/risk/RiskTab').then(m => ({ default: m.RiskTab })), { loading: () => <LazyLoader type="chart" /> });
-const CascadeRiskPanel = dynamic(() => import('@/components/risk/CascadeRiskPanel').then(m => ({ default: m.CascadeRiskPanel })), { loading: () => <LazyLoader type="chart" /> });
-const DecisionPanel = dynamic(() => import('@/components/risk/DecisionPanel').then(m => ({ default: m.DecisionPanel })), { loading: () => <LazyLoader type="chart" /> });
+const InventoryTab = dynamic(() => import('@/components/inventory/InventoryTab').then(m => ({ default: m.InventoryTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
+const CostTab = dynamic(() => import('@/components/cost/CostTab').then(m => ({ default: m.CostTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const LogisticsTab = dynamic(() => import('@/components/logistics/LogisticsTab').then(m => ({ default: m.LogisticsTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
+const SalesTab = dynamic(() => import('@/components/sales/SalesTab').then(m => ({ default: m.SalesTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const SupplierTab = dynamic(() => import('@/components/supplier/SupplierTab').then(m => ({ default: m.SupplierTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
+const RiskTab = dynamic(() => import('@/components/risk/RiskTab').then(m => ({ default: m.RiskTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const CascadeRiskPanel = dynamic(() => import('@/components/risk/CascadeRiskPanel').then(m => ({ default: m.CascadeRiskPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const DecisionPanel = dynamic(() => import('@/components/risk/DecisionPanel').then(m => ({ default: m.DecisionPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
 
-import { MonitorStrip } from '@/components/dashboard/MonitorStrip';
-import { DecisionCenter } from '@/components/dashboard/DecisionCenter';
-import { SandboxReplay } from '@/components/dashboard/SandboxReplay';
-import { PassportPanel } from '@/components/dashboard/PassportPanel';
-import { ConfigToolbar } from '@/components/dashboard/ConfigToolbar';
-import { initEnginePersistence } from '@/lib/engine/persistence';
+// Was static import — now dynamic (only loaded on tab switch, not in initial bundle)
+const MonitorStrip = dynamic(() => import('@/components/dashboard/MonitorStrip').then(m => ({ default: m.MonitorStrip })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const DecisionCenter = dynamic(() => import('@/components/dashboard/DecisionCenter').then(m => ({ default: m.DecisionCenter })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const SandboxReplay = dynamic(() => import('@/components/dashboard/SandboxReplay').then(m => ({ default: m.SandboxReplay })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const PassportPanel = dynamic(() => import('@/components/dashboard/PassportPanel').then(m => ({ default: m.PassportPanel })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const ConfigToolbar = dynamic(() => import('@/components/dashboard/ConfigToolbar').then(m => ({ default: m.ConfigToolbar })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
+const initEnginePersistence = () => import('@/lib/engine/persistence').then(m => m.initEnginePersistence());
 
 // ==================== Dynamic Dialog/Sheet Imports ====================
 // Dialogs and sheets are rarely opened, so they are lazy loaded.
