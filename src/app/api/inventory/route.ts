@@ -49,10 +49,25 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
     }
 
     case "health": {
-      if (!sku) throw ValidationError("缺少 sku 参数");
-      const health = await getInventoryHealth(sku, warehouse);
-      if (!health) throw NotFoundError(`未找到 SKU: ${sku}`);
-      return apiSuccess(health);
+      if (sku) {
+        const health = await getInventoryHealth(sku, warehouse);
+        if (!health) throw NotFoundError(`未找到 SKU: ${sku}`);
+        return apiSuccess(health);
+      }
+      // No SKU → summary of all inventory health
+      const allInv = await db.inventory.findMany({
+        select: { sku: true, productName: true, quantity: true, safetyStock: true, stockStatus: true },
+      });
+      const critical = allInv.filter(i => i.stockStatus === 'critical');
+      const warning = allInv.filter(i => i.stockStatus === 'warning');
+      return apiSuccess({
+        critical: critical.map(i => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, safetyStock: i.safetyStock })),
+        warning: warning.map(i => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, safetyStock: i.safetyStock })),
+        healthyRate: allInv.length > 0
+          ? Math.round((allInv.filter(i => i.stockStatus === 'healthy').length / allInv.length) * 100)
+          : 100,
+        totalSkus: allInv.length,
+      });
     }
 
     case "safety_stock": {
