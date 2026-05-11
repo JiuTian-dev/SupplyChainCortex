@@ -137,20 +137,73 @@ async function fetchSteelRebarSHFE(): Promise<DailyCommodityPrice | null> {
   }
 }
 
+// ─── DCE Plastic Futures (via Sina) ─────────────────────────────────────────────
+
+/**
+ * DCE plastics: LLDPE (L), PP (PP), PVC (V) — major raw materials for appliance housings.
+ * Format: same as SHFE (nf_ prefix), fields[8]=price, fields[5]=prev settle.
+ */
+const DCE_PLASTICS: Record<string, { symbol: string; name: string }> = {
+  PLASTIC_PP:   { symbol: 'PP2609', name: 'PP 聚丙烯' },
+  PLASTIC_LLDPE:{ symbol: 'L2609',  name: 'LLDPE 聚乙烯' },
+  PLASTIC_PVC:  { symbol: 'V2609',  name: 'PVC 聚氯乙烯' },
+};
+
+async function fetchDCEPlastic(code: string, symbol: string, name: string): Promise<DailyCommodityPrice | null> {
+  try {
+    const url = `https://hq.sinajs.cn/list=nf_${symbol}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { Referer: 'https://finance.sina.com.cn' },
+    });
+    if (!res.ok) return null;
+    const buffer = await res.arrayBuffer();
+    const text = new TextDecoder('gbk').decode(buffer);
+    const match = text.match(/"([^"]+)"/);
+    if (!match) return null;
+    const fields = match[1].split(',');
+    if (fields.length < 17) return null;
+
+    const price = parseFloat(fields[8]);
+    const prevSettle = parseFloat(fields[5]);
+    if (isNaN(price) || price <= 0 || price > 50000) return null;
+
+    const changePct = prevSettle > 0 ? ((price - prevSettle) / prevSettle) * 100 : 0;
+
+    return {
+      code,
+      name,
+      price: Math.round(price * 100) / 100,
+      unit: '¥/吨',
+      date: fields[17] || new Date().toISOString().split('T')[0],
+      changePct: Math.round(changePct * 10) / 10,
+      source: 'DCE/Sina',
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Main Export ─────────────────────────────────────────────────────────────────
 
 export async function fetchDailyCommodities(): Promise<DailyCommodityPrice[]> {
   const results: DailyCommodityPrice[] = [];
 
-  // Copper & Aluminum — Alpha Vantage, throttled to 2 requests (well within 5/min limit)
+  // Copper & Aluminum — Alpha Vantage
   for (const [code, config] of Object.entries(AV_SYMBOLS)) {
     const price = await fetchAVCommodity(code, config);
     if (price) results.push(price);
   }
 
-  // Steel Rebar — SHFE/Sina (free, no rate limit)
+  // Steel Rebar — SHFE/Sina
   const steel = await fetchSteelRebarSHFE();
   if (steel) results.push(steel);
+
+  // Plastics — DCE/Sina
+  for (const [code, config] of Object.entries(DCE_PLASTICS)) {
+    const plastic = await fetchDCEPlastic(code, config.symbol, config.name);
+    if (plastic) results.push(plastic);
+  }
 
   return results;
 }

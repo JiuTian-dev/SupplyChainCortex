@@ -208,6 +208,31 @@ async function main() {
   }
 
   // ── Summary ───────────────────────────────────────────────────────────────
+  // ── Test 9: Amazon Competitor ─────────────────────────────────────────────
+  console.log('[9/9] Testing Amazon competitor prices...');
+  try {
+    const { fetchCompetitorPrices } = await import('../src/lib/sources/amazon-competitor.ts');
+    const start = Date.now();
+    const data = await fetchCompetitorPrices();
+    const ms = Date.now() - start;
+
+    const valid = data.filter(s => s.competitorCount > 0);
+    if (valid.length > 0) {
+      const overallAvg = Math.round(valid.reduce((s, r) => s + r.avgPrice, 0) / valid.length * 100) / 100;
+      console.log(`  ✓ ${valid.length}/${data.length} categories with data`);
+      console.log(`  ✓ Overall avg price: $${overallAvg}`);
+      console.log(`  ✓ Top category: ${valid.sort((a, b) => b.competitorCount - a.competitorCount)[0].keyword}`);
+      results.push({ name: 'Amazon', status: '✓ OK', time: `${ms}ms`, detail: `${valid.length} categories, avg $${overallAvg}` });
+    } else {
+      console.log('  ⚠ No data — Amazon may have blocked the request');
+      results.push({ name: 'Amazon', status: '⚠ NO DATA', time: `${ms}ms`, detail: 'Amazon anti-bot triggered' });
+    }
+  } catch (err) {
+    console.log(`  ✗ Error: ${err}`);
+    results.push({ name: 'Amazon', status: '✗ FAIL', time: '-', detail: String(err).slice(0, 80) });
+  }
+  console.log('');
+
   console.log('\n╔══════════════════════════════════════════════╗');
   console.log('║   Test Summary                                ║');
   console.log('╚══════════════════════════════════════════════╝\n');

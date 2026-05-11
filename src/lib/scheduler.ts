@@ -162,6 +162,17 @@ async function jobCPSC(): Promise<JobResult> {
   }
 }
 
+async function jobAmazonCompetitor(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { syncCompetitorToDB } = await import('@/lib/sources/amazon-competitor');
+    const count = await syncCompetitorToDB();
+    return { job: 'Amazon', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'Amazon', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
 export async function jobWeather(): Promise<JobResult> {
   const start = Date.now();
   try {
@@ -195,6 +206,7 @@ const JOBS: Record<string, () => Promise<JobResult>> = {
   Commodities: jobCommodities,
   CarbonPrice: jobCarbonPrice,
   CPSC: jobCPSC,
+  Amazon: jobAmazonCompetitor,
   Weather: jobWeather,
   FX: jobFX,
 };
@@ -245,6 +257,7 @@ export function startScheduler(): void {
     { name: 'Commodities', ms: 6 * 60 * 60 * 1000 },
     { name: 'PBOC', ms: 6 * 60 * 60 * 1000 },
     { name: 'CPSC', ms: 12 * 60 * 60 * 1000 },
+    { name: 'Amazon', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
     { name: 'SCFI', ms: 6 * 60 * 60 * 1000 },
   ];
 

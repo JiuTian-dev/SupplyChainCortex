@@ -42,7 +42,9 @@ const BASELINE: Record<string, { price: number; name: string; unit: string }> = 
   COPPER:    { price: 13609, name: '铜 (Cu)',          unit: 'USD/吨' },
   ALUMINUM:  { price: 3518,  name: '铝 (Al)',          unit: 'USD/吨' },
   STEEL_HRC: { price: 698,   name: '热轧钢卷 (HRC)',    unit: 'USD/吨' },
-  PLASTIC:   { price: 1150,  name: 'ABS 塑料粒子',      unit: 'USD/吨' },
+  PLASTIC_PP:    { price: 8659,  name: 'PP 聚丙烯',          unit: '¥/吨' },
+  PLASTIC_LLDPE: { price: 8144,  name: 'LLDPE 聚乙烯',       unit: '¥/吨' },
+  PLASTIC_PVC:   { price: 5130,  name: 'PVC 聚氯乙烯',       unit: '¥/吨' },
 };
 
 // FRED series mapping
