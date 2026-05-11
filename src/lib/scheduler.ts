@@ -173,6 +173,19 @@ async function jobAmazonCompetitor(): Promise<JobResult> {
   }
 }
 
+async function jobAlertCheck(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { getCascadeRisk } = await import('@/lib/services/cascade-risk.service');
+    const { runAlertCycle } = await import('@/lib/services/alert-engine.service');
+    const risk = await getCascadeRisk({ scenario: 'auto', includeForwardProjection: false, includeCounterfactuals: false });
+    const count = await runAlertCycle(risk);
+    return { job: 'AlertCheck', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'AlertCheck', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
 async function jobAutoBacktest(): Promise<JobResult> {
   const start = Date.now();
   try {
@@ -225,6 +238,17 @@ async function jobAutoBacktest(): Promise<JobResult> {
   }
 }
 
+async function jobSupplierScores(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { refreshAllSupplierScores } = await import('@/lib/services/suppliers.service');
+    const count = await refreshAllSupplierScores();
+    return { job: 'SupplierScores', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'SupplierScores', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
 export async function jobWeather(): Promise<JobResult> {
   const start = Date.now();
   try {
@@ -258,7 +282,9 @@ const JOBS: Record<string, () => Promise<JobResult>> = {
   Commodities: jobCommodities,
   CarbonPrice: jobCarbonPrice,
   CPSC: jobCPSC,
+  SupplierScores: jobSupplierScores,
   Amazon: jobAmazonCompetitor,
+  AlertCheck: jobAlertCheck,
   AutoBacktest: jobAutoBacktest,
   Weather: jobWeather,
   FX: jobFX,
@@ -303,6 +329,7 @@ export function startScheduler(): void {
   // Periodic refresh intervals (Node.js setInterval, no cron dependency needed)
   // These are intentionally staggered to spread load
   const intervals: Array<{ name: string; ms: number }> = [
+    { name: 'AlertCheck', ms: 60 * 60 * 1000 }, // check alerts hourly
     { name: 'FX', ms: 30 * 60 * 1000 },
     { name: 'SCFIS', ms: 60 * 60 * 1000 },
     { name: 'CarbonPrice', ms: 60 * 60 * 1000 },
@@ -310,6 +337,7 @@ export function startScheduler(): void {
     { name: 'Commodities', ms: 6 * 60 * 60 * 1000 },
     { name: 'PBOC', ms: 6 * 60 * 60 * 1000 },
     { name: 'CPSC', ms: 12 * 60 * 60 * 1000 },
+    { name: 'SupplierScores', ms: 24 * 60 * 60 * 1000 }, // daily
     { name: 'Amazon', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
     { name: 'AutoBacktest', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
     { name: 'SCFI', ms: 6 * 60 * 60 * 1000 },

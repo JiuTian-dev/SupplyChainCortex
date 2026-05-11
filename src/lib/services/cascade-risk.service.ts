@@ -1239,6 +1239,30 @@ export async function getCascadeRisk(options?: {
     },
   };
 
+  // Phase 0: Audit trail — log this decision cycle
+  const computedOverallRisk = anomalySources.length > 0
+    ? anomalySources.reduce((sum, n) => sum + n.riskScore, 0) / anomalySources.length
+    : 0;
+  try {
+    await db.auditLog.create({
+      data: {
+        action: 'ANALYZE',
+        entity: 'cascade-risk',
+        userId: 'system',
+        userName: '级联引擎',
+        severity: computedOverallRisk > 70 ? 'important' : (computedOverallRisk > 40 ? 'warning' : 'info'),
+        details: {
+          scenario, overallRisk: computedOverallRisk,
+          affectedNodes: propagation.length,
+          totalMonthlyLoss: propagation.reduce((s, p) => s + (p.monetaryImpact || 0), 0),
+          maxDepth, degradedSources: degradedSources,
+          sourceCategories: anomalySources.map(s => s.category),
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch { /* Audit log is non-critical */ }
+
   // Phase 5: Counterfactuals
   if (includeCounterfactuals && topAffectedProducts.length > 0) {
     const affectedSku = topAffectedProducts[0].sku;
@@ -1329,6 +1353,28 @@ export async function getCascadeRisk(options?: {
       })),
     });
   }
+
+  // Write DecisionLog for audit trail
+  try {
+    await db.decisionLog.create({
+      data: {
+        auditId: report.id || `cascade-${Date.now()}`,
+        engine: 'cascade-risk',
+        action: 'propagation',
+        input: JSON.stringify({ scenario, fusionStrategy }),
+        output: JSON.stringify({
+          affectedNodes: propagation.length,
+          totalLoss: report.summary?.totalMonthlyLoss || 0,
+          maxDepth,
+          topRisks: (topAffectedProducts || []).slice(0, 3).map(p => p.productName),
+        }),
+        durationMs: Date.now() - ((report as any)._startedAt || Date.now()),
+        cacheHit: false,
+        degradedSources: JSON.stringify(degradedSources),
+        version: '2.9.3',
+      },
+    });
+  } catch { /* non-critical */ }
 
   return report;
 }

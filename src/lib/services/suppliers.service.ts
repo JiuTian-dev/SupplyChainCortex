@@ -154,6 +154,135 @@ export function paginate<T>(items: T[], page: number, pageSize: number): Paginat
   return { data, pagination: { page, pageSize, total, totalPages } };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dynamic Supplier Scoring — live data replaces static seed ratings
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface DynamicScore {
+  deliveryScore: number;  // 0-100 based on actual delays
+  qualityScore: number;   // 0-100 based on defects + CPSC recalls
+  priceScore: number;     // 0-100 based on cost trends
+  riskScore: number;      // 0-100 based on region (port congestion, weather)
+  overall: number;        // 0-5 weighted average
+  breakdown: string;
+}
+
+export async function computeDynamicSupplierScore(supplierId: string): Promise<DynamicScore | null> {
+  const supplier = await db.supplier.findUnique({ where: { id: supplierId } });
+  if (!supplier) return null;
+
+  // ── Delivery Score (0-100): based on actual shipment delays ──────────────
+  const shipments = await db.shipmentItem.findMany({
+    where: {
+      status: 'delivered',
+      updatedAt: { gte: new Date(Date.now() - 90 * 86400000) },
+    },
+    take: 200,
+  });
+
+  const regionShipments = shipments.filter(s => {
+    // Match supplier region to shipment origin
+    const sOrigin = (s as any).origin || '';
+    const sRegion = supplier.region;
+    return sOrigin.includes(sRegion) || sRegion.includes(sOrigin.slice(0, 2));
+  });
+
+  const totalDeliveries = regionShipments.length || 1;
+  const delayedDeliveries = regionShipments.filter(s => s.delayDays > 0).length;
+  const avgDelayDays = regionShipments.length > 0
+    ? regionShipments.reduce((s, sh) => s + sh.delayDays, 0) / regionShipments.length
+    : supplier.leadTime * 0.3;
+
+  const deliveryScore = Math.max(0, Math.min(100,
+    100 - (delayedDeliveries / totalDeliveries) * 50 - avgDelayDays * 5
+  ));
+
+  // ── Quality Score (0-100): based on defects + recalls ───────────────────
+  const [defects, cpscRecalls] = await Promise.all([
+    db.defectRecord.count({ where: { createdAt: { gte: new Date(Date.now() - 90 * 86400000) } } }),
+    db.regulationChange.count({
+      where: {
+        source: 'CCPIT/CPSC',
+        createdAt: { gte: new Date(Date.now() - 90 * 86400000) },
+      },
+    }),
+  ]);
+
+  const qualityScore = Math.max(0, Math.min(100,
+    100 - defects * 3 - cpscRecalls * 8
+  ));
+
+  // ── Price Score (0-100): based on cost trends vs benchmark ──────────────
+  const costRecords = await db.costRecord.findMany({
+    where: { updatedAt: { gte: new Date(Date.now() - 30 * 86400000) } },
+    take: 100,
+  });
+  const avgMargin = costRecords.length > 0
+    ? costRecords.reduce((s, c) => s + c.grossMargin, 0) / costRecords.length
+    : 48;
+  const priceScore = Math.max(0, Math.min(100, avgMargin * 2)); // 50% margin → 100
+
+  // ── Risk Score (0-100): based on region + port congestion ───────────────
+  let regionRisk = 50; // baseline
+  try {
+    const { getPortCongestion } = await import('@/lib/sources/port-congestion');
+    const congestion = await getPortCongestion();
+    const supplierRegion = supplier.region;
+    const regionPorts = congestion.ports.filter(p =>
+      supplierRegion.includes(p.country) || p.country.includes(supplierRegion)
+    );
+    if (regionPorts.length > 0) {
+      const worstLevel = Math.max(...regionPorts.map(p =>
+        p.congestionLevel === 'severe' ? 100 : p.congestionLevel === 'high' ? 75 : p.congestionLevel === 'moderate' ? 50 : 25
+      ));
+      regionRisk = worstLevel;
+    }
+  } catch { /* use baseline */ }
+
+  const riskScore = Math.max(0, Math.min(100, 100 - regionRisk));
+
+  // ── Overall (0-5) ───────────────────────────────────────────────────────
+  const overall = Math.round(
+    (deliveryScore * 0.35 + qualityScore * 0.25 + priceScore * 0.20 + riskScore * 0.20) / 20 * 10
+  ) / 10;
+
+  const breakdown = `交付${deliveryScore.toFixed(0)} | 质量${qualityScore.toFixed(0)} | 价格${priceScore.toFixed(0)} | 区域${riskScore.toFixed(0)}`;
+
+  return { deliveryScore, qualityScore, priceScore, riskScore, overall, breakdown };
+}
+
+export async function refreshAllSupplierScores(): Promise<number> {
+  const suppliers = await db.supplier.findMany({ where: { status: 'active' } });
+  let updated = 0;
+
+  for (const supplier of suppliers) {
+    try {
+      const scores = await computeDynamicSupplierScore(supplier.id);
+      if (!scores) continue;
+
+      await db.supplier.update({
+        where: { id: supplier.id },
+        data: {
+          rating: scores.overall,
+          ratingDetails: {
+            deliveryScore: scores.deliveryScore,
+            qualityScore: scores.qualityScore,
+            priceScore: scores.priceScore,
+            riskScore: scores.riskScore,
+            breakdown: scores.breakdown,
+            computedAt: new Date().toISOString(),
+            computedBy: 'dynamic-scoring-engine',
+          },
+        },
+      });
+      updated++;
+    } catch { continue; }
+  }
+  return updated;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /** Parse ratingDetails (handles both Json object and string types) */
 export function parseRatingDetails(ratingDetails: unknown): unknown {
   if (!ratingDetails) return null;
