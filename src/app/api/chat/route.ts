@@ -648,9 +648,10 @@ async function handleNonStreaming(
     if (result.toolCalls) {
       for (const tc of result.toolCalls) {
         try {
-          const execResult = await executeTool(tc.name, tc.arguments);
+          const parsed = (typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments) || {};
+          const execResult = await executeTool(tc.name, parsed);
           toolsUsed.push(tc.name);
-          const formatted = formatToolResult(tc.name, tc.arguments?.action as string || '', execResult);
+          const formatted = formatToolResult(tc.name, parsed?.action as string || '', execResult);
           toolResults.push({ tool: tc.name, result: formatted });
         } catch (toolErr) {
           toolResults.push({ tool: tc.name, result: `执行失败: ${(toolErr as Error).message}` });
