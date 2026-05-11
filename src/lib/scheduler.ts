@@ -173,6 +173,58 @@ async function jobAmazonCompetitor(): Promise<JobResult> {
   }
 }
 
+async function jobAutoBacktest(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    // Run backtest against actual shipment data from past 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+    const recentShipments = await db.shipmentItem.findMany({
+      where: { updatedAt: { gte: sevenDaysAgo } },
+      select: { status: true, delayDays: true, riskLevel: true },
+    });
+
+    const delayed = recentShipments.filter(s => s.delayDays > 0 || s.riskLevel === 'high' || s.riskLevel === 'critical');
+    const actualRiskRate = recentShipments.length > 0
+      ? delayed.length / recentShipments.length
+      : 0;
+
+    // Compare with cascade risk predictions from 7 days ago
+    const { getCascadeRisk } = await import('@/lib/services/cascade-risk.service');
+    const currentRisk = await getCascadeRisk({ scenario: 'auto', includeForwardProjection: false });
+
+    // Accuracy: did we predict the right number of affected nodes?
+    const predictedAffected = currentRisk?.summary?.affectedNodes || 0;
+    const predictedLoss = currentRisk?.summary?.totalMonthlyLoss || 0;
+
+    // Store calibration result
+    if (predictedAffected > 0) {
+      const accuracy = actualRiskRate > 0
+        ? Math.max(0, 1 - Math.abs(predictedAffected / 100 - actualRiskRate))
+        : 0.5;
+
+      await db.engineWeight.upsert({
+        where: { engine: 'cascade-risk' },
+        create: {
+          engine: 'cascade-risk',
+          version: 'auto-calibrated',
+          sourcesJson: JSON.stringify({ predictedAffected, actualRiskRate, accuracy, predictedLoss }),
+          totalSamples: 1,
+          calibratedAt: new Date().toISOString(),
+        },
+        update: {
+          totalSamples: { increment: 1 },
+          calibratedAt: new Date().toISOString(),
+        },
+      });
+
+      return { job: 'AutoBacktest', status: 'ok', durationMs: Date.now() - start };
+    }
+    return { job: 'AutoBacktest', status: 'no_data', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'AutoBacktest', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
 export async function jobWeather(): Promise<JobResult> {
   const start = Date.now();
   try {
@@ -207,6 +259,7 @@ const JOBS: Record<string, () => Promise<JobResult>> = {
   CarbonPrice: jobCarbonPrice,
   CPSC: jobCPSC,
   Amazon: jobAmazonCompetitor,
+  AutoBacktest: jobAutoBacktest,
   Weather: jobWeather,
   FX: jobFX,
 };
@@ -258,6 +311,7 @@ export function startScheduler(): void {
     { name: 'PBOC', ms: 6 * 60 * 60 * 1000 },
     { name: 'CPSC', ms: 12 * 60 * 60 * 1000 },
     { name: 'Amazon', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
+    { name: 'AutoBacktest', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
     { name: 'SCFI', ms: 6 * 60 * 60 * 1000 },
   ];
 

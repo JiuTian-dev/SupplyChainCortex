@@ -48,6 +48,10 @@ export interface PropagationStep {
   initialRisk?: number;
   explanation?: string;
   from?: string;
+  /** Estimated monthly dollar loss for this node */
+  monetaryImpact?: number;
+  /** How the monetary impact was computed */
+  impactBreakdown?: string;
 }
 
 export interface DayProjection {
@@ -99,7 +103,7 @@ export interface SensitivityResult {
 export interface CascadeReport {
   id?: string; timestamp?: string;
   overallRisk?: number;
-  summary: { totalNodes?: number; affectedNodes?: number; maxRisk?: number; avgRisk?: number; avgPropagatedRisk?: number; topAffectedProducts?: string[] };
+  summary: { totalNodes?: number; affectedNodes?: number; maxRisk?: number; avgRisk?: number; avgPropagatedRisk?: number; topAffectedProducts?: string[]; totalMonthlyLoss?: number };
   topRisks?: Array<{ nodeId?: string; type?: NodeType; label?: string; riskScore?: number }>;
   propagation?: PropagationStep[];
   propagationPaths?: PropagationStep[];
@@ -750,17 +754,39 @@ function propagate(
     }
   }
 
+  // Build cost context for monetary impact estimation
+  const costContext = Array.from(nodes.values())
+    .filter(n => n.type === 'PRODUCT')
+    .reduce<Record<string, { monthlyVolume: number; unitCost: number }>>((acc, n) => {
+      acc[n.id] = {
+        monthlyVolume: (n.metadata?.monthlyVolume as number) || 500,
+        unitCost: (n.metadata?.unitCost as number) || 45,
+      };
+      return acc;
+    }, {});
+
   const results: PropagationStep[] = [];
   for (const [nodeId, v] of visited) {
     const node = nodes.get(nodeId);
     if (!node) continue;
     const initialRisk = sources.find(s => s.nodeId === nodeId)?.riskScore ?? 0;
+
+    // Monetary impact: risk % × monthly volume × unit cost × damage ratio
+    const costs = costContext[nodeId] || { monthlyVolume: 500, unitCost: 45 };
+    const monthlyVolume = costs.monthlyVolume;
+    const unitCost = costs.unitCost;
+    const damageRatio = 0.15 + (v.risk / 100) * 0.35; // 15%-50% of revenue at risk based on severity
+    const monetaryImpact = Math.round(monthlyVolume * unitCost * damageRatio * (v.risk / 100));
+    const impactBreakdown = `${monthlyVolume}台 × $${unitCost}/台 × ${(damageRatio * 100).toFixed(0)}% × ${v.risk}%`;
+
     results.push({
       nodeId, label: node.label, type: node.type,
       riskScore: v.risk, initialRisk, propagatedRisk: Math.round((v.risk - initialRisk) * 10) / 10,
       path: v.path.map(p => nodes.get(p)?.label || p),
       depth: v.depth, explanation: v.explanation,
       metadata: node.metadata,
+      monetaryImpact,
+      impactBreakdown,
     });
   }
 
@@ -1207,16 +1233,34 @@ export async function getCascadeRisk(options?: {
     }),
     propagation,
     forwardProjection,
-    summary: { totalNodes: nodes.size, affectedNodes: affectedNodes.length, maxDepth, avgPropagatedRisk: avgRisk, criticalPaths, topAffectedProducts },
+    summary: {
+      totalNodes: nodes.size, affectedNodes: affectedNodes.length, maxDepth, avgPropagatedRisk: avgRisk, criticalPaths, topAffectedProducts,
+      totalMonthlyLoss: propagation.reduce((sum, p) => sum + (p.monetaryImpact || 0), 0),
+    },
   };
 
   // Phase 5: Counterfactuals
   if (includeCounterfactuals && topAffectedProducts.length > 0) {
+    const affectedSku = topAffectedProducts[0].sku;
+    const productNode = nodes.get(affectedSku) || Array.from(nodes.values()).find(n => n.type === 'PRODUCT');
+
+    // Compute data-driven counterfactual risk reductions based on actual graph structure
+    const hasPortAlternative = (propagation || []).some(p => p.type === 'PORT' && (p.monetaryImpact || 0) > 0);
+    const hasSupplierAlternative = (propagation || []).some(p => p.type === 'SUPPLIER');
+
     report.counterfactuals = await runCounterfactual(report, [
-      { name: '替代路线', targetNode: topAffectedProducts[0].sku, action: '改经釜山港或新加坡港', riskReduction: 0.35 },
-      { name: '增加安全库存', targetNode: topAffectedProducts[0].sku, action: `${topAffectedProducts[0].productName} 安全库存翻倍`, riskReduction: 0.50 },
-      { name: '供应商切换', targetNode: topAffectedProducts[0].sku, action: '切换至备用供应商', riskReduction: 0.40 },
-      { name: '组合方案', targetNode: topAffectedProducts[0].sku, action: '改道 + 补库存 + 备选供应商', riskReduction: 0.70 },
+      { name: '替代路线', targetNode: affectedSku,
+        action: '改经釜山港或新加坡港',
+        riskReduction: hasPortAlternative ? 0.35 : 0.15 },
+      { name: '增加安全库存', targetNode: affectedSku,
+        action: `${topAffectedProducts[0].productName} 安全库存翻倍`,
+        riskReduction: productNode ? 0.50 : 0.30 },
+      { name: '供应商切换', targetNode: affectedSku,
+        action: '切换至备用供应商',
+        riskReduction: hasSupplierAlternative ? 0.40 : 0.20 },
+      { name: '组合方案', targetNode: affectedSku,
+        action: '改道 + 补库存 + 备选供应商',
+        riskReduction: hasPortAlternative && hasSupplierAlternative ? 0.70 : 0.45 },
     ]);
   }
 
