@@ -105,6 +105,63 @@ async function jobCommodities(): Promise<JobResult> {
   }
 }
 
+async function jobSCFIS(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { fetchSCFISPrice } = await import('@/lib/sources/scfis-futures');
+    const data = await fetchSCFISPrice();
+    if (!data) return { job: 'SCFIS', status: 'no_data', durationMs: Date.now() - start };
+
+    await db.supplyChainEvent.create({
+      data: {
+        type: 'data_update',
+        title: `SCFIS 欧线期货: ${data.price} 点`,
+        description: JSON.stringify(data),
+        icon: '🚢',
+        color: data.changePct > 0 ? '#ef4444' : '#22c55e',
+        severity: Math.abs(data.changePct) > 3 ? 'warning' : 'info',
+      },
+    });
+    return { job: 'SCFIS', status: 'ok', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'SCFIS', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
+async function jobCarbonPrice(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { fetchCarbonPrice } = await import('@/lib/sources/carbon-price');
+    const data = await fetchCarbonPrice();
+    if (!data) return { job: 'CarbonPrice', status: 'no_data', durationMs: Date.now() - start };
+
+    await db.supplyChainEvent.create({
+      data: {
+        type: 'data_update',
+        title: `EU碳价: €${data.price}/t CO2`,
+        description: JSON.stringify(data),
+        icon: '🏭',
+        color: data.changePct > 2 ? '#ef4444' : '#22c55e',
+        severity: data.price > 90 ? 'warning' : 'info',
+      },
+    });
+    return { job: 'CarbonPrice', status: 'ok', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'CarbonPrice', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
+async function jobCPSC(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { syncCPSCToDB } = await import('@/lib/sources/cpsc-recall');
+    const count = await syncCPSCToDB();
+    return { job: 'CPSC', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'CPSC', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
 export async function jobWeather(): Promise<JobResult> {
   const start = Date.now();
   try {
@@ -132,9 +189,12 @@ async function jobFX(): Promise<JobResult> {
 // ─── Scheduler ───────────────────────────────────────────────────────────────────
 
 const JOBS: Record<string, () => Promise<JobResult>> = {
+  SCFIS: jobSCFIS,
   SCFI: jobSCFI,
   PBOC: jobPBOC,
   Commodities: jobCommodities,
+  CarbonPrice: jobCarbonPrice,
+  CPSC: jobCPSC,
   Weather: jobWeather,
   FX: jobFX,
 };
@@ -152,10 +212,13 @@ export function startScheduler(): void {
   // Bootstrap: run all jobs on startup (with staggered delays to avoid thundering herd)
   const bootstrapJobs: Array<{ name: string; delay: number }> = [
     { name: 'FX', delay: 1000 },
-    { name: 'Weather', delay: 5000 },
-    { name: 'Commodities', delay: 10000 },
-    { name: 'PBOC', delay: 15000 },
-    { name: 'SCFI', delay: 20000 },
+    { name: 'SCFIS', delay: 3000 },
+    { name: 'CarbonPrice', delay: 5000 },
+    { name: 'Weather', delay: 8000 },
+    { name: 'Commodities', delay: 12000 },
+    { name: 'PBOC', delay: 16000 },
+    { name: 'CPSC', delay: 20000 },
+    { name: 'SCFI', delay: 24000 },
   ];
 
   for (const { name, delay } of bootstrapJobs) {
@@ -175,11 +238,14 @@ export function startScheduler(): void {
   // Periodic refresh intervals (Node.js setInterval, no cron dependency needed)
   // These are intentionally staggered to spread load
   const intervals: Array<{ name: string; ms: number }> = [
-    { name: 'FX', ms: 30 * 60 * 1000 },        // 30 min
-    { name: 'Weather', ms: 60 * 60 * 1000 },    // 1 hour
-    { name: 'Commodities', ms: 6 * 60 * 60 * 1000 }, // 6 hours
-    { name: 'PBOC', ms: 6 * 60 * 60 * 1000 },   // 6 hours (weekdays only via job logic)
-    { name: 'SCFI', ms: 6 * 60 * 60 * 1000 },   // 6 hours (only updates Fridays)
+    { name: 'FX', ms: 30 * 60 * 1000 },
+    { name: 'SCFIS', ms: 60 * 60 * 1000 },
+    { name: 'CarbonPrice', ms: 60 * 60 * 1000 },
+    { name: 'Weather', ms: 60 * 60 * 1000 },
+    { name: 'Commodities', ms: 6 * 60 * 60 * 1000 },
+    { name: 'PBOC', ms: 6 * 60 * 60 * 1000 },
+    { name: 'CPSC', ms: 12 * 60 * 60 * 1000 },
+    { name: 'SCFI', ms: 6 * 60 * 60 * 1000 },
   ];
 
   for (const { name, ms } of intervals) {

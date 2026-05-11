@@ -10,7 +10,7 @@
  */
 
 import { db } from '@/lib/db';
-import { fetchSCFI, scfiToFreightRates } from '@/lib/sources/scfi-scraper';
+import { fetchSCFISPrice, scfisToFreightRate } from '@/lib/sources/scfis-futures';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -135,20 +135,24 @@ export async function getFreightRates(): Promise<FreightReport> {
   const usedRoutes = new Set<string>();
   let primarySource = 'baseline';
 
-  // Priority 1: Live SCFI scrape
+  // Priority 1: SCFIS futures (INE, public exchange data, compliant)
   try {
-    const scfi = await fetchSCFI();
-    if (scfi && scfi.routes.length > 0) {
-      const liveRates = scfiToFreightRates(scfi);
-      for (const r of liveRates) {
-        const key = r.origin + r.destination;
-        usedRoutes.add(key);
-        rates.push({
-          ...r,
-          source: 'api',
-          updatedAt: scfi.date,
-        });
-      }
+    const scfis = await fetchSCFISPrice();
+    if (scfis) {
+      const { rateUSD, route } = scfisToFreightRate(scfis.price);
+      const scfis20GP = Math.round(rateUSD / 1.35);
+      rates.push({
+        route,
+        origin: '上海',
+        destination: '汉堡',
+        rate40GP: rateUSD,
+        rate20GP: scfis20GP,
+        trend: scfis.changePct > 2 ? 'rising' : scfis.changePct < -2 ? 'falling' : 'stable',
+        changePct: scfis.changePct,
+        source: 'api',
+        updatedAt: scfis.date,
+      });
+      usedRoutes.add('上海' + '汉堡');
       primarySource = 'api';
     }
   } catch { /* fall through */ }
