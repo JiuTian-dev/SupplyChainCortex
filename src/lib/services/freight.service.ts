@@ -1,15 +1,16 @@
 /**
  * Ocean Freight Rate Service — container shipping rates for key routes.
  *
- * Data sources:
- *   - DB ShipmentItem logistics costs (actual rates from existing shipments)
- *   - Static baseline: Shanghai Containerized Freight Index (SCFI) 2026 Q1
- *   - Fallback: route estimates
+ * Data source priority:
+ *   1. Live SCFI scrape (weekly, free, from public financial news)
+ *   2. DB ShipmentItem logistics costs (actual rates from existing shipments)
+ *   3. Static baseline: Shanghai Containerized Freight Index (SCFI) Q2 2026
  *
- * Free, no API key required. Update baseline quarterly from public SCFI/WCI reports.
+ * Free, no API key required. Baseline updated quarterly.
  */
 
 import { db } from '@/lib/db';
+import { fetchSCFI, scfiToFreightRates } from '@/lib/sources/scfi-scraper';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ export interface FreightRate {
   rate20GP: number;      // USD per 20ft container
   trend: 'rising' | 'falling' | 'stable';
   changePct: number;     // vs last quarter
-  source: 'db' | 'baseline' | 'static';
+  source: 'api' | 'db' | 'baseline' | 'static';
   updatedAt: string;
 }
 
@@ -33,29 +34,29 @@ export interface FreightReport {
   updatedAt: string;
 }
 
-// ─── 2026 Q2 Baseline (SCFI public data, USD/40GP) ──────────────────────────────
+// ─── 2026 Q2 Baseline (SCFI May 2026 data, USD) ────────────────────────────────
 
 const BASELINE_RATES: Record<string, Omit<FreightRate, 'source' | 'updatedAt' | 'trend' | 'changePct'>> = {
   'CN-USWC': {
     route: '上海→洛杉矶/长滩',
     origin: '上海',
     destination: '洛杉矶',
-    rate40GP: 2100,
-    rate20GP: 1600,
+    rate40GP: 2826,
+    rate20GP: 2100,
   },
   'CN-USEC': {
     route: '上海→纽约/新泽西',
     origin: '上海',
     destination: '纽约',
-    rate40GP: 3200,
-    rate20GP: 2400,
+    rate40GP: 3812,
+    rate20GP: 2830,
   },
   'CN-NEUR': {
     route: '上海→汉堡/鹿特丹',
     origin: '上海',
     destination: '汉堡',
-    rate40GP: 2500,
-    rate20GP: 1850,
+    rate40GP: 2155,
+    rate20GP: 1596,
   },
   'CN-UK': {
     route: '深圳→费力克斯托',
@@ -68,8 +69,8 @@ const BASELINE_RATES: Record<string, Omit<FreightRate, 'source' | 'updatedAt' | 
     route: '上海→东京/横滨',
     origin: '上海',
     destination: '东京',
-    rate40GP: 800,
-    rate20GP: 600,
+    rate40GP: 428,
+    rate20GP: 317,
   },
   'CN-AU': {
     route: '深圳→悉尼',
@@ -82,8 +83,8 @@ const BASELINE_RATES: Record<string, Omit<FreightRate, 'source' | 'updatedAt' | 
     route: '上海→釜山',
     origin: '上海',
     destination: '釜山',
-    rate40GP: 600,
-    rate20GP: 450,
+    rate40GP: 235,
+    rate20GP: 174,
   },
 };
 
@@ -130,20 +131,48 @@ async function getDBFreightRates(): Promise<FreightRate[]> {
 // ─── Main Export ─────────────────────────────────────────────────────────────────
 
 export async function getFreightRates(): Promise<FreightReport> {
-  const dbRates = await getDBFreightRates();
+  const rates: FreightRate[] = [];
+  const usedRoutes = new Set<string>();
+  let primarySource = 'baseline';
 
-  // Merge: DB data preferred, fall back to baseline
-  const dbRouteKeys = new Set(dbRates.map(r => {
-    const match = Object.entries(BASELINE_RATES).find(([, v]) =>
-      r.origin.includes(v.origin) || r.destination.includes(v.destination)
-    );
-    return match?.[0];
-  }).filter(Boolean));
+  // Priority 1: Live SCFI scrape
+  try {
+    const scfi = await fetchSCFI();
+    if (scfi && scfi.routes.length > 0) {
+      const liveRates = scfiToFreightRates(scfi);
+      for (const r of liveRates) {
+        const key = r.origin + r.destination;
+        usedRoutes.add(key);
+        rates.push({
+          ...r,
+          source: 'api',
+          updatedAt: scfi.date,
+        });
+      }
+      primarySource = 'api';
+    }
+  } catch { /* fall through */ }
 
-  const rates: FreightRate[] = [...dbRates];
+  // Priority 2: DB shipment costs
+  try {
+    const dbRates = await getDBFreightRates();
+    for (const r of dbRates) {
+      const key = r.origin + r.destination;
+      if (!usedRoutes.has(key)) {
+        usedRoutes.add(key);
+        rates.push(r);
+      }
+    }
+    if (primarySource === 'baseline' && dbRates.length > 0) {
+      primarySource = 'db';
+    }
+  } catch { /* fall through */ }
 
+  // Priority 3: Static baseline (Q2 2026)
   for (const [key, baseline] of Object.entries(BASELINE_RATES)) {
-    if (!dbRouteKeys.has(key)) {
+    const routeKey = baseline.origin + baseline.destination;
+    if (!usedRoutes.has(routeKey)) {
+      usedRoutes.add(routeKey);
       rates.push({
         ...baseline,
         trend: 'stable',
@@ -158,7 +187,6 @@ export async function getFreightRates(): Promise<FreightReport> {
     ? Math.round(rates.reduce((s, r) => s + r.rate40GP, 0) / rates.length)
     : 0;
 
-  // Determine overall trend
   const risingCount = rates.filter(r => r.trend === 'rising').length;
   const fallingCount = rates.filter(r => r.trend === 'falling').length;
 
@@ -166,7 +194,7 @@ export async function getFreightRates(): Promise<FreightReport> {
     rates,
     avgRate40GP,
     trend: risingCount > fallingCount ? 'rising' : fallingCount > risingCount ? 'falling' : 'stable',
-    source: dbRates.length > 0 ? 'db+baseline' : 'baseline',
+    source: primarySource,
     updatedAt: new Date().toISOString(),
   };
 }

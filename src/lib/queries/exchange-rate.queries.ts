@@ -1,16 +1,17 @@
 /**
- * Exchange Rate Queries — Frankfurter API (free, no key required).
- * Migrated from services/exchange-rate.service.ts.
+ * Exchange Rate Queries — Frankfurter API + PBOC midpoint.
  *
  * Provides:
- *  - Latest CNY→USD/EUR/GBP/JPY/KRW rates
+ *  - Latest CNY→USD/EUR/GBP/JPY/KRW/AUD market rates (Frankfurter, free)
+ *  - PBOC central parity / midpoint (ALAPI or BOC scrape, free)
  *  - Historical rates for trend analysis
- *  - Currency conversion utility
+ *  - Midpoint vs market spread for FX pressure detection
  */
 
 import { cachedFetch, cacheKey, CACHE_TTL } from '@/lib/cache';
 import { daysAgo } from '@/lib/utils/date';
 import { roundTo } from '@/lib/utils/format';
+import { getPBOCMidpoints } from '@/lib/sources/pboc-exchange-rate';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,8 @@ export interface ExchangeRateSnapshot {
   base: string;
   rates: Record<string, number>;
   trend: Record<string, { direction: 'up' | 'down' | 'stable'; change: number }>;
+  /** PBOC central parity midpoint — official daily fixing rate */
+  midpoints?: Record<string, { midpoint: number; spread: number }>;
 }
 
 // ─── Config ──────────────────────────────────────────────────────────────────────
@@ -65,7 +68,24 @@ export async function getLatestRates(base = 'CNY'): Promise<ExchangeRateSnapshot
         } catch { /* skip individual currency trend on failure */ }
       }
 
-      return { timestamp: data.date, base, rates: data.rates, trend };
+      // Fetch PBOC midpoints in parallel (not on critical path)
+      let midpoints: Record<string, { midpoint: number; spread: number }> | undefined;
+      try {
+        const pboc = await getPBOCMidpoints();
+        if (pboc) {
+          midpoints = {};
+          for (const mp of pboc.midpoints) {
+            const marketRate = data.rates[mp.currency];
+            if (marketRate) {
+              const perUnitMid = mp.units > 1 ? mp.midpoint / mp.units : mp.midpoint;
+              const spread = Math.round(((marketRate - perUnitMid) / perUnitMid) * 10000) / 100;
+              midpoints[mp.currency] = { midpoint: perUnitMid, spread };
+            }
+          }
+        }
+      } catch { /* midpoints optional */ }
+
+      return { timestamp: data.date, base, rates: data.rates, trend, midpoints };
     },
     CACHE_TTL.MEDIUM
   );

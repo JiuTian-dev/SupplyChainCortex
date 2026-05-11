@@ -5,13 +5,14 @@
  *                Plastic resin (housings), Silicon steel (motor laminations)
  *
  * Data source priority:
- *   1. FRED (St. Louis Fed) — free API, register at fred.stlouisfed.org for key
- *      Set FRED_API_KEY in .env. Series: PCOPPUSDM, PALUMUSDM, PSTEELUSDM
- *   2. DB CostRecord trend — real-time BOM cost change detection
- *   3. Static baseline — 2026 Q1 global averages
+ *   1. Alpha Vantage — daily copper & aluminum (free 25 req/day)
+ *   2. FRED (St. Louis Fed) — monthly copper, aluminum, steel (free)
+ *   3. DB CostRecord trend — BOM cost change detection
+ *   4. Static baseline — 2026 Q1 global averages
  */
 
 import { db } from '@/lib/db';
+import { fetchDailyCommodities } from '@/lib/sources/alphavantage-commodities';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -36,10 +37,10 @@ export interface CommodityReport {
 
 // ─── Static Baseline (USD/metric ton, 2026 Q1) ──────────────────────────────────
 
-// Baseline updated: 2026-03 FRED data (PCOPPUSDM, PALUMUSDM, PSTEELUSDM)
+// Baseline updated: 2026-05-11 market data (LME/Alphavantage/SHFE)
 const BASELINE: Record<string, { price: number; name: string; unit: string }> = {
-  COPPER:    { price: 12529, name: '铜 (Cu)',          unit: 'USD/吨' },
-  ALUMINUM:  { price: 3373,  name: '铝 (Al)',          unit: 'USD/吨' },
+  COPPER:    { price: 13609, name: '铜 (Cu)',          unit: 'USD/吨' },
+  ALUMINUM:  { price: 3518,  name: '铝 (Al)',          unit: 'USD/吨' },
   STEEL_HRC: { price: 698,   name: '热轧钢卷 (HRC)',    unit: 'USD/吨' },
   PLASTIC:   { price: 1150,  name: 'ABS 塑料粒子',      unit: 'USD/吨' },
 };
@@ -120,14 +121,42 @@ async function fetchFromDB(): Promise<CommodityPrice[]> {
 
 export async function getCommodityPrices(): Promise<CommodityReport> {
   let commodities: CommodityPrice[] = [];
+  const apiSources: string[] = [];
 
-  // Priority 1: FRED (St. Louis Fed) — free, no credit card
-  const apiPrices = await fetchFromFRED();
-  if (apiPrices && apiPrices.length > 0) {
-    commodities = apiPrices;
-  }
+  // Priority 1: Alpha Vantage daily prices (copper + aluminum) + SHFE steel
+  try {
+    const daily = await fetchDailyCommodities();
+    if (daily.length > 0) {
+      for (const d of daily) {
+        commodities.push({
+          name: d.name,
+          code: d.code,
+          price: d.price,
+          unit: d.unit,
+          changePct: d.changePct,
+          source: 'api',
+          updatedAt: d.date,
+        });
+      }
+      apiSources.push('alphavantage');
+    }
+  } catch { /* fall through */ }
 
-  // Priority 2: DB BOM analysis
+  // Priority 2: FRED monthly prices (fill gaps for what Alpha Vantage didn't cover)
+  const coveredCodes = new Set(commodities.map(c => c.code));
+  try {
+    const fredPrices = await fetchFromFRED();
+    if (fredPrices) {
+      for (const fp of fredPrices) {
+        if (!coveredCodes.has(fp.code)) {
+          commodities.push(fp);
+          apiSources.push('fred');
+        }
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Priority 3: DB BOM analysis
   if (commodities.length === 0) {
     try {
       const dbPrices = await fetchFromDB();
@@ -135,18 +164,21 @@ export async function getCommodityPrices(): Promise<CommodityReport> {
     } catch { /* fall through */ }
   }
 
-  // Priority 3: static baseline
-  if (commodities.length === 0) {
+  // Priority 4: static baseline
+  const existingCodes = new Set(commodities.map(c => c.code));
+  if (existingCodes.size < Object.keys(BASELINE).length) {
     for (const [code, info] of Object.entries(BASELINE)) {
-      commodities.push({
-        name: info.name,
-        code,
-        price: info.price,
-        unit: info.unit,
-        changePct: 0,
-        source: 'static',
-        updatedAt: new Date().toISOString(),
-      });
+      if (!existingCodes.has(code)) {
+        commodities.push({
+          name: info.name,
+          code,
+          price: info.price,
+          unit: info.unit,
+          changePct: 0,
+          source: 'static',
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
   }
 
@@ -160,7 +192,7 @@ export async function getCommodityPrices(): Promise<CommodityReport> {
     overallTrend: avgChange > 3 ? 'rising' : avgChange < -3 ? 'falling' : 'stable',
     avgChangePct: Math.round(avgChange * 10) / 10,
     affectedMaterials: changes.map(c => c.name),
-    source: commodities[0]?.source || 'static',
+    source: apiSources.length > 0 ? apiSources.join('+') : commodities[0]?.source || 'static',
     updatedAt: new Date().toISOString(),
   };
 }
