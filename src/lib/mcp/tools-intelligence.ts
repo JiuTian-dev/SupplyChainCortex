@@ -331,4 +331,154 @@ export const intelligenceTools: MCPTool[] = [
       });
     },
   },
+
+  // ── 22. web_search ───────────────────────────────────────────────────────
+  {
+    name: 'web_search',
+    description: '联网搜索最新公开信息：SCFI运价指数、LME铜铝钢价格、EU碳价、CPSC召回、关税政策变动、港口新闻等。用于获取实时外部数据，补充内部数据库。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: '搜索关键词，如: "SCFI Shanghai container freight index May 2026"',
+        },
+      },
+      required: ['query'],
+    },
+    handler: async (params) => {
+      const { webSearch, formatSearchContext } = await import('@/lib/services/web-search.service');
+      const { results, source } = await webSearch(params.query as string);
+      return {
+        source,
+        query: params.query,
+        resultCount: results.length,
+        results: results.slice(0, 8),
+        formattedContext: formatSearchContext(results),
+      };
+    },
+  },
+
+  // ── 23. query_commodities ────────────────────────────────────────────────
+  {
+    name: 'query_commodities',
+    description: '查询大宗商品日度价格：铜(Copper)、铝(Aluminum)、螺纹钢(Steel Rebar)、PP聚丙烯、LLDPE聚乙烯、PVC聚氯乙烯。数据来源: Alpha Vantage + SHFE/DCE期货交易所。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const { fetchDailyCommodities } = await import('@/lib/sources/alphavantage-commodities');
+      const commodities = await fetchDailyCommodities();
+      return {
+        count: commodities.length,
+        commodities: commodities.map(c => ({
+          name: c.name, code: c.code, price: c.price, unit: c.unit,
+          changePct: c.changePct, date: c.date, source: c.source,
+        })),
+        summary: commodities.map(c => `${c.name}: ${c.price} ${c.unit} (${c.changePct > 0 ? '+' : ''}${c.changePct}%)`).join(' | '),
+      };
+    },
+  },
+
+  // ── 24. query_scfis ──────────────────────────────────────────────────────
+  {
+    name: 'query_scfis',
+    description: '查询SCFIS欧洲航线集装箱运价指数期货(INE上海国际能源交易中心)。可推算上海→欧洲集装箱运费。公开数据，无需密钥。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const { fetchSCFISPrice, scfisToFreightRate } = await import('@/lib/sources/scfis-futures');
+      const data = await fetchSCFISPrice();
+      if (!data) return { error: 'SCFIS数据暂不可用（非交易时间或合约未找到）' };
+      const freight = scfisToFreightRate(data.price);
+      return {
+        index: data.price,
+        contract: data.contract,
+        date: data.date,
+        changePct: data.changePct,
+        estimatedFreightUSD: freight.rateUSD,
+        route: freight.route,
+        source: data.source,
+      };
+    },
+  },
+
+  // ── 25. query_carbon_price ───────────────────────────────────────────────
+  {
+    name: 'query_carbon_price',
+    description: '查询欧盟碳排放配额(EUA)实时价格。ICE欧洲期货交易所公开数据，通过新浪全球期货接口。用于CBAM碳关税成本计算。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const { fetchCarbonPrice, estimateCBAMCost } = await import('@/lib/sources/carbon-price');
+      const data = await fetchCarbonPrice();
+      if (!data) return { error: '碳价数据暂不可用（非交易时间）' };
+      return {
+        euaPrice: data.price,
+        unit: 'EUR/吨 CO2',
+        changePct: data.changePct,
+        date: data.date,
+        source: data.source,
+        cbamExample: `一台3kg咖啡机(碳足迹7.5kg CO2)的CBAM成本约为 €${estimateCBAMCost(data.price, 3).toFixed(2)}/台（2026年10%付费比例）`,
+      };
+    },
+  },
+
+  // ── 26. query_cpsc_recalls ───────────────────────────────────────────────
+  {
+    name: 'query_cpsc_recalls',
+    description: '查询美国CPSC消费品召回数据(中国产小家电)。数据来源: 江苏省公平贸易预警平台(CCPIT贸促会)，每日更新。用于合规风险评估。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const { fetchProductRecalls } = await import('@/lib/sources/cpsc-recall');
+      const recalls = await fetchProductRecalls();
+      if (recalls.length === 0) return { message: '近期无小家电相关CPSC召回', totalChecked: 'CCPIT最近30天数据' };
+      return {
+        totalRecalls: recalls.length,
+        recalls: recalls.map(r => ({
+          title: r.title, date: r.date, hazard: r.hazard,
+          country: r.country, productName: r.productName, remedy: r.remedy,
+        })),
+        riskSummary: recalls.map(r => `[${r.hazard}] ${r.title}`).join('\n'),
+        complianceNote: '以上召回涉及中国产小家电，请检查自有产品是否涉及类似缺陷',
+      };
+    },
+  },
+
+  // ── 27. query_port_congestion ────────────────────────────────────────────
+  {
+    name: 'query_port_congestion',
+    description: '查询全球10大港口拥堵状况。综合GSCPI(纽约联储供应链压力指数)和公开港口报告。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const { getPortCongestion } = await import('@/lib/sources/port-congestion');
+      const data = await getPortCongestion();
+      return {
+        globalLevel: data.globalLevel,
+        affectedRoutes: data.affectedRoutes,
+        source: data.source,
+        ports: data.ports.map(p => ({
+          port: p.port, country: p.country,
+          congestion: p.congestionLevel, waitDays: p.avgWaitDays,
+          vesselsWaiting: p.vesselsWaiting, trend: p.trend,
+        })),
+      };
+    },
+  },
 ];
