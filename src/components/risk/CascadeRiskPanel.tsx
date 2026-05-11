@@ -228,7 +228,7 @@ export function CascadeRiskPanel() {
           </div>
           <div className="rounded-lg border p-2.5 text-center">
             <p className="text-[10px] text-muted-foreground">受影响产品</p>
-            <p className="text-lg font-bold text-red-600 dark:text-red-400">{products.length}</p>
+            <p className="text-lg font-bold text-red-600 dark:text-red-400">{productRisks.length}</p>
           </div>
         </div>
 
