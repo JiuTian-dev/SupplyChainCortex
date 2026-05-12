@@ -348,32 +348,37 @@ export const intelligenceTools: MCPTool[] = [
     },
     handler: async (params) => {
       const { webSearch, formatSearchContext } = await import('@/lib/services/web-search.service');
-      const query = params.query as string;
+      const query = (params.query as string) || '';
 
-      // Try original query first
-      let { results, source } = await webSearch(query);
-
-      // If query contains Chinese and got poor results, try again with English keywords
-      if (/[一-鿿]/.test(query) && results.length === 0) {
-        // Extract potential English keywords from the Chinese query
-        // and try with common English search patterns for supply chain topics
-        const englishQueries = [
-          query.replace(/[一-鿿]+/g, '').trim() || query, // strip Chinese
-        ].filter(Boolean);
-        for (const eq of englishQueries.slice(0, 2)) {
-          if (results.length > 0) break;
-          const r = await webSearch(eq);
-          if (r.results.length > 0) { results = r.results; source = r.source; }
-        }
+      // Chinese-only queries: refuse and ask for English translation
+      // Wikipedia/Google News don't handle Chinese text well
+      if (/[一-鿿]/.test(query) && !/[a-zA-Z]{3,}/.test(query)) {
+        return {
+          error: 'search_engine_requires_english',
+          message: '搜索引擎仅支持英文。请将中文查询翻译为英文关键词后重新搜索。',
+          chineseQuery: query,
+          suggestedEnglishQueries: [
+            query.includes('关税') ? `"US China tariff ${new Date().getFullYear()}"` : null,
+            query.includes('运价') || query.includes('运费') ? '"container freight rate index"' : null,
+            query.includes('铜') || query.includes('铝') || query.includes('钢') ? '"copper aluminum steel price"' : null,
+            query.includes('碳') ? '"EU carbon price EUA"' : null,
+            query.includes('召回') ? '"CPSC product recall China"' : null,
+            query.includes('港口') ? '"port congestion"' : null,
+          ].filter(Boolean),
+          example: '请将 "中美关税变化" 翻译为 "US China tariff changes" 后重新调用 web_search',
+          retryWithEnglish: true,
+        };
       }
+
+      // English (or mixed) query — proceed with search
+      const { results, source } = await webSearch(query);
 
       return {
         source,
-        query: params.query,
+        query,
         resultCount: results.length,
         results: results.slice(0, 8),
         formattedContext: formatSearchContext(results),
-        hint: /[一-鿿]/.test(query) ? '中文查询建议使用英文关键词以获得更好结果，例如: "US China tariff 2026"' : undefined,
       };
     },
   },
