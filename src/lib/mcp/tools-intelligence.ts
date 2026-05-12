@@ -349,6 +349,10 @@ export const intelligenceTools: MCPTool[] = [
     handler: async (params) => {
       const { webSearch, formatSearchContext } = await import('@/lib/services/web-search.service');
       const query = (params.query as string) || '';
+      // Debug: log the received query to check for encoding issues
+      if (query.length > 0) {
+        console.log('[web_search] raw query chars:', [...query].map(c => c.codePointAt(0)?.toString(16)).join(' '));
+      }
       const { results, source } = await webSearch(query);
       return {
         source,

@@ -28,7 +28,9 @@ const handlePost = async (request: NextRequest): Promise<NextResponse> => {
   await optionalRequirePermission('mcp:execute');
   let body: { tool?: string; parameters?: Record<string, unknown> };
   try {
-    body = await request.json();
+    // Use raw text + manual parse to avoid UTF-8 corruption in Turbopack
+    const raw = await request.text();
+    body = JSON.parse(raw);
   } catch {
     return apiError('请求体格式无效', 400, 'INVALID_BODY');
   }
