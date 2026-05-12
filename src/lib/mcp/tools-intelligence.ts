@@ -349,38 +349,10 @@ export const intelligenceTools: MCPTool[] = [
     handler: async (params) => {
       const { webSearch, formatSearchContext } = await import('@/lib/services/web-search.service');
       const query = (params.query as string) || '';
-      const isChinese = /[一-鿿]/.test(query);
-
-      // Chinese query — auto-translate key terms to English before searching
-      let searchQuery = query;
-      if (isChinese) {
-        const termMap: [RegExp, string][] = [
-          [/中美贸易战/g, 'US China trade war '], [/中美/g, 'US China '],
-          [/关税/g, 'tariff '], [/贸易战/g, 'trade war '],
-          [/运价|运费/g, 'freight rate '], [/集装箱/g, 'container '],
-          [/铜价|铜/g, 'copper price '], [/铝价|铝/g, 'aluminum price '],
-          [/钢价|钢|螺纹钢/g, 'steel price '], [/碳价|碳关税/g, 'carbon price EUA '],
-          [/召回/g, 'product recall CPSC '], [/港口/g, 'port '],
-          [/供应链/g, 'supply chain '], [/家电|小家电/g, 'appliance '],
-          [/出口/g, 'export '], [/进口/g, 'import '],
-          [/变化|最新|动态|新闻|最近|有什么/g, ''], [/政策/g, 'policy '],
-        ];
-        searchQuery = query;
-        for (const [re, en] of termMap) {
-          searchQuery = searchQuery.replace(re, en);
-        }
-        // Remove remaining Chinese chars
-        searchQuery = searchQuery.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!searchQuery || searchQuery.length < 3) searchQuery = 'supply chain news 2026';
-      }
-
-      const { results, source } = await webSearch(searchQuery);
-
+      const { results, source } = await webSearch(query);
       return {
         source,
-        originalQuery: query,
-        searchQuery,
-        translated: isChinese,
+        query,
         resultCount: results.length,
         results: results.slice(0, 8),
         formattedContext: formatSearchContext(results),

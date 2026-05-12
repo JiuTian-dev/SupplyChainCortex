@@ -144,30 +144,55 @@ function hasChinese(text: string): boolean {
   return /[一-鿿]/.test(text);
 }
 
+/**
+ * Translate common Chinese supply chain terms to English keywords.
+ * Used to make Chinese queries searchable on English-only search engines.
+ */
+function translateChineseKeywords(query: string): string {
+  const termMap: [RegExp, string][] = [
+    [/中美贸易战/g, 'US China trade war '],
+    [/中美/g, 'US China '],
+    [/关税/g, 'tariff '],
+    [/贸易战/g, 'trade war '],
+    [/运价|运费/g, 'freight rate '],
+    [/集装箱/g, 'container '],
+    [/铜价|铜/g, 'copper price '],
+    [/铝价|铝/g, 'aluminum price '],
+    [/钢价|钢|螺纹钢/g, 'steel price '],
+    [/碳价|碳关税/g, 'carbon price EUA '],
+    [/召回/g, 'product recall CPSC '],
+    [/港口/g, 'port '],
+    [/供应链/g, 'supply chain '],
+    [/家电|小家电/g, 'appliance '],
+    [/出口/g, 'export '],
+    [/进口/g, 'import '],
+    [/变化|最新|动态|新闻|最近|有什么/g, ''],
+    [/政策/g, 'policy '],
+  ];
+  let result = query;
+  for (const [re, en] of termMap) {
+    result = result.replace(re, en);
+  }
+  return result.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // ─── Main Export ─────────────────────────────────────────────────────────────────
 
 export async function webSearch(query: string): Promise<{ results: SearchResult[]; source: string }> {
+  // Auto-translate Chinese queries to English
+  const searchQuery = hasChinese(query) ? translateChineseKeywords(query) : query;
   const isChinese = hasChinese(query);
 
-  // Chinese queries: skip Wikipedia (matches tokens poorly), go straight to News
-  // English queries: Wikipedia first (excellent factual coverage)
-  if (!isChinese) {
-    const wiki = await searchWikipedia(query);
-    if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
-  }
+  // Wikipedia first for factual queries
+  const wiki = await searchWikipedia(searchQuery);
+  if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
 
-  // Google News RSS — works for both English and Chinese (with English keywords)
-  const news = await searchGoogleNews(isChinese ? query : query);
+  // Google News RSS for current events
+  const news = await searchGoogleNews(searchQuery);
   if (news.length > 0) return { results: news, source: 'Google News' };
 
-  // Fallback: try Wikipedia even for Chinese (may get partial matches)
-  if (isChinese) {
-    const wiki = await searchWikipedia(query);
-    if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
-  }
-
   // Last resort
-  const ddg = await searchDuckDuckGoLite(query);
+  const ddg = await searchDuckDuckGoLite(searchQuery);
   if (ddg.length > 0) return { results: ddg, source: 'DuckDuckGo Lite' };
 
   return { results: [], source: 'none' };
