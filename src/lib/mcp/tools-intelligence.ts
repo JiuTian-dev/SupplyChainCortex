@@ -348,13 +348,32 @@ export const intelligenceTools: MCPTool[] = [
     },
     handler: async (params) => {
       const { webSearch, formatSearchContext } = await import('@/lib/services/web-search.service');
-      const { results, source } = await webSearch(params.query as string);
+      const query = params.query as string;
+
+      // Try original query first
+      let { results, source } = await webSearch(query);
+
+      // If query contains Chinese and got poor results, try again with English keywords
+      if (/[一-鿿]/.test(query) && results.length === 0) {
+        // Extract potential English keywords from the Chinese query
+        // and try with common English search patterns for supply chain topics
+        const englishQueries = [
+          query.replace(/[一-鿿]+/g, '').trim() || query, // strip Chinese
+        ].filter(Boolean);
+        for (const eq of englishQueries.slice(0, 2)) {
+          if (results.length > 0) break;
+          const r = await webSearch(eq);
+          if (r.results.length > 0) { results = r.results; source = r.source; }
+        }
+      }
+
       return {
         source,
         query: params.query,
         resultCount: results.length,
         results: results.slice(0, 8),
         formattedContext: formatSearchContext(results),
+        hint: /[一-鿿]/.test(query) ? '中文查询建议使用英文关键词以获得更好结果，例如: "US China tariff 2026"' : undefined,
       };
     },
   },

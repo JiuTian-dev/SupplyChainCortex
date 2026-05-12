@@ -138,18 +138,35 @@ function decodeEntities(text: string): string {
     .replace(/&mdash;/g, '—').replace(/&ndash;/g, '–');
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────────
+
+function hasChinese(text: string): boolean {
+  return /[一-鿿]/.test(text);
+}
+
 // ─── Main Export ─────────────────────────────────────────────────────────────────
 
 export async function webSearch(query: string): Promise<{ results: SearchResult[]; source: string }> {
-  // Strategy 1: Wikipedia (for factual queries)
-  const wiki = await searchWikipedia(query);
-  if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
+  const isChinese = hasChinese(query);
 
-  // Strategy 2: Google News RSS (for current events)
-  const news = await searchGoogleNews(query);
+  // Chinese queries: skip Wikipedia (matches tokens poorly), go straight to News
+  // English queries: Wikipedia first (excellent factual coverage)
+  if (!isChinese) {
+    const wiki = await searchWikipedia(query);
+    if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
+  }
+
+  // Google News RSS — works for both English and Chinese (with English keywords)
+  const news = await searchGoogleNews(isChinese ? query : query);
   if (news.length > 0) return { results: news, source: 'Google News' };
 
-  // Strategy 3: DuckDuckGo Lite
+  // Fallback: try Wikipedia even for Chinese (may get partial matches)
+  if (isChinese) {
+    const wiki = await searchWikipedia(query);
+    if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
+  }
+
+  // Last resort
   const ddg = await searchDuckDuckGoLite(query);
   if (ddg.length > 0) return { results: ddg, source: 'DuckDuckGo Lite' };
 
