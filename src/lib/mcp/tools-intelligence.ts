@@ -349,33 +349,37 @@ export const intelligenceTools: MCPTool[] = [
     handler: async (params) => {
       const { webSearch, formatSearchContext } = await import('@/lib/services/web-search.service');
       const query = (params.query as string) || '';
+      const isChinese = /[一-鿿]/.test(query);
 
-      // Chinese-only queries: refuse and ask for English translation
-      // Wikipedia/Google News don't handle Chinese text well
-      if (/[一-鿿]/.test(query) && !/[a-zA-Z]{3,}/.test(query)) {
-        return {
-          error: 'search_engine_requires_english',
-          message: '搜索引擎仅支持英文。请将中文查询翻译为英文关键词后重新搜索。',
-          chineseQuery: query,
-          suggestedEnglishQueries: [
-            query.includes('关税') ? `"US China tariff ${new Date().getFullYear()}"` : null,
-            query.includes('运价') || query.includes('运费') ? '"container freight rate index"' : null,
-            query.includes('铜') || query.includes('铝') || query.includes('钢') ? '"copper aluminum steel price"' : null,
-            query.includes('碳') ? '"EU carbon price EUA"' : null,
-            query.includes('召回') ? '"CPSC product recall China"' : null,
-            query.includes('港口') ? '"port congestion"' : null,
-          ].filter(Boolean),
-          example: '请将 "中美关税变化" 翻译为 "US China tariff changes" 后重新调用 web_search',
-          retryWithEnglish: true,
-        };
+      // Chinese query — auto-translate key terms to English before searching
+      let searchQuery = query;
+      if (isChinese) {
+        const termMap: [RegExp, string][] = [
+          [/中美/g, 'US China'], [/关税/g, 'tariff'], [/贸易战/g, 'trade war'],
+          [/运价|运费/g, 'freight rate'], [/集装箱/g, 'container'],
+          [/铜价|铜/g, 'copper price'], [/铝价|铝/g, 'aluminum price'],
+          [/钢价|钢|螺纹钢/g, 'steel price'], [/碳价|碳关税/g, 'carbon price EUA'],
+          [/召回/g, 'product recall CPSC'], [/港口/g, 'port'],
+          [/供应链/g, 'supply chain'], [/家电|小家电/g, 'appliance'],
+          [/出口/g, 'export'], [/进口/g, 'import'],
+          [/变化|最新|动态|新闻/g, ''], [/政策/g, 'policy'],
+        ];
+        searchQuery = query;
+        for (const [re, en] of termMap) {
+          searchQuery = searchQuery.replace(re, en);
+        }
+        // Remove remaining Chinese chars
+        searchQuery = searchQuery.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!searchQuery || searchQuery.length < 3) searchQuery = 'supply chain news 2026';
       }
 
-      // English (or mixed) query — proceed with search
-      const { results, source } = await webSearch(query);
+      const { results, source } = await webSearch(searchQuery);
 
       return {
         source,
-        query,
+        originalQuery: query,
+        searchQuery,
+        translated: isChinese,
         resultCount: results.length,
         results: results.slice(0, 8),
         formattedContext: formatSearchContext(results),
