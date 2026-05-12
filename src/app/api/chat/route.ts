@@ -50,7 +50,7 @@ MCP 工具清单：
 分析原则：
 1. 先查数据再回答，绝不编造数字
 2. 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
-3. **联网搜索必须使用英文关键词**。例如用户问"中美关税变化"，你必须web_search("US China tariff changes 2026")而非web_search("中美关税变化")。中文查询在英文搜索引擎中返回无效结果。
+3. **联网搜索必须使用英文关键词，禁止使用中文**。正确: web_search("US China tariff 2026")。错误: web_search("中美关税")。如果搜索结果提示需要英文，立即用英文关键词重新搜索，不要放弃。
 4. 用中文回复，金额用美元/人民币单位，数字保留合理精度
 5. 回复末尾可提出后续分析建议`;
 
@@ -126,6 +126,9 @@ function formatToolResult(tool: string, action: string, result: unknown): string
       return `🌤 港口天气: 所有港口海况正常，无恶劣天气预警`;
     }
     case 'web_search': {
+      if (data.error === 'search_engine_requires_english') {
+        return `⚠️ 搜索失败: ${data.message}\n请用英文关键词重新搜索。例如: ${data.example || '将中文翻译为英文'}`;
+      }
       const ctx = data.formattedContext as string | undefined;
       return `🔍 联网搜索结果 (${data.source}):\n${ctx || JSON.stringify(data.results).substring(0, 1000)}`;
     }
