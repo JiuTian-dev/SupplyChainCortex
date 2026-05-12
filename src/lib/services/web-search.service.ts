@@ -146,32 +146,32 @@ function hasChinese(text: string): boolean {
 
 /**
  * Translate common Chinese supply chain terms to English keywords.
- * Used to make Chinese queries searchable on English-only search engines.
+ * Uses Unicode escapes to avoid Turbopack encoding issues.
  */
 function translateChineseKeywords(query: string): string {
-  const termMap: [RegExp, string][] = [
-    [/中美贸易战/g, 'US China trade war '],
-    [/中美/g, 'US China '],
-    [/关税/g, 'tariff '],
-    [/贸易战/g, 'trade war '],
-    [/运价|运费/g, 'freight rate '],
-    [/集装箱/g, 'container '],
-    [/铜价|铜/g, 'copper price '],
-    [/铝价|铝/g, 'aluminum price '],
-    [/钢价|钢|螺纹钢/g, 'steel price '],
-    [/碳价|碳关税/g, 'carbon price EUA '],
-    [/召回/g, 'product recall CPSC '],
-    [/港口/g, 'port '],
-    [/供应链/g, 'supply chain '],
-    [/家电|小家电/g, 'appliance '],
-    [/出口/g, 'export '],
-    [/进口/g, 'import '],
-    [/变化|最新|动态|新闻|最近|有什么/g, ''],
-    [/政策/g, 'policy '],
+  const terms: [string, string][] = [
+    ['中美贸易战', 'US China trade war '],  // 中美贸易战
+    ['中美', 'US China '],                                // 中美
+    ['关税', 'tariff '],                                  // 关税
+    ['贸易战', 'trade war '],                         // 贸易战
+    ['运价|运费', 'freight rate '],              // 运价|运费
+    ['集装箱', 'container '],                         // 集装箱
+    ['铜价|铜', 'copper price '],                     // 铜价|铜
+    ['铝价|铝', 'aluminum price '],                   // 铝价|铝
+    ['钢价|钢|螺纹钢', 'steel price '],  // 钢价|钢|螺纹钢
+    ['碳价|碳关税', 'carbon price EUA '],    // 碳价|碳关税
+    ['召回', 'product recall CPSC '],                     // 召回
+    ['港口', 'port '],                                     // 港口
+    ['供应链', 'supply chain '],                      // 供应链
+    ['家电|小家电', 'appliance '],            // 家电|小家电
+    ['出口', 'export '],                                   // 出口
+    ['进口', 'import '],                                   // 进口
+    ['变化|最新|动态|新闻|最近|有什么', ''], // 变化|最新|动态|新闻|最近|有什么
+    ['政策', 'policy '],                                   // 政策
   ];
   let result = query;
-  for (const [re, en] of termMap) {
-    result = result.replace(re, en);
+  for (const [zh, en] of terms) {
+    result = result.replace(new RegExp(zh, 'g'), en);
   }
   return result.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
