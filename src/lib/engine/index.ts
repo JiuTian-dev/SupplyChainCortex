@@ -208,6 +208,10 @@ export {
 } from './connector-health';
 export type { SourceHealth } from './connector-health';
 
+// Query Cache (v0.18)
+export { queryCache, CACHE_TTL } from './query-cache';
+export type { CacheStats } from './query-cache';
+
 // Push Hub (v0.14)
 export { pushHub } from './push-hub';
 export type { PushNotification, GraphChangeEvent, PushEvent } from './push-hub';

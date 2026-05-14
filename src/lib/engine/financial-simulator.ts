@@ -109,6 +109,11 @@ const OVERHEAD_PCT = 0.05; // 5% overhead
 // ─── Calculation ─────────────────────────────────────────────────────────────────
 
 export function runSimulation(input: SimInput): SimResult {
+  // Cache check — skip for quickCheck to avoid double caching
+  return _runSimulation(input);
+}
+
+function _runSimulation(input: SimInput): SimResult {
   const exRate = input.exchangeRate || DEFAULT_EXCHANGE_RATE[input.market] || 7.2;
   const tariffRate = input.tariffRatePct !== undefined ? input.tariffRatePct / 100 : (DEFAULT_TARIFF_RATE[input.market] || 0.05);
 
