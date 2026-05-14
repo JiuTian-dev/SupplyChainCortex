@@ -73,6 +73,8 @@ function buildToolRegistryPrompt(): string {
     query_cpsc_recalls: '美国CPSC中国产小家电召回',
     query_port_congestion: '全球10港拥堵状况',
     query_financial_index: '金融指数 — QQQ/SPY/SMH/^IXIC',
+    query_amazon_competitors: '亚马逊竞品数据(免费) — 品类价格趋势/竞品价格区间/单品查询',
+    query_brand_sentiment: '品牌舆情监控(免费) — Reddit/Twitter/论坛的提及/情感分析/风险信号',
     execute_workflow: '执行工作流 (action: wf-full-health/wf-cost-audit/wf-risk-scan)',
     run_sandbox: '运行供应链仿真 (scenario: baseline/trade_war/typhoon_season/perfect_storm)',
     web_search: '联网搜索最新公开信息 (query: 英文关键词)',

@@ -23,6 +23,7 @@ export interface MCPToolParameter {
   type: string;
   description: string;
   enum?: string[];
+  items?: { type: string };
 }
 
 export interface MCPTool {

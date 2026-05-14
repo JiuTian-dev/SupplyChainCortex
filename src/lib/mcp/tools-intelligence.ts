@@ -4,6 +4,7 @@
  */
 
 import type { MCPTool } from './tools';
+import { summarize } from './helpers';
 
 import {
   getSupplierPerformanceAnalytics, getCostOptimizationAnalytics,
@@ -24,26 +25,6 @@ import { executeWorkflow, detectWorkflows, getWorkflows } from '@/lib/services/m
 import { computeTariff, getTariffOverview, simulateTariffScenario } from '@/lib/services/tariff.service';
 
 import { runSandbox } from '@/lib/services/agent-sandbox.service';
-
-// ─── Shared helpers ──────────────────────────────────────────────────────────────
-
-function summarize<T>(data: T, maxItems = 20): T {
-  if (Array.isArray(data)) {
-    if (data.length > maxItems) return data.slice(0, maxItems) as T;
-  }
-  if (data && typeof data === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      if (Array.isArray(value) && value.length > maxItems) {
-        result[key] = { items: value.slice(0, maxItems), total: value.length, truncated: true, note: `显示前 ${maxItems} 条，共 ${value.length} 条` };
-      } else {
-        result[key] = value;
-      }
-    }
-    return result as T;
-  }
-  return data;
-}
 
 // ─── Tool Definitions ───────────────────────────────────────────────────────────
 
@@ -173,14 +154,14 @@ export const intelligenceTools: MCPTool[] = [
   // ── 17. query_cascade_risk ──────────────────────────────────────────────────
   {
     name: 'query_cascade_risk',
-    description: '供应链级联风险传播分析。当某个节点（港口、供应商、汇率等）发生异常，模拟风险如何沿供应链依赖关系（港口→货运→仓库→产品→客户）逐级传播。支持weather_disruption/port_congestion/exchange_shock/supplier_failure/auto场景。返回受影响产品排名、传播路径、预估收入影响。这是本项目的核心创新算法。',
+    description: '供应链级联风险传播模拟。情景驱动式仿真，模拟风险事件（供应中断、汇率冲击、关税上调、天气恶劣、港口拥堵、供应商故障等）如何沿供应链依赖关系（港口→货运→仓库→产品→客户）逐级传播，计算受影响产品排名、传播路径和预估收入影响。这是本项目的核心创新算法。如需仅查询风险状态和数据（风险仪表盘、矩阵、缓解措施、预警），请使用 query_risk 工具。',
     parameters: {
       type: 'object',
       properties: {
         scenario: {
           type: 'string',
-          enum: ['weather_disruption', 'port_congestion', 'exchange_shock', 'supplier_failure', 'auto'],
-          description: '触发场景: weather_disruption(天气,使用实时Open-Meteo数据), port_congestion(港口拥堵), exchange_shock(汇率冲击,使用实时Frankfurter数据), supplier_failure(供应商故障), auto(自动检测)',
+          enum: ['weather_disruption', 'port_congestion', 'exchange_shock', 'exchange_rate_shock', 'supplier_failure', 'supply_disruption', 'demand_spike', 'tariff_increase', 'tariff_escalation', 'auto'],
+          description: '模拟场景: weather_disruption(天气,使用实时Open-Meteo数据), port_congestion(港口拥堵), exchange_shock/exchange_rate_shock(汇率冲击,使用实时Frankfurter数据), supplier_failure(供应商故障), supply_disruption(供应中断), demand_spike(需求激增), tariff_increase/tariff_escalation(关税上调,使用实时关税数据), auto(自动检测)',
         },
         sourcePort: {
           type: 'string',
@@ -190,10 +171,20 @@ export const intelligenceTools: MCPTool[] = [
       required: [],
     },
     handler: async (params) => {
-      const scenario = (params.scenario as string) || 'auto';
+      const rawScenario = (params.scenario as string) || 'auto';
       const sourcePort = params.sourcePort as string | undefined;
+
+      // Map user-facing scenario names to engine-compatible names
+      const scenarioMap: Record<string, string> = {
+        'exchange_rate_shock': 'exchange_shock',
+        'supply_disruption': 'supplier_failure',
+        'tariff_increase': 'tariff_escalation',
+        'demand_spike': 'auto',
+      };
+      const mappedScenario = scenarioMap[rawScenario] || rawScenario;
+
       return await getCascadeRisk({
-        scenario: scenario as 'weather_disruption' | 'port_congestion' | 'exchange_shock' | 'supplier_failure' | 'auto',
+        scenario: mappedScenario as 'weather_disruption' | 'port_congestion' | 'exchange_shock' | 'supplier_failure' | 'tariff_escalation' | 'auto',
         sourcePort,
       });
     },
@@ -483,6 +474,113 @@ export const intelligenceTools: MCPTool[] = [
           congestion: p.congestionLevel, waitDays: p.avgWaitDays,
           vesselsWaiting: p.vesselsWaiting, trend: p.trend,
         })),
+      };
+    },
+  },
+
+  // ── 28. query_financial_index ───────────────────────────────────────────
+  {
+    name: 'query_financial_index',
+    description: '查询金融市场指数：纳斯达克100(QQQ)、标普500(SPY)、半导体指数(SMH)、纳斯达克综合(^IXIC)。可用于分析科技股/芯片股走势对供应链的影响。',
+    parameters: {
+      type: 'object',
+      properties: {
+        symbols: {
+          type: 'array',
+          items: { type: 'string' },
+          description: '指数代码列表，默认全部: QQQ, SPY, SMH, ^IXIC',
+        },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { queryFinancialIndices, formatIndexSummary } = await import('@/lib/sources/financial-indices');
+      const symbols = params.symbols as string[] | undefined;
+      const results = await queryFinancialIndices(symbols);
+      return {
+        indices: results,
+        summary: formatIndexSummary(results),
+        note: '数据来源 Alpha Vantage，缓存30分钟。免费层限25次/天。',
+      };
+    },
+  },
+
+  // ── Amazon Competitor Intelligence ──────────────────────────────────────────
+  {
+    name: 'query_amazon_competitors',
+    description: '查询亚马逊竞品数据 — 品类价格趋势、竞争对手价格区间、产品信息。数据源: PricePilot MCP(免费) + 联网搜索。适用于了解竞品定价和市场格局。',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: '产品关键词，如 "coffee maker" 或 "vacuum cleaner"' },
+        category: { type: 'string', description: '亚马逊品类名，如 "coffee-makers" "vacuums" "blenders"' },
+        action: { type: 'string', description: 'overview(竞品总览) | trends(品类趋势) | lookup(单品查询)' },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { fetchCompetitorPrices, fetchCategoryTrends, lookupProduct } = await import('@/lib/sources/amazon-competitor');
+      const action = params.action as string || 'overview';
+      const keyword = params.keyword as string || 'small kitchen appliance';
+      const category = params.category as string;
+
+      if (action === 'trends') {
+        const cats = category ? [category] : ['coffee-makers', 'vacuums', 'blenders', 'air-fryers'];
+        const trends = await fetchCategoryTrends(cats);
+        return { trends, note: '数据源: PricePilot MCP(免费) + Web Search fallback' };
+      }
+
+      if (action === 'lookup') {
+        const product = await lookupProduct(keyword);
+        return { product, note: '数据源: Web Search(免费)' };
+      }
+
+      const prices = await fetchCompetitorPrices(keyword, category);
+      return { prices, keyword, category, note: '数据源: PricePilot MCP(免费) + Web Search fallback。价格区间为估算值，精确数据需接入Keepa/JungleScout API。' };
+    },
+  },
+
+  // ── Brand Sentiment & Social Monitoring ─────────────────────────────────────
+  {
+    name: 'query_brand_sentiment',
+    description: '查询品牌/产品的社交媒体舆情 — Reddit、Twitter/X、论坛的提及、情感分析、风险信号检测。免费，基于联网搜索。适用于监控产品口碑、竞品动态、质量风险预警。',
+    parameters: {
+      type: 'object',
+      properties: {
+        brand: { type: 'string', description: '品牌或产品名称，如 "Cosori air fryer" 或 "Govee humidifier"' },
+        action: { type: 'string', description: 'full(完整报告) | quick(快速风险扫描) | reviews(差评监控)' },
+      },
+      required: ['brand'],
+    },
+    handler: async (params) => {
+      const { generateSentimentReport, quickRiskScan, monitorProductReviews } = await import('@/lib/sources/social-sentiment');
+      const brand = params.brand as string;
+      const action = params.action as string || 'full';
+
+      if (action === 'quick') {
+        const scan = await quickRiskScan(brand);
+        return { ...scan, note: '快速风险扫描基于搜索摘要，完整报告需进一步分析。' };
+      }
+
+      if (action === 'reviews') {
+        const signals = await monitorProductReviews(brand);
+        return {
+          product: brand,
+          negativeSignalCount: signals.length,
+          signals: signals.slice(0, 10),
+          riskFlags: [...new Set(signals.flatMap(s => {
+            const lower = (s.title + ' ' + s.snippet).toLowerCase();
+            const flags = ['recall', 'fire', 'defective', 'dangerous', 'shock', 'broke'];
+            return flags.filter(f => lower.includes(f));
+          }))],
+          note: '基于搜索结果提取的负面信号。建议结合CPSC召回数据库交叉验证。',
+        };
+      }
+
+      const report = await generateSentimentReport(brand);
+      return {
+        ...report,
+        note: `情感评分: ${report.sentimentScore} (范围 -1到+1)。数据源: 联网搜索(免费)。`,
       };
     },
   },

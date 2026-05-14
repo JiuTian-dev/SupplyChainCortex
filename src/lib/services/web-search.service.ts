@@ -485,7 +485,7 @@ export async function searchSupplementary(query: string): Promise<{ reddit: Sear
 /**
  * Format search results as context for LLM prompt injection.
  */
-export function formatSearchContext(results: SearchResult[]): string {
+export function formatSearchContext(results: SearchResult[], maxResults = 6): string {
   if (results.length === 0) {
     const provider = getConfig().provider;
     if (provider === 'searxng') {
@@ -555,7 +555,7 @@ export function formatSearchContext(results: SearchResult[]): string {
   const header = `📡 联网搜索结果 (${tagged.length}条，[权威]=政府/媒体/机构 [博客]=个人分析 [社区]=论坛)。
 ⚠️ 优先使用内置MCP工具的精准数据。搜索结果用于补充政策背景和行业动态，可能包含过时或主观内容。\n`;
 
-  return header + tagged.join('\n\n');
+  return header + tagged.slice(0, maxResults).join('\n\n');
 }
 
 /**
