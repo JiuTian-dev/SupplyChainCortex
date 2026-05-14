@@ -290,7 +290,7 @@ async function handleReActStream(
           apiKey,
           enableWebSearch: webSearchEnabled,
           enableRAG: true,
-          maxRounds: 5,
+          maxRounds: 8,
           temperature: 0.7,
           maxTokens: 4000,
         });
@@ -374,7 +374,7 @@ async function handleReActNonStream(
       apiKey,
       enableWebSearch: webSearchEnabled,
       enableRAG: true,
-      maxRounds: 5,
+      maxRounds: 8,
     });
 
     for await (const event of eventStream) {
