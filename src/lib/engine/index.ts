@@ -168,3 +168,18 @@ export {
   getKnowledgeHealth,
   getChunksNeedingReview,
 } from './rag';
+
+// Graph-RAG (v0.11)
+export {
+  buildGraph, getGraph, refreshGraph, searchNodes,
+  getNeighbors, getUpstream, summarizeGraph,
+} from './graph-store';
+export type { SupplyChainGraph, GraphNode, GraphEdge } from './graph-store';
+export {
+  cascadePropagation, betweennessCentrality, findPath, impactRadius,
+} from './graph-algorithms';
+export type { CascadeResult, CentralityResult, PathResult } from './graph-algorithms';
+export {
+  buildGraphContext, formatGraphContext,
+} from './graph-rag';
+export type { GraphContext } from './graph-rag';

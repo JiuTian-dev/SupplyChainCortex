@@ -10,6 +10,7 @@
 
 import { db } from '@/lib/db';
 import { agentMemory, type SharedContext } from '@/lib/engine/memory';
+import { buildGraphContext, formatGraphContext } from '@/lib/engine/graph-rag';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -314,13 +315,23 @@ export function formatBriefingContext(briefing: AgentBriefing): string {
 }
 
 /**
- * One-shot: gather briefing and format it for prompt injection.
- * Returns empty string on failure (graceful degradation).
+ * One-shot: gather briefing + graph context and format for prompt injection.
+ * The query parameter enables entity extraction for targeted graph analysis.
  */
-export async function buildDynamicSystemContext(): Promise<string> {
+export async function buildDynamicSystemContext(query?: string): Promise<string> {
   try {
     const briefing = await gatherBriefing();
-    return formatBriefingContext(briefing);
+    let context = formatBriefingContext(briefing);
+
+    // Add graph context if query mentions supply chain entities
+    if (query) {
+      try {
+        const graphCtx = await buildGraphContext(query);
+        context += '\n' + formatGraphContext(graphCtx);
+      } catch { /* graph is best-effort */ }
+    }
+
+    return context;
   } catch (err) {
     console.error('[ContextBuilder] Failed to gather briefing:', err);
     return '';

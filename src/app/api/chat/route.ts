@@ -279,7 +279,7 @@ async function handleReActStream(
       try {
         // Build dynamic context from live supply chain state
         enqueue('thinking', { status: 'context' });
-        const dynamicContext = await buildDynamicSystemContext();
+        const dynamicContext = await buildDynamicSystemContext(message);
 
         enqueue('thinking', { status: 'analyzing' });
 
@@ -365,7 +365,7 @@ async function handleReActNonStream(
   let passport: Record<string, unknown> | undefined;
 
   try {
-    const dynamicContext = await buildDynamicSystemContext();
+    const dynamicContext = await buildDynamicSystemContext(message);
 
     const eventStream = runReActAgent(message, history, dynamicContext, {
       provider,
