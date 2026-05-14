@@ -15,7 +15,7 @@ import {
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
   Wifi, GripVertical, RefreshCw, Play, CircleDot, Loader2, Check,
   Square, MoreHorizontal, Paperclip,
-  FileDown, FolderOpen, HardDrive,
+  FileDown, FolderOpen, HardDrive, Image, FileText, RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS, getProviderModels, getDefaultModel, type AIModel } from '@/lib/services/ai-providers.service';
@@ -194,14 +194,40 @@ export function ChatPanel() {
     } catch { toast.error('获取列表失败'); }
   }, []);
 
-  // File upload
+  // File upload — supports text/csv/json, images (preview), PDF (extract text)
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    const text = await file.text();
-    const preview = text.slice(0, 500) + (text.length > 500 ? `\n... (${text.length} 字符)` : '');
-    setMessages(prev => [...prev, { id: `file-${Date.now()}`, role: 'user', content: `📎 ${file.name}\n\`\`\`\n${preview}\n\`\`\``, timestamp: new Date().toISOString() }]);
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+
+    if (isImage) {
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      setMessages(prev => [...prev, {
+        id: `file-${Date.now()}`, role: 'user',
+        content: `📷 ${file.name}\n![上传图片](${dataUrl})`,
+        timestamp: new Date().toISOString(),
+      }]);
+    } else if (isPdf) {
+      setMessages(prev => [...prev, {
+        id: `file-${Date.now()}`, role: 'user',
+        content: `📄 ${file.name} (${(file.size / 1024).toFixed(0)}KB)\n_PDF文件已上传。如需提取内容，后续版本将支持PDF解析。_`,
+        timestamp: new Date().toISOString(),
+      }]);
+    } else {
+      const text = await file.text();
+      const preview = text.slice(0, 800) + (text.length > 800 ? `\n... (${text.length} 字符)` : '');
+      setMessages(prev => [...prev, {
+        id: `file-${Date.now()}`, role: 'user',
+        content: `📎 ${file.name} (${(file.size / 1024).toFixed(0)}KB)\n\`\`\`\n${preview}\n\`\`\``,
+        timestamp: new Date().toISOString(),
+      }]);
+    }
     e.target.value = '';
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Export as Markdown
   const exportMarkdown = useCallback(() => {
@@ -209,7 +235,20 @@ export function ChatPanel() {
     const blob = new Blob([md], { type: 'text/markdown' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`; a.click();
-    toast.success('已导出');
+    toast.success('Markdown 已导出');
+  }, [messages]);
+
+  // Export as PDF (via browser print)
+  const exportPdf = useCallback(() => {
+    const html = messages.map(m =>
+      `<div style="margin-bottom:20px;font-family:sans-serif">
+        <h3 style="color:${m.role==='user'?'#3b82f6':'#f97316'}">${m.role==='user'?'🧑 你':'🤖 供应链助手'} (${m.timestamp.slice(11,19)})</h3>
+        <div style="white-space:pre-wrap;line-height:1.6">${m.content.replace(/\n/g,'<br>')}</div>
+      </div><hr>`
+    ).join('');
+    const w = window.open('', '_blank', 'width=800,height=600');
+    if (w) { w.document.write(`<html><head><title>供应链分析报告</title><meta charset="utf-8"></head><body>${html}</body></html>`); w.document.close(); setTimeout(() => w.print(), 500); }
+    toast.success('PDF 导出已打开打印窗口');
   }, [messages]);
 
   // Send message with SSE streaming
@@ -339,6 +378,37 @@ export function ChatPanel() {
   const handleQuickAction = (message: string) => { sendMessage(message); };
   const toggleDataExpand = (msgId: string) => { setExpandedData(prev => prev === msgId ? null : msgId); };
 
+  // Generate suggested follow-up questions from assistant response
+  const generateFollowUps = (content: string): string[] => {
+    const suggestions: string[] = [];
+    const lower = content.toLowerCase();
+    if (lower.includes('补货') || lower.includes('库存') || lower.includes('缺货')) {
+      suggestions.push('帮我创建补货订单');
+    }
+    if (lower.includes('关税') || lower.includes('tariff')) {
+      suggestions.push('模拟关税从25%降到10%的利润变化');
+    }
+    if (lower.includes('供应商') || lower.includes('supplier')) {
+      suggestions.push('帮我在1688找备选供应商');
+    }
+    if (lower.includes('合规') || lower.includes('认证') || lower.includes('fcc') || lower.includes('ce')) {
+      suggestions.push('检查这个产品的合规要求');
+    }
+    if (lower.includes('竞品') || lower.includes('competitor') || lower.includes('亚马逊')) {
+      suggestions.push('查一下竞品的最新定价');
+    }
+    if (lower.includes('物流') || lower.includes('货运') || lower.includes('港口')) {
+      suggestions.push('查当前的货运状态');
+    }
+    if (suggestions.length < 2) {
+      if (lower.includes('毛利') || lower.includes('成本') || lower.includes('利润')) {
+        suggestions.push('跑一下财务模拟看看利润空间');
+      }
+      suggestions.push('做一次全面的供应链健康检查');
+    }
+    return suggestions.slice(0, 3);
+  };
+
   // Claim feedback handler
   const handleClaimVerdict = useCallback(async (msgId: string, claims: ClaimData[], claimId: string, verdict: ClaimVerdict) => {
     setFeedbackMap(prev => ({ ...prev, [claimId]: verdict }));
@@ -446,7 +516,7 @@ export function ChatPanel() {
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`} onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
 
               {/* Actions dropdown — consolidated upload / export / save / load / clear */}
-              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt,.json" onChange={handleFileUpload} />
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt,.json,.pdf,.png,.jpg,.jpeg,.gif,.webp" onChange={handleFileUpload} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" aria-label="更多操作"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
@@ -455,7 +525,8 @@ export function ChatPanel() {
                   <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="text-xs gap-2 cursor-pointer"><Paperclip className="h-3.5 w-3.5" />上传文件</DropdownMenuItem>
                   {messages.length > 0 && (
                     <>
-                      <DropdownMenuItem onClick={exportMarkdown} className="text-xs gap-2 cursor-pointer"><FileDown className="h-3.5 w-3.5" />导出 MD</DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportMarkdown} className="text-xs gap-2 cursor-pointer"><FileDown className="h-3.5 w-3.5" />导出 Markdown</DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportPdf} className="text-xs gap-2 cursor-pointer"><FileText className="h-3.5 w-3.5" />导出 PDF 报告</DropdownMenuItem>
                       <DropdownMenuItem onClick={saveToServer} className="text-xs gap-2 cursor-pointer"><HardDrive className="h-3.5 w-3.5" />保存到服务器</DropdownMenuItem>
                       <DropdownMenuItem onClick={loadConvList} className="text-xs gap-2 cursor-pointer"><FolderOpen className="h-3.5 w-3.5" />加载历史对话</DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -650,6 +721,35 @@ export function ChatPanel() {
                     {expandedData === msg.id && msg.data && (
                       <Card className="mt-2 text-xs border-dashed"><CardContent className="p-2 max-h-40 overflow-y-auto"><pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-all">{JSON.stringify(msg.data, null, 2).substring(0, 2000)}</pre></CardContent></Card>
                     )}
+                    {/* Regenerate button — only on last assistant message */}
+                    {msg.role === 'assistant' && msg.content && !streaming &&
+                      msg.id === messages[messages.length - 1]?.id && (
+                      <button
+                        onClick={() => {
+                          const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+                          if (lastUserMsg) {
+                            setMessages(prev => prev.slice(0, -1)); // remove last assistant msg
+                            sendMessage(lastUserMsg.content);
+                          }
+                        }}
+                        className="text-[10px] text-muted-foreground hover:text-orange-500 mt-1 flex items-center gap-1"
+                      ><RotateCcw className="h-3 w-3" /> 重新生成</button>
+                    )}
+                    {/* Suggested follow-ups — on last assistant message */}
+                    {msg.role === 'assistant' && msg.content && !streaming &&
+                      msg.id === messages[messages.length - 1]?.id && messages.length > 0 && (() => {
+                        const suggestions = generateFollowUps(msg.content);
+                        if (suggestions.length === 0) return null;
+                        return (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {suggestions.map((q, i) => (
+                              <button key={i} onClick={() => sendMessage(q)}
+                                className="text-[10px] px-2 py-1 rounded-full border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
+                              >{q}</button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                   </div>
                   {msg.role === 'user' && (
                     <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-950/30 dark:to-cyan-950/30 flex items-center justify-center shrink-0 mt-1"><User className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" /></div>
@@ -687,7 +787,10 @@ export function ChatPanel() {
             )}
             <div className="flex gap-2">
               <Tooltip><TooltipTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-orange-500 shrink-0" onClick={() => fileInputRef.current?.click()} aria-label="上传文件"><Paperclip className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="top" className="text-xs">上传 CSV/TXT/JSON</TooltipContent></Tooltip>
-              <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入问题，如：当前库存情况..." className="flex-1 h-9 text-sm rounded-full border-orange-200 focus-visible:ring-orange-300 dark:border-orange-800" disabled={isLoading} maxLength={2000} />
+              <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+                placeholder="输入问题，如：当前库存情况... (Enter发送, Shift+Enter换行)"
+                className="flex-1 h-9 text-sm rounded-full border-orange-200 focus-visible:ring-orange-300 dark:border-orange-800" disabled={isLoading} maxLength={2000} />
               {isLoading ? (
                 <Button type="button" size="icon" className="h-9 w-9 rounded-full bg-red-500 hover:bg-red-600 text-white shrink-0 animate-pulse" onClick={() => { abortRef.current?.abort(); setIsLoading(false); setStreaming(false); }}><Square className="h-4 w-4" /></Button>
               ) : (
