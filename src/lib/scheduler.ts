@@ -176,8 +176,67 @@ async function jobAlertCheck(): Promise<JobResult> {
   try {
     const { getCascadeRisk } = await import('@/lib/services/cascade-risk.service');
     const { runAlertCycle } = await import('@/lib/services/alert-engine.service');
+    const { buildNotifications } = await import('@/lib/services/notifications.service');
+    const { pushHub } = await import('@/lib/engine/push-hub');
+    const { getGraph, adjustEdgeWeight } = await import('@/lib/engine/graph-store');
+
     const risk = await getCascadeRisk({ scenario: 'auto', includeForwardProjection: false, includeCounterfactuals: false });
     const count = await runAlertCycle(risk);
+
+    // Push notifications in real-time
+    try {
+      const notifications = await buildNotifications();
+      const criticalNew = notifications.filter(n => n.severity === 'critical');
+      const warningNew = notifications.filter(n => n.severity === 'warning');
+      const toPush = [...criticalNew.slice(0, 5), ...warningNew.slice(0, 3)];
+      pushHub.emitNotificationBatch(toPush);
+    } catch { /* push is best-effort */ }
+
+    // Graph change detection
+    try {
+      const graph = await getGraph();
+      let graphChanges = 0;
+
+      // Check for supplier nodes with high edge weights (degrading supplier reliability)
+      for (const [nodeId, node] of graph.nodes) {
+        if (node.type !== 'supplier') continue;
+        const outEdges = graph.outgoingEdges.get(nodeId) || [];
+        for (const edge of outEdges) {
+          // Edge weight > 0.7 means high risk — supplier is degrading
+          if (edge.weight > 0.7 && edge.type === 'SUPPLIED_BY') {
+            pushHub.emitGraphChange({
+              nodeId,
+              nodeLabel: node.label,
+              changeType: 'risk_spike',
+              oldValue: 0.5,
+              newValue: edge.weight,
+              message: `供应商 ${node.label} 风险评分上升至 ${(edge.weight * 100).toFixed(0)}%`,
+              severity: edge.weight > 0.85 ? 'warning' : 'info',
+              timestamp: new Date().toISOString(),
+            });
+            graphChanges++;
+          }
+          // Edge weight < 0.1 means the relationship is nearly gone
+          if (edge.weight < 0.1 && edge.weight > 0 && edge.type === 'SUPPLIED_BY') {
+            pushHub.emitGraphChange({
+              nodeId,
+              nodeLabel: node.label,
+              changeType: 'edge_removed',
+              oldValue: edge.weight,
+              message: `供应商 ${node.label} 的关系权重降至极低 (${(edge.weight * 100).toFixed(0)}%)`,
+              severity: 'info',
+              timestamp: new Date().toISOString(),
+            });
+            graphChanges++;
+          }
+        }
+      }
+
+      if (graphChanges > 0) {
+        console.log(`[AlertCheck] Pushed ${graphChanges} graph change alerts`);
+      }
+    } catch { /* graph is best-effort */ }
+
     return { job: 'AlertCheck', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
   } catch (err) {
     return { job: 'AlertCheck', status: 'error', durationMs: Date.now() - start, error: String(err) };

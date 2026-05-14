@@ -21,11 +21,12 @@ import { getDashboardMetrics, getInventoryDistribution } from '@/lib/queries/das
 import { getAlertTimeline } from '@/lib/services/inventory.service';
 import { getShipmentList } from '@/lib/services/logistics.service';
 import { getEvents } from '@/lib/queries/events.queries';
-import { pingAllConnectors } from '@/lib/queries/connector-health.queries';
+import { getConnectorHealth } from '@/lib/mcp/connector-health';
 import { getLatestRates } from '@/lib/queries/exchange-rate.queries';
 import { getPortWeatherSummary } from '@/lib/services/weather.service';
 import { setCostSseBroadcaster } from '@/lib/services/cost.service';
 import { cachedFetch, cacheKey, CACHE_TTL } from '@/lib/cache';
+import { pushHub, type PushEvent } from '@/lib/engine/push-hub';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ function formatHeartbeat(): string {
 /** Fetch connector health data for SSE push */
 async function fetchConnectorHealthPayload() {
   try {
-    const connectors = await pingAllConnectors();
+    const connectors = await getConnectorHealth();
     return { connectors, timestamp: new Date().toISOString() };
   } catch {
     return null;
@@ -241,6 +242,26 @@ export async function GET(request: NextRequest) {
       // Wire cost service SSE broadcaster (so FX rate changes push to connected clients)
       setCostSseBroadcaster((event, data) => {
         enqueue(formatSSE(event, data as Record<string, unknown>));
+      });
+
+      // ── Push Hub subscription (event-driven, replaces polling for alerts) ──
+      const pushUnsubscribe = pushHub.subscribe((event: PushEvent) => {
+        if (closed) return;
+        try {
+          switch (event.type) {
+            case 'notification':
+              enqueue(formatSSE('notification', { ...event.data, source: 'push' }));
+              break;
+            case 'graph-change':
+              enqueue(formatSSE('graph-change', { ...event.data, source: 'push' }));
+              break;
+            case 'alert-summary':
+              enqueue(formatSSE('alert-summary', { ...event.data, source: 'push' }));
+              break;
+          }
+        } catch {
+          // Client disconnected
+        }
       });
 
       // ── Heartbeat (every 30s) ──
@@ -430,6 +451,7 @@ export async function GET(request: NextRequest) {
       request.signal.addEventListener('abort', () => {
         closed = true;
         clearAllTimers();
+        pushUnsubscribe();
         try { controller.close(); } catch { /* already closed */ }
       });
     },

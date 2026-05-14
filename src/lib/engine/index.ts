@@ -207,3 +207,7 @@ export {
   registerSource,
 } from './connector-health';
 export type { SourceHealth } from './connector-health';
+
+// Push Hub (v0.14)
+export { pushHub } from './push-hub';
+export type { PushNotification, GraphChangeEvent, PushEvent } from './push-hub';

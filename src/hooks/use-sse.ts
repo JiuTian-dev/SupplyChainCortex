@@ -77,6 +77,7 @@ export function useSSE() {
   const queryClient = useQueryClient();
   const setWsConnected = useConnectionStore((s) => s.setWsConnected);
   const wsConnected = useConnectionStore((s) => s.wsConnected);
+  const refreshHealth = useConnectionStore((s) => s.refreshHealth);
   const registerReconnect = useConnectionStore((s) => s.registerReconnect);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
@@ -103,6 +104,8 @@ export function useSSE() {
         if (process.env.NODE_ENV === 'development') console.log('[SSE] Connected');
         reconnectAttemptsRef.current = 0;
         setWsConnected(true);
+        // Seed connector health immediately (SSE pushes every 90 s, first at 5 s)
+        refreshHealth();
       });
 
       // ── Dashboard update ──
@@ -133,6 +136,32 @@ export function useSSE() {
         } catch (err) {
           if (process.env.NODE_ENV === 'development') console.warn('[SSE] Failed to parse notification:', err);
         }
+      });
+
+      // ── Graph change event (v0.14 push hub) ──
+      eventSource.addEventListener('graph-change', (e) => {
+        try {
+          const change = JSON.parse(e.data);
+          if (process.env.NODE_ENV === 'development') console.log('[SSE] graph-change', change.message);
+          if (change.severity === 'warning') {
+            toast.warning('图谱变化', { description: change.message });
+          }
+          // Graph changes are informational — don't spam for 'info' level
+        } catch (err) {
+          if (process.env.NODE_ENV === 'development') console.warn('[SSE] Failed to parse graph-change:', err);
+        }
+      });
+
+      // ── Alert summary event (v0.14 push hub) ──
+      eventSource.addEventListener('alert-summary', (e) => {
+        try {
+          const summary = JSON.parse(e.data);
+          if (summary.critical > 0) {
+            toast.error(`${summary.critical} 个严重告警`, {
+              description: `共 ${summary.total} 个告警，其中 ${summary.warning} 个警告`,
+            });
+          }
+        } catch { /* ignore parse errors */ }
       });
 
       // ── Inventory alert ──
@@ -260,7 +289,7 @@ export function useSSE() {
       }
       setWsConnected(false);
     };
-  }, [setWsConnected, registerReconnect, addNotification, queryClient]);
+  }, [setWsConnected, refreshHealth, registerReconnect, addNotification, queryClient]);
 
   return { connected: wsConnected };
 }
