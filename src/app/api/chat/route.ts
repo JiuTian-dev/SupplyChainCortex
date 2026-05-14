@@ -15,7 +15,7 @@ import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
 import { runReActAgent } from '@/lib/engine/react-agent';
-import { buildDynamicSystemContext } from '@/lib/engine/context-builder';
+import { buildDynamicSystemContext, rememberConversationTurn } from '@/lib/engine/context-builder';
 import {
   chatCompletionStream,
   chatCompletion,
@@ -391,6 +391,11 @@ async function handleReActNonStream(
     if (!fullResponse.trim() && hadError) {
       console.warn('[ReAct] No content produced, falling back to hybrid mode. Error:', errorMsg);
       return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
+    }
+
+    // Remember this conversation turn for multi-turn context
+    if (fullResponse.trim()) {
+      rememberConversationTurn(message, fullResponse);
     }
 
     return NextResponse.json({

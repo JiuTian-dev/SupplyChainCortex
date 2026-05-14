@@ -160,3 +160,11 @@ export type {
   ToolPolicy,
   AutonomyPolicy,
 } from './autonomy-policy';
+
+// RAG Knowledge Evolution (v0.9)
+export {
+  evolveFromFeedback,
+  updateChunkScore,
+  getKnowledgeHealth,
+  getChunksNeedingReview,
+} from './rag';

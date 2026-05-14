@@ -12,6 +12,8 @@ import { withErrorHandler } from '@/lib/api-utils';
 import { runCalibration } from '@/lib/engine/calibration';
 import { setConfigVersion } from '@/lib/engine/cache';
 import { updateWeights, getCalibratedWeights, buildConfidenceWeights, loadWeightsFromDB } from '@/lib/engine/weights';
+import { evolveFromFeedback, getKnowledgeHealth, getChunksNeedingReview } from '@/lib/engine/rag';
+import { getSourceReliabilityMap } from '@/lib/engine/evidence-feedback';
 import { db } from '@/lib/db';
 import crypto from 'crypto';
 
@@ -23,10 +25,53 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   const report = await runCalibration();
 
+  // ── Weights: detailed Bayesian weight status ────────────────────────
+  if (action === 'weights') {
+    const current = getCalibratedWeights('cascade-risk');
+    const persisted = await loadWeightsFromDB('cascade-risk');
+
+    return NextResponse.json({
+      success: true,
+      current: {
+        sources: current.sources.map(s => ({
+          source: s.source, weight: s.weight,
+          alpha: s.alpha, beta: s.beta,
+          sampleSize: s.sampleSize, lastUpdated: s.lastUpdated,
+        })),
+        totalSamples: current.totalSamples,
+        calibratedAt: current.calibratedAt,
+      },
+      persisted: persisted ? {
+        sources: persisted.sources.map(s => ({
+          source: s.source, weight: s.weight,
+          alpha: s.alpha, beta: s.beta,
+          sampleSize: s.sampleSize, lastUpdated: s.lastUpdated,
+        })),
+        totalSamples: persisted.totalSamples,
+        calibratedAt: persisted.calibratedAt,
+      } : null,
+      // Beta distribution confidence intervals for each source
+      confidence: current.sources.map(s => {
+        const n = s.alpha + s.beta;
+        const p = s.alpha / n;
+        // Approximate 95% CI for Beta: p +/- 1.96 * sqrt(p*(1-p)/n)
+        const se = Math.sqrt((p * (1 - p)) / Math.max(n, 1));
+        return {
+          source: s.source,
+          mean: Math.round(p * 1000) / 1000,
+          ci95Lower: Math.round(Math.max(0, p - 1.96 * se) * 1000) / 1000,
+          ci95Upper: Math.round(Math.min(1, p + 1.96 * se) * 1000) / 1000,
+          stability: n > 30 ? 'high' : n > 10 ? 'medium' : 'low',
+        };
+      }),
+      report,
+    });
+  }
+
   // ── Apply: auto-calibrate weights from feedback ─────────────────
   if (action === 'apply') {
     const before = getCalibratedWeights('cascade-risk');
-    const feedbacks = await db.feedbackLog.findMany({ take: 200 });
+    const feedbacks = await (db as unknown as Record<string, { findMany: (a: Record<string, unknown>) => Promise<Array<{ engine: string; action: string }>> }>).feedbackLog?.findMany({ take: 200 }) || [];
 
     const inputs = feedbacks.map(f => ({
       engine: f.engine,
@@ -59,6 +104,21 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     });
   }
 
+  // ── RAG Evolve: update knowledge base from evidence feedback ────
+  if (action === 'rag-evolve') {
+    const sourceReliability = getSourceReliabilityMap();
+    const result = evolveFromFeedback(sourceReliability);
+    const health = getKnowledgeHealth();
+
+    return NextResponse.json({
+      success: true,
+      sourceReliability,
+      knowledgeEvolution: result,
+      knowledgeHealth: health,
+      needsReview: getChunksNeedingReview().map(c => ({ id: c.id, title: c.title, score: (c as unknown as { usefulnessScore: number }).usefulnessScore })),
+    });
+  }
+
   // ── Rollback: restore last persisted weights ───────────────────
   if (action === 'rollback') {
     const persisted = await loadWeightsFromDB('cascade-risk');
@@ -75,13 +135,32 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     });
   }
 
+  const currentWeights = getCalibratedWeights('cascade-risk');
+  const persistedWeights = await loadWeightsFromDB('cascade-risk');
+
   const calHash = crypto.createHash('sha256')
     .update(JSON.stringify(report.engines))
     .digest('hex')
     .slice(0, 12);
   setConfigVersion(calHash);
 
-  return NextResponse.json({ success: true, report });
+  return NextResponse.json({
+    success: true,
+    report,
+    sourceWeights: currentWeights.sources.map(s => ({
+      source: s.source, weight: s.weight,
+      sampleSize: s.sampleSize, lastUpdated: s.lastUpdated,
+    })),
+    weightTrend: persistedWeights ? currentWeights.sources.map(s => {
+      const prev = persistedWeights!.sources.find(p => p.source === s.source);
+      return {
+        source: s.source,
+        current: s.weight,
+        previous: prev?.weight ?? s.weight,
+        delta: prev ? Math.round((s.weight - prev.weight) * 10000) / 10000 : 0,
+      };
+    }) : null,
+  });
 });
 
 /** Infer which data source a decision engine primarily depends on */

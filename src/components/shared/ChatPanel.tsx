@@ -7,15 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   MessageSquare, X, Send, Bot, User, Sparkles, ChevronDown,
   Package, DollarSign, TrendingUp, Ship, Building2, Shield, BarChart3,
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
-  Download, Upload,
   Wifi, GripVertical, RefreshCw, Play, CircleDot, Loader2, Check,
-  Square,
+  Square, MoreHorizontal, Paperclip,
+  FileDown, FolderOpen, HardDrive,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS, getProviderModels, getDefaultModel, type AIModel } from '@/lib/services/ai-providers.service';
@@ -29,6 +29,7 @@ import {
   renderMarkdown, CopyButton, TypingIndicator,
   fetchOllamaModels, fmtBytes,
 } from './ChatPanel.helpers';
+import { ClaimLabel, parseClaimsFromText, type ClaimData, type ClaimVerdict, type FeedbackClaimsMap } from './ClaimLabel';
 
 // ─── ChatPanel Component ──────────────────────────────────────────────────────
 
@@ -46,9 +47,10 @@ export function ChatPanel() {
   const [selectedModel, setSelectedModel] = useState<string>('deepseek-chat');
   const [apiKey, setApiKey] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState<boolean | undefined>(undefined);
   const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [feedbackMap, setFeedbackMap] = useState<FeedbackClaimsMap>({});
   const [testingConnection, setTestingConnection] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [scanningOllama, setScanningOllama] = useState(false);
@@ -235,7 +237,7 @@ export function ChatPanel() {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, webSearch: webSearchEnabled }),
+        body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
         signal: abortController.signal,
       });
 
@@ -283,16 +285,22 @@ export function ChatPanel() {
               setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: accumulatedContent || '查询完成，但未能生成回复。', toolsUsed: finalToolsUsed, data: Object.keys(toolResults).length > 0 ? toolResults : undefined } : msg));
               break;
             }
+            case 'error': {
+              const errMsg = sseEvent.data.message as string || '服务端处理异常';
+              setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: `⚠️ ${errMsg}` } : msg));
+              break;
+            }
+            // heartbeats, comments, unknown events — silently ignored
           }
         }
       }
-    } catch (error) {
+    } catch (streamError) {
       if (abortController.signal.aborted) return;
-      if (process.env.NODE_ENV === 'development') console.warn('SSE streaming failed, falling back:', error);
+      console.warn('SSE streaming failed, falling back to non-streaming:', streamError);
       try {
         const fallbackResponse = await fetch('/api/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text.trim(), history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined }),
+          body: JSON.stringify({ message: text.trim(), history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
         });
         const result = await fallbackResponse.json();
         if (result.success && result.data) {
@@ -307,11 +315,39 @@ export function ChatPanel() {
       setIsLoading(false); setStreaming(false); setThinking(false);
       setStreamingToolCalls([]); abortRef.current = null;
     }
-  }, [isLoading, messages, selectedModel, selectedProvider, apiKey]);
+  }, [isLoading, messages, selectedModel, selectedProvider, apiKey, webSearchEnabled]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };
   const handleQuickAction = (message: string) => { sendMessage(message); };
   const toggleDataExpand = (msgId: string) => { setExpandedData(prev => prev === msgId ? null : msgId); };
+
+  // Claim feedback handler
+  const handleClaimVerdict = useCallback(async (msgId: string, claims: ClaimData[], claimId: string, verdict: ClaimVerdict) => {
+    setFeedbackMap(prev => ({ ...prev, [claimId]: verdict }));
+
+    // Collect all claims with their current verdicts for this message
+    const updatedClaims = claims.map(c => ({
+      claimId: c.id,
+      claimText: c.text,
+      citedSource: c.source,
+      statedConfidence: c.confidence,
+      verdict: c.id === claimId ? verdict : (feedbackMap[c.id] || 'unverified' as ClaimVerdict),
+    }));
+
+    // Fire-and-forget POST to feedback API
+    try {
+      await fetch('/api/engine-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auditId: `chat-${msgId}`,
+          engine: 'chat-agent',
+          action: verdict === 'accurate' ? 'accepted' : 'modified',
+          claims: updatedClaims,
+        }),
+      });
+    } catch { /* non-blocking */ }
+  }, [feedbackMap]);
 
   // ─── Render: Floating Entry Button ──────────────────────────────────────────
 
@@ -353,6 +389,7 @@ export function ChatPanel() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Model selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-7 gap-1 text-white/90 hover:text-white hover:bg-white/20 text-xs">
@@ -383,20 +420,34 @@ export function ChatPanel() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${webSearchEnabled ? 'bg-green-500/30 text-green-400' : ''}`} onClick={() => { setWebSearchEnabled(!webSearchEnabled); if (!webSearchEnabled) toast.success('联网搜索已开启'); else toast.success('联网搜索已关闭'); }} aria-label="联网搜索"><Globe className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">{webSearchEnabled ? '联网搜索: 开' : '联网搜索: 关'}</TooltipContent></Tooltip>
+
+              {/* Web search toggle */}
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${webSearchEnabled === true ? 'bg-green-500/30 text-green-400' : webSearchEnabled === false ? 'bg-red-500/20 text-red-300' : ''}`} onClick={() => { const next = webSearchEnabled === undefined ? true : webSearchEnabled === true ? false : undefined; setWebSearchEnabled(next); if (next === true) toast.success('联网搜索: 强制开启'); else if (next === false) toast.success('联网搜索: 强制关闭'); else toast.success('联网搜索: 自动检测'); }} aria-label="联网搜索"><Globe className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">{webSearchEnabled === true ? '搜索: 开' : webSearchEnabled === false ? '搜索: 关' : '搜索: 自动'}</TooltipContent></Tooltip>
+
+              {/* Settings */}
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`} onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
+
+              {/* Actions dropdown — consolidated upload / export / save / load / clear */}
               <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt,.json" onChange={handleFileUpload} />
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={() => fileInputRef.current?.click()} aria-label="上传"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">上传 CSV</TooltipContent></Tooltip>
-              {messages.length > 0 && (
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={exportMarkdown} aria-label="导出"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">导出 MD</TooltipContent></Tooltip>
-              )}
-              {messages.length > 0 && (
-                <>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={saveToServer} aria-label="保存对话"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">保存到服务器</TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={loadConvList} aria-label="加载对话"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">加载历史对话</TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={clearMessages} aria-label="清除历史"><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">清除历史</TooltipContent></Tooltip>
-                </>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" aria-label="更多操作"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="text-xs gap-2 cursor-pointer"><Paperclip className="h-3.5 w-3.5" />上传文件</DropdownMenuItem>
+                  {messages.length > 0 && (
+                    <>
+                      <DropdownMenuItem onClick={exportMarkdown} className="text-xs gap-2 cursor-pointer"><FileDown className="h-3.5 w-3.5" />导出 MD</DropdownMenuItem>
+                      <DropdownMenuItem onClick={saveToServer} className="text-xs gap-2 cursor-pointer"><HardDrive className="h-3.5 w-3.5" />保存到服务器</DropdownMenuItem>
+                      <DropdownMenuItem onClick={loadConvList} className="text-xs gap-2 cursor-pointer"><FolderOpen className="h-3.5 w-3.5" />加载历史对话</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={clearMessages} className="text-xs gap-2 cursor-pointer text-red-500"><Trash2 className="h-3.5 w-3.5" />清除聊天记录</DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Close */}
               <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={() => setIsOpen(false)} aria-label="关闭聊天面板"><X className="h-4 w-4" /></Button>
             </div>
           </div>
@@ -485,14 +536,34 @@ export function ChatPanel() {
                       </div>
                       {msg.content && !(streaming && msg.id.endsWith('-ai')) && <CopyButton text={msg.content} />}
                     </div>
+                    {/* Evidence feedback claims */}
+                    {msg.role === 'assistant' && msg.content && !(streaming && msg.id.endsWith('-ai')) && (() => {
+                      const claims = parseClaimsFromText(msg.content);
+                      if (claims.length === 0) return null;
+                      const msgId = msg.id;
+                      return (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-[10px] text-muted-foreground mb-1">📌 分析声明 (点击标注准确性):</p>
+                          <div className="flex flex-wrap gap-1">
+                            {claims.map(claim => (
+                              <ClaimLabel
+                                key={`${msgId}-${claim.id}`}
+                                claim={{ ...claim, verdict: feedbackMap[claim.id] }}
+                                onVerdict={(claimId, verdict) => handleClaimVerdict(msgId, claims, claimId, verdict)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {msg.role === 'assistant' && (() => {
                       const isCurrentlyStreaming = streaming && msg.id.endsWith('-ai');
                       const toolsToShow = isCurrentlyStreaming ? streamingToolCalls : (msg.toolsUsed || []);
                       if (toolsToShow.length === 0) return null;
                       return (
                         <div className="flex items-center gap-1 mt-1 flex-wrap">
-                          {toolsToShow.map((tool) => (
-                            <Badge key={tool} variant="secondary" className="text-[10px] h-5 gap-1 bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-300 border-orange-200 dark:border-orange-800">
+                          {Array.from(new Set(toolsToShow)).map((tool, i) => (
+                            <Badge key={`${tool}-${i}`} variant="secondary" className="text-[10px] h-5 gap-1 bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-300 border-orange-200 dark:border-orange-800">
                               {isCurrentlyStreaming ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : TOOL_ICONS[tool]}
                               {TOOL_LABELS[tool] || tool}
                             </Badge>
@@ -542,6 +613,7 @@ export function ChatPanel() {
               </div>
             )}
             <div className="flex gap-2">
+              <Tooltip><TooltipTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-orange-500 shrink-0" onClick={() => fileInputRef.current?.click()} aria-label="上传文件"><Paperclip className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="top" className="text-xs">上传 CSV/TXT/JSON</TooltipContent></Tooltip>
               <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入问题，如：当前库存情况..." className="flex-1 h-9 text-sm rounded-full border-orange-200 focus-visible:ring-orange-300 dark:border-orange-800" disabled={isLoading} maxLength={2000} />
               {isLoading ? (
                 <Button type="button" size="icon" className="h-9 w-9 rounded-full bg-red-500 hover:bg-red-600 text-white shrink-0 animate-pulse" onClick={() => { abortRef.current?.abort(); setIsLoading(false); setStreaming(false); }}><Square className="h-4 w-4" /></Button>

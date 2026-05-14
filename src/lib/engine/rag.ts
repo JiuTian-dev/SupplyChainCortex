@@ -18,6 +18,34 @@ interface KnowledgeChunk {
   title: string;
   content: string;
   keywords: string[];
+  /** 0-1 score. Starts at 1.0. Degrades with negative feedback. Auto-demotes at <0.3. */
+  usefulnessScore?: number;
+  /** When this chunk was last updated (ISO) */
+  lastUpdated?: string;
+  /** Data source tags for mapping to evidence feedback sources */
+  sourceTags?: string[];
+}
+
+/** Helper: get usefulness score with default */
+function getScore(chunk: KnowledgeChunk): number {
+  return chunk.usefulnessScore ?? 1.0;
+}
+
+/** Helper: get source tags with defaults inferred from domain */
+function getSourceTags(chunk: KnowledgeChunk): string[] {
+  if (chunk.sourceTags?.length) return chunk.sourceTags;
+  const domainTagMap: Record<string, string[]> = {
+    tariff: ['tariff', 'ustr', 'cbam', 'rcep', 'hs-code'],
+    logistics: ['scfi', 'freight', 'port', 'incoterms'],
+    compliance: ['fcc', 'ce', 'gdpr', 'compliance'],
+    risk: ['risk', 'fx', 'supplier'],
+    general: ['fba', 'tax', 'general'],
+    production: ['qc', 'oem', 'production', 'cost'],
+    ecommerce: ['amazon', 'temu', 'walmart', 'ecommerce'],
+    safety: ['ul', 'cpsc', 'rohs', 'safety', 'lithium'],
+    payment: ['payment', 'fx', 'lc'],
+  };
+  return domainTagMap[chunk.domain] || [chunk.domain];
 }
 
 const KNOWLEDGE_BASE: KnowledgeChunk[] = [
@@ -404,14 +432,19 @@ export interface RAGResult {
 
 /**
  * Retrieve top-K most relevant knowledge chunks for a query.
- * Uses TF-IDF cosine similarity (self-contained, zero API calls).
+ * Uses TF-IDF cosine similarity weighted by usefulnessScore.
+ * Chunks with usefulnessScore < 0.3 are excluded (auto-demoted).
  */
 export function retrieveKnowledge(query: string, topK = 3): RAGResult[] {
   const queryTokens = tokenize(query);
   if (queryTokens.length === 0) return [];
 
-  const tfs = KNOWLEDGE_BASE.map(c => computeTF(c));
-  const idf = computeIDF(KNOWLEDGE_BASE);
+  // Only use active chunks
+  const activeChunks = KNOWLEDGE_BASE.filter(c => getScore(c as KnowledgeChunk) >= 0.3);
+  if (activeChunks.length === 0) return [];
+
+  const tfs = activeChunks.map(c => computeTF(c));
+  const idf = computeIDF(activeChunks);
 
   // Query TF-IDF vector
   const queryTF: Record<string, number> = {};
@@ -423,8 +456,8 @@ export function retrieveKnowledge(query: string, topK = 3): RAGResult[] {
     queryTF[t] = (queryTF[t] / queryLen) * (idf[t] || 1);
   }
 
-  // Cosine similarity
-  const scores = KNOWLEDGE_BASE.map((chunk, i) => {
+  // Cosine similarity × usefulnessScore
+  const scores = activeChunks.map((chunk, i) => {
     const tf = tfs[i];
     let dotProduct = 0;
     let queryNorm = 0;
@@ -440,7 +473,9 @@ export function retrieveKnowledge(query: string, topK = 3): RAGResult[] {
 
     queryNorm = Math.sqrt(queryNorm) || 1;
     chunkNorm = Math.sqrt(chunkNorm) || 1;
-    return { chunk, score: dotProduct / (queryNorm * chunkNorm) };
+    const tfidfScore = dotProduct / (queryNorm * chunkNorm);
+    const usefulnessBoost = getScore(chunk as KnowledgeChunk);
+    return { chunk, score: tfidfScore * (0.5 + 0.5 * usefulnessBoost) };
   });
 
   return scores
@@ -477,4 +512,101 @@ export function getRAGDomains(): string[] {
 /** Search by domain */
 export function searchByDomain(domain: string): KnowledgeChunk[] {
   return KNOWLEDGE_BASE.filter(c => c.domain === domain);
+}
+
+// ─── Knowledge Evolution ──────────────────────────────────────────────────────────
+
+/**
+ * Update a knowledge chunk's usefulness score.
+ * Score decays with negative feedback, recovers with positive.
+ */
+export function updateChunkScore(chunkId: string, delta: number): void {
+  const chunk = KNOWLEDGE_BASE.find(c => c.id === chunkId) as KnowledgeChunk | undefined;
+  if (!chunk) return;
+
+  const currentScore = getScore(chunk);
+  const newScore = Math.max(0, Math.min(1, currentScore + delta));
+  chunk.usefulnessScore = newScore;
+  chunk.lastUpdated = new Date().toISOString();
+
+  if (newScore < 0.3) {
+    console.warn(`[RAG] Chunk "${chunk.title}" auto-demoted (score: ${newScore.toFixed(2)}). Consider manual review.`);
+  }
+}
+
+/**
+ * Evolve knowledge base based on evidence feedback source reliability.
+ * Maps source reliability scores from evidence-feedback to knowledge chunk
+ * usefulness scores via source tag matching.
+ *
+ * Called periodically or on-demand via /api/engine-calibrate.
+ */
+export function evolveFromFeedback(sourceReliability: Record<string, number>): {
+  updated: number;
+  demoted: string[];
+} {
+  let updated = 0;
+  const demoted: string[] = [];
+
+  for (const chunk of KNOWLEDGE_BASE as KnowledgeChunk[]) {
+    const tags = getSourceTags(chunk);
+    const relevances = tags
+      .map(tag => sourceReliability[tag])
+      .filter((r): r is number => r !== undefined);
+
+    if (relevances.length === 0) continue;
+
+    const avgReliability = relevances.reduce((a, b) => a + b, 0) / relevances.length;
+
+    const currentScore = getScore(chunk);
+    const targetScore = avgReliability;
+    const newScore = currentScore * 0.7 + targetScore * 0.3;
+
+    if (Math.abs(newScore - currentScore) > 0.02) {
+      chunk.usefulnessScore = Math.round(newScore * 100) / 100;
+      chunk.lastUpdated = new Date().toISOString();
+      updated++;
+
+      if (newScore < 0.3) {
+        demoted.push(chunk.title);
+      }
+    }
+  }
+
+  return { updated, demoted };
+}
+
+/**
+ * Get knowledge base health stats.
+ */
+export function getKnowledgeHealth(): {
+  total: number;
+  active: number;
+  demoted: number;
+  avgScore: number;
+  staleCount: number;
+} {
+  const chunks = KNOWLEDGE_BASE as KnowledgeChunk[];
+  const active = chunks.filter(c => getScore(c) >= 0.3);
+  const demoted = chunks.filter(c => getScore(c) < 0.3);
+  const avgScore = chunks.reduce((s, c) => s + getScore(c), 0) / chunks.length;
+
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const staleCount = active.filter(c => (c.lastUpdated || '2020-01-01') < ninetyDaysAgo).length;
+
+  return {
+    total: chunks.length,
+    active: active.length,
+    demoted: demoted.length,
+    avgScore: Math.round(avgScore * 100) / 100,
+    staleCount,
+  };
+}
+
+export function getChunksNeedingReview(): KnowledgeChunk[] {
+  const chunks = KNOWLEDGE_BASE as KnowledgeChunk[];
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  return chunks.filter(c =>
+    getScore(c) < 0.3 || (c.lastUpdated || '2020-01-01') < ninetyDaysAgo
+  );
 }

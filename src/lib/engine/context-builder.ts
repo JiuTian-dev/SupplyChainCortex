@@ -9,6 +9,7 @@
  */
 
 import { db } from '@/lib/db';
+import { agentMemory, type SharedContext } from '@/lib/engine/memory';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -172,7 +173,8 @@ export async function gatherBriefing(): Promise<AgentBriefing> {
   // ── Feedback insight ────────────────────────────────────────────────────────
   let feedbackInsight = '暂无足够的反馈数据来总结模式。';
   try {
-    const recentFeedback = await db.feedbackLog.findMany({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recentFeedback = await (db as any).feedbackLog?.findMany({
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: { action: true, userNotes: true, engine: true },
@@ -290,6 +292,24 @@ export function formatBriefingContext(briefing: AgentBriefing): string {
     lines.push(briefing.feedbackInsight);
   }
 
+  // ── Conversation memory from agentMemory ────────────────────────────────────
+  const recentTopics = agentMemory.get<string[]>('conversation', 'recentTopics') || [];
+  const recentEntities = agentMemory.get<string[]>('conversation', 'recentEntities') || [];
+  const lastConclusion = agentMemory.get<string>('conversation', 'lastConclusion');
+
+  if (recentTopics.length > 0 || recentEntities.length > 0) {
+    lines.push(`\n### 💬 最近对话上下文`);
+    if (recentTopics.length > 0) {
+      lines.push(`讨论主题: ${recentTopics.join(', ')}`);
+    }
+    if (recentEntities.length > 0) {
+      lines.push(`涉及SKU/实体: ${recentEntities.join(', ')}`);
+    }
+    if (lastConclusion) {
+      lines.push(`上轮结论: ${lastConclusion.slice(0, 200)}`);
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -305,4 +325,48 @@ export async function buildDynamicSystemContext(): Promise<string> {
     console.error('[ContextBuilder] Failed to gather briefing:', err);
     return '';
   }
+}
+
+// ─── Conversation Memory Extraction ───────────────────────────────────────────────
+
+/**
+ * Extract key entities, topics, and conclusions from an agent response
+ * and store them in agentMemory for the next conversation turn.
+ */
+export function rememberConversationTurn(userQuery: string, agentResponse: string): void {
+  // Extract SKUs (SKU-XXX pattern)
+  const skuMatches = agentResponse.match(/(?:SKU|sku)[-：:\s]*([A-Z]{2,4}-\d{3,5})/g) || [];
+  const skus = skuMatches.map(s => s.replace(/SKU[-：:\s]*/i, 'SKU-')).slice(0, 5);
+
+  // Extract product names (Chinese + English common patterns)
+  const productMatches = agentResponse.match(/(?:智能|便携|无线|多功能|蒸汽|超声波)(?:[一-鿿\w]{2,8}[器锅机杯壶])/g) || [];
+  const products = productMatches.slice(0, 5);
+
+  // Extract key topics from user query
+  const topicKeywords: Record<string, string> = {
+    '库存': '库存管理', '成本': '成本分析', '物流': '物流货运', '货运': '物流货运',
+    '供应商': '供应商管理', '风险': '风险分析', '销售': '销售分析', '关税': '关税合规',
+    '合规': '合规认证', '汇率': '汇率风险', '铜': '大宗商品', '碳': '碳排放',
+  };
+
+  const topics: string[] = [];
+  for (const [keyword, topic] of Object.entries(topicKeywords)) {
+    if (userQuery.includes(keyword) && !topics.includes(topic)) {
+      topics.push(topic);
+    }
+  }
+  if (topics.length === 0) topics.push('综合查询');
+
+  // Extract last conclusion (first 200 chars after "结论" or "建议" section)
+  const conclusionMatch = agentResponse.match(/(?:##\s*结论|##\s*建议|综合分析)[\s\S]*?(?=##|$)/);
+  const conclusion = conclusionMatch
+    ? conclusionMatch[0].replace(/[#*\n]/g, ' ').trim().slice(0, 300)
+    : agentResponse.slice(0, 200);
+
+  const entities = [...new Set([...skus, ...products])].slice(0, 8);
+
+  // Store in agentMemory with 30-minute TTL
+  agentMemory.set('conversation', 'recentTopics', topics, 30 * 60 * 1000);
+  agentMemory.set('conversation', 'recentEntities', entities, 30 * 60 * 1000);
+  agentMemory.set('conversation', 'lastConclusion', conclusion, 30 * 60 * 1000);
 }
