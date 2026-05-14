@@ -223,3 +223,19 @@ export type { SimInput, SimResult, ScenarioResult } from './financial-simulator'
 // Product Feed (v0.16)
 export { generateProductFeed, getProductAgentCard } from './product-feed';
 export type { AgentProductFeed, AgentProductEntry } from './product-feed';
+
+// Arbitrage Engine (v0.17)
+export { findArbitrageOpportunity } from './arbitrage-engine';
+export type { ArbitrageOpportunity, ArbitrageRequest } from './arbitrage-engine';
+
+// Coherence Audit (v0.17)
+export { runCoherenceAudit } from './coherence-audit';
+export type { CoherenceIssue, CoherenceAuditReport } from './coherence-audit';
+
+// Recall Early Warning (v0.17)
+export { runRecallRiskAnalysis } from './recall-early-warning';
+export type { RecallPattern, ProductRecallRisk, RecallWarningReport } from './recall-early-warning';
+
+// Supplier Discovery (v0.17)
+export { discoverSuppliers } from './supplier-discovery';
+export type { DiscoveredSupplier, SupplierDiscoveryResult } from './supplier-discovery';

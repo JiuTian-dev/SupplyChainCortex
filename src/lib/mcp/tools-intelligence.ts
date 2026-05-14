@@ -710,4 +710,106 @@ export const intelligenceTools: MCPTool[] = [
       };
     },
   },
+
+  // ── Cross-Platform Arbitrage Engine ────────────────────────────────────────
+  {
+    name: 'query_arbitrage',
+    description: '跨平台套利分析 — 输入产品描述，自动搜索1688采购价+Amazon竞品价+关税+合规成本，输出完整套利决策：毛利率/年利润/回本周期/合规清单/风险评估/投资建议。帮你判断"这个品能不能做"。',
+    parameters: {
+      type: 'object',
+      properties: {
+        product_description: { type: 'string', description: '产品描述，如 "便携榨汁杯 300ml USB充电"' },
+        target_market: { type: 'string', description: '目标市场: US, EU, UK, JP (默认US)' },
+        source_platform: { type: 'string', description: '采购平台: 1688 (默认), Temu' },
+      },
+      required: ['product_description'],
+    },
+    handler: async (params) => {
+      const { findArbitrageOpportunity } = await import('@/lib/engine/arbitrage-engine');
+      const result = await findArbitrageOpportunity({
+        productDescription: params.product_description as string,
+        targetMarket: params.target_market as string || 'US',
+        sourcePlatform: params.source_platform as string || '1688',
+      });
+      return {
+        ...result,
+        note: `评分 ${result.score}/100。价格数据来自公开搜索，精确数据需接入1688/Amazon API。合规费用为行业估算值。`,
+      };
+    },
+  },
+
+  // ── Decision Coherence Audit ───────────────────────────────────────────────
+  {
+    name: 'query_coherence_audit',
+    description: '决策一致性审计 — 扫描全部SKU，检测跨系统矛盾: HS编码vs关税不匹配、安全库存vs实际交货期脱节、认证缺失或过期、产地vs关税率冲突、售价无法覆盖成本。输出审计评分和修复建议。这是市场上独有的功能。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const { runCoherenceAudit } = await import('@/lib/engine/coherence-audit');
+      const report = await runCoherenceAudit();
+      return {
+        ...report,
+        note: '决策一致性审计是SupplyChain Cortex独有功能。30-40%的跨境物流延误来自跨系统数据不一致(Forbes 2026)。定期审计可避免海关稽查、平台下架和资金损失。',
+      };
+    },
+  },
+
+  // ── Product Recall Early Warning ───────────────────────────────────────────
+  {
+    name: 'query_recall_risk',
+    description: '产品召回风险预警 — 基于CPSC历史召回数据+产品品类模式匹配，分析你的SKU是否存在召回隐患。输出风险评分、匹配的召回模式、建议的预防性修复措施及成本估算。提前预警，防止成为下一个召回。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sku: { type: 'string', description: '可选: 只分析特定SKU' },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { runRecallRiskAnalysis } = await import('@/lib/engine/recall-early-warning');
+      const report = await runRecallRiskAnalysis();
+      if (params.sku) {
+        const product = report.products.find(p => p.sku === params.sku);
+        return {
+          product,
+          allSkusCount: report.totalSkusAnalyzed,
+          note: product
+            ? `${product.sku} 召回风险: ${product.riskLevel}, 评分 ${product.riskScore}/100`
+            : `未找到SKU ${params.sku}`,
+        };
+      }
+      return {
+        ...report,
+        note: '召回模式基于CPSC 2024-2026历史数据。预防性修复措施的成本为行业估算值。高危SKU建议优先安排工厂审核。',
+      };
+    },
+  },
+
+  // ── AI Supplier Discovery ──────────────────────────────────────────────────
+  {
+    name: 'query_supplier_discovery',
+    description: 'AI供应商发现 — 输入产品描述，搜索1688/Alibaba/GlobalSources匹配供应商。按价格/MOQ/交期/认证/地理位置综合评分排序。生成中文询盘模板。零API成本，基于联网搜索。',
+    parameters: {
+      type: 'object',
+      properties: {
+        product_description: { type: 'string', description: '产品描述，如 "蓝牙音箱 便携防水"' },
+        target_market: { type: 'string', description: '目标市场: US, EU (默认US)' },
+      },
+      required: ['product_description'],
+    },
+    handler: async (params) => {
+      const { discoverSuppliers } = await import('@/lib/engine/supplier-discovery');
+      const result = await discoverSuppliers(
+        params.product_description as string,
+        params.target_market as string || 'US',
+      );
+      return {
+        ...result,
+        note: '供应商数据来自公开搜索，评分和报价为AI估算。建议联系供应商确认实际报价、MOQ和交期。询盘模板可直接复制使用。',
+      };
+    },
+  },
 ];
