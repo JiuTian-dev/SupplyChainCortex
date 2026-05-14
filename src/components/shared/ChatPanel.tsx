@@ -378,34 +378,66 @@ export function ChatPanel() {
   const handleQuickAction = (message: string) => { sendMessage(message); };
   const toggleDataExpand = (msgId: string) => { setExpandedData(prev => prev === msgId ? null : msgId); };
 
-  // Generate suggested follow-up questions from assistant response
+  // Generate context-aware follow-up questions from assistant response
   const generateFollowUps = (content: string): string[] => {
     const suggestions: string[] = [];
     const lower = content.toLowerCase();
-    if (lower.includes('补货') || lower.includes('库存') || lower.includes('缺货')) {
-      suggestions.push('帮我创建补货订单');
-    }
-    if (lower.includes('关税') || lower.includes('tariff')) {
-      suggestions.push('模拟关税从25%降到10%的利润变化');
-    }
-    if (lower.includes('供应商') || lower.includes('supplier')) {
-      suggestions.push('帮我在1688找备选供应商');
-    }
-    if (lower.includes('合规') || lower.includes('认证') || lower.includes('fcc') || lower.includes('ce')) {
-      suggestions.push('检查这个产品的合规要求');
-    }
-    if (lower.includes('竞品') || lower.includes('competitor') || lower.includes('亚马逊')) {
-      suggestions.push('查一下竞品的最新定价');
-    }
-    if (lower.includes('物流') || lower.includes('货运') || lower.includes('港口')) {
-      suggestions.push('查当前的货运状态');
-    }
-    if (suggestions.length < 2) {
-      if (lower.includes('毛利') || lower.includes('成本') || lower.includes('利润')) {
-        suggestions.push('跑一下财务模拟看看利润空间');
+
+    // Extract specific SKUs mentioned for targeted follow-ups
+    const skuMatches = content.match(/(?:SKU|sku)[-:]*\s*([A-Z]{2,4}-\d{3,5})/g) || [];
+    const mentionedSku = skuMatches.length > 0 && skuMatches[0] ? skuMatches[0].replace(/SKU[-: ]*/i, 'SKU-') : null;
+
+    // Extract product names mentioned
+    const productMatch = content.match(/(便携榨汁[杯机]|智能加湿[器壶]|无线吸尘[器机]|智能电热[水壶]|便携咖啡[机壶]|空气净化[器机]|负离子吹风[机筒])/g) || [];
+    const mentionedProduct = productMatch.length > 0 && productMatch[0] ? productMatch[0] : null;
+
+    // Context-aware suggestions based on what was discussed
+    if (lower.includes('补货') || lower.includes('缺货') || lower.includes('库存不足') || lower.includes('库存预警')) {
+      if (mentionedProduct) {
+        suggestions.push(`立即为${mentionedProduct}创建补货订单`);
+      } else if (mentionedSku) {
+        suggestions.push(`立即为${mentionedSku}创建补货订单`);
       }
-      suggestions.push('做一次全面的供应链健康检查');
+      suggestions.push('空运补货5000台的到岸成本是多少？');
     }
+    if (lower.includes('关税') || lower.includes('tariff') || lower.includes('贸易战')) {
+      if (mentionedProduct) {
+        suggestions.push(`${mentionedProduct}在25%关税下的利润还剩多少？`);
+      } else {
+        suggestions.push('模拟关税从25%降到10%对全部SKU的利润影响');
+      }
+    }
+    if (lower.includes('供应商') || lower.includes('supplier') || lower.includes('1688')) {
+      if (mentionedProduct) {
+        suggestions.push(`在1688上搜${mentionedProduct}的具体工厂联系方式`);
+      } else {
+        suggestions.push('帮我在1688找备选供应商');
+      }
+    }
+    if (lower.includes('合规') || lower.includes('认证') || lower.includes('fcc') || lower.includes('ce') || lower.includes('ul')) {
+      suggestions.push('检查这个产品出口美国需要的全部认证和费用');
+    }
+    if (lower.includes('物流') || lower.includes('货运') || lower.includes('港口') || lower.includes('延误')) {
+      suggestions.push('查当前所有延误货运的详细状态');
+    }
+    if (lower.includes('召回') || lower.includes('recall') || lower.includes('安全')) {
+      suggestions.push('查一下这个品类的CPSC召回历史');
+    }
+    if (lower.includes('爆品') || lower.includes('选品') || lower.includes('什么产品')) {
+      suggestions.push('帮我分析这个品在亚马逊上的竞品定价和利润空间');
+    }
+
+    // Fallback: if no specific context matched, offer relevant next steps
+    if (suggestions.length === 0) {
+      if (lower.includes('毛利') || lower.includes('成本') || lower.includes('利润')) {
+        suggestions.push('跑一下财务模拟看看降本空间');
+      }
+      if (lower.includes('健康') || lower.includes('dashboard') || lower.includes('概览')) {
+        suggestions.push('深入排查健康评分最低的环节');
+      }
+      suggestions.push('做一次全面的供应链一致性审计');
+    }
+
     return suggestions.slice(0, 3);
   };
 

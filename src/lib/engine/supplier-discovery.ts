@@ -38,6 +38,8 @@ export interface SupplierDiscoveryResult {
     targetPriceUsd: number;
   };
   inquiryTemplate: string;
+  searchLinks?: Record<string, string>;
+  disclaimer?: string;
   summary: string;
 }
 
@@ -68,11 +70,6 @@ export async function discoverSuppliers(
     } catch { /* best-effort */ }
   }
 
-  // If no results, generate synthetic supplier profiles based on category knowledge
-  if (suppliers.length === 0) {
-    suppliers.push(...generateSyntheticSuppliers(productDescription));
-  }
-
   // Score and rank
   for (const s of suppliers) {
     s.score = computeSupplierScore(s);
@@ -92,8 +89,18 @@ export async function discoverSuppliers(
   };
   const sim = runSimulation(simInput);
 
-  // Generate inquiry template in Chinese
+  // Generate inquiry template
   const inquiryTemplate = generateInquiryTemplate(productDescription, bestSupplier);
+
+  // Build direct search links for the user
+  const searchLinks = {
+    '1688搜索': `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(productDescription)}`,
+    '阿里巴巴国际站': `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(productDescription)}`,
+  };
+
+  const summary = suppliers.length > 0
+    ? `搜索到 ${suppliers.length} 条供应商线索。⚠️ 这些数据来自公开搜索结果，非实时数据库。建议点击下方链接直达1688/Alibaba查看完整商家信息和联系方式。`
+    : `未在搜索结果中提取到结构化供应商数据。请直接使用下方链接在1688/Alibaba上搜索。`;
 
   return {
     productDescription,
@@ -105,9 +112,9 @@ export async function discoverSuppliers(
       targetPriceUsd: sim.input.sellingPriceUsd,
     },
     inquiryTemplate,
-    summary: suppliers.length > 0
-      ? `找到 ${suppliers.length} 个潜在供应商。最佳匹配: ${bestSupplier?.name}，报价 ¥${bestSupplier?.priceCny}，评分 ${bestSupplier?.score}/100。`
-      : `未找到精确匹配的供应商。以下是基于品类知识的参考供应商画像和推荐询盘模板。`,
+    searchLinks,
+    summary,
+    disclaimer: '供应商数据来自公开网页搜索，非实时数据库。公司名称、报价、MOQ等信息可能与实际有出入。请通过下方链接直接访问平台核实，并使用询盘模板联系商家。',
   };
 }
 
@@ -270,29 +277,3 @@ function detectCertifications(text: string): string[] {
   return certs;
 }
 
-function generateSyntheticSuppliers(product: string): DiscoveredSupplier[] {
-  const basePrice = estimatePrice(product);
-  return [
-    {
-      name: '深圳市XX电子科技有限公司',
-      platform: '1688', location: '深圳',
-      priceCny: Math.round(basePrice * 0.85), moq: 200, leadTimeDays: 15,
-      certifications: ['FCC', 'CE', 'RoHS', 'ISO9001'],
-      rating: 4.3, score: 0, strengths: [], weaknesses: [],
-    },
-    {
-      name: '义乌市XX电器厂',
-      platform: '1688', location: '义乌',
-      priceCny: Math.round(basePrice * 0.72), moq: 500, leadTimeDays: 20,
-      certifications: ['CE', 'RoHS'],
-      rating: 3.8, score: 0, strengths: [], weaknesses: [],
-    },
-    {
-      name: 'Ningbo XX Electrical Co., Ltd',
-      platform: 'Alibaba', location: '宁波',
-      priceCny: Math.round(basePrice * 1.05), moq: 100, leadTimeDays: 18,
-      certifications: ['FCC', 'CE', 'UL', 'RoHS', 'BSCI'],
-      rating: 4.5, score: 0, strengths: [], weaknesses: [],
-    },
-  ];
-}
