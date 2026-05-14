@@ -15,6 +15,7 @@
  */
 
 import { feedbackStore, recordFeedback, type FeedbackAction } from './feedback';
+import { adjustEdgeWeight, recordSuccessTrace, recordFailureTrace, getGraph, searchNodes } from './graph-store';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -245,7 +246,88 @@ export function recordEvidenceFeedback(params: {
       userId: params.userId,
       evaluatedAt: now,
     });
+
+    // ── Graph edge weight feedback ──────────────────────────────────────────
+    tryWiringFeedbackToGraph(claim.claimText, claim.citedSource, claim.verdict);
   }
+}
+
+/**
+ * Wire evidence feedback to graph edge weights.
+ * Accepted claims reinforce related graph edges, rejected claims weaken them.
+ */
+async function tryWiringFeedbackToGraph(
+  claimText: string,
+  citedSource: string,
+  verdict: string,
+): Promise<void> {
+  try {
+    const graph = await getGraph();
+    if (!graph || graph.nodes.size === 0) return;
+
+    // Extract entities from the claim text and source
+    const entityNames = extractEntityNames(claimText);
+    const sourceEntities = extractEntityNames(citedSource);
+
+    // Find matching graph nodes
+    const matchedNodeIds: string[] = [];
+    for (const name of [...entityNames, ...sourceEntities]) {
+      const found = searchNodes(graph, name);
+      for (const n of found) matchedNodeIds.push(n.id);
+    }
+
+    if (matchedNodeIds.length < 2) return;
+
+    // Track affected edges
+    const affectedEdgeKeys: string[] = [];
+    const delta = verdict === 'accurate' ? 0.05 : verdict === 'inaccurate' ? -0.1 : verdict === 'outdated' ? -0.05 : 0;
+
+    // Adjust weights on edges between matched nodes
+    for (let i = 0; i < matchedNodeIds.length; i++) {
+      for (let j = i + 1; j < matchedNodeIds.length; j++) {
+        const outEdges = graph.outgoingEdges.get(matchedNodeIds[i]) || [];
+        for (const edge of outEdges) {
+          if (edge.to === matchedNodeIds[j]) {
+            adjustEdgeWeight(matchedNodeIds[i], matchedNodeIds[j], edge.type, delta);
+            affectedEdgeKeys.push(`${matchedNodeIds[i]}→${matchedNodeIds[j]}:${edge.type}`);
+          }
+        }
+        // Also check reverse
+        const reverseEdges = graph.outgoingEdges.get(matchedNodeIds[j]) || [];
+        for (const edge of reverseEdges) {
+          if (edge.to === matchedNodeIds[i]) {
+            adjustEdgeWeight(matchedNodeIds[j], matchedNodeIds[i], edge.type, delta);
+            affectedEdgeKeys.push(`${matchedNodeIds[j]}→${matchedNodeIds[i]}:${edge.type}`);
+          }
+        }
+      }
+    }
+
+    // Record in dual memory traces
+    const factId = `fact-${Date.now()}`;
+    if (verdict === 'accurate') {
+      recordSuccessTrace(factId, matchedNodeIds, affectedEdgeKeys);
+    } else {
+      recordFailureTrace(factId, matchedNodeIds, affectedEdgeKeys);
+    }
+  } catch {
+    // Graph feedback is best-effort, non-blocking
+  }
+}
+
+function extractEntityNames(text: string): string[] {
+  const patterns = [
+    /SKU[-:]\s*\w+/gi,
+    /(?:智能|便携|无线|多功能|蒸汽|超声波|HEPA)[一-鿿\w]{2,8}[器锅机杯壶]/g,
+    /(?:洛杉矶|长滩|纽约|上海|宁波|深圳|汉堡|鹿特丹)/g,
+    /\w{2,4}-\d{3,5}/g,
+  ];
+  const names: string[] = [];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m) names.push(...m);
+  }
+  return [...new Set(names)].slice(0, 5);
 }
 
 /**

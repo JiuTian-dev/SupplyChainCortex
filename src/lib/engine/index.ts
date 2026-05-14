@@ -193,3 +193,17 @@ export {
   runConsolidation, formatConsolidatedFactsContext,
 } from './memory-consolidation';
 export type { ConsolidationReport } from './memory-consolidation';
+
+// Strategy Engine (v0.13)
+export {
+  recommendStrategies, formatStrategyContext,
+} from './strategy-engine';
+export type { StrategyOption, StrategyRecommendation, RiskContext } from './strategy-engine';
+
+// Data Source Health (v0.13)
+export {
+  recordSourceSuccess, recordSourceFailure,
+  getSourceHealth, getAllSourceHealths, getSourceHealthSummary, getDegradedSources,
+  registerSource,
+} from './connector-health';
+export type { SourceHealth } from './connector-health';

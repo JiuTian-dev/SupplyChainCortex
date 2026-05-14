@@ -13,6 +13,8 @@ import { agentMemory, type SharedContext } from '@/lib/engine/memory';
 import { buildGraphContext, formatGraphContext } from '@/lib/engine/graph-rag';
 import { episodeStore, formatEpisodeContext } from '@/lib/engine/episode-store';
 import { formatConsolidatedFactsContext } from '@/lib/engine/memory-consolidation';
+import { recommendStrategies, formatStrategyContext, type RiskContext } from '@/lib/engine/strategy-engine';
+import { getSourceHealthSummary } from '@/lib/engine/connector-health';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -348,6 +350,29 @@ export async function buildDynamicSystemContext(query?: string): Promise<string>
       const factsCtx = formatConsolidatedFactsContext(5);
       if (factsCtx) context += factsCtx;
     } catch { /* facts are best-effort */ }
+
+    // Add strategy recommendations if risk is detected
+    if (briefing.criticalAlerts.length > 0 || briefing.healthScore < 70) {
+      try {
+        const risk: RiskContext = {
+          type: briefing.criticalAlerts.length > 0 ? 'supplier_failure' : 'demand_drop',
+          severity: briefing.healthScore < 50 ? 'critical' : briefing.healthScore < 70 ? 'high' : 'medium',
+          affectedEntities: [
+            ...briefing.inventoryWarnings.map(i => i.sku),
+            ...briefing.shipmentConcerns.map(s => s.tracking),
+          ],
+          cascadeDepth: briefing.supplierRisks.length > 0 ? 2 : 1,
+          estimatedLossCny: briefing.costAnomalies.reduce((s, c) => s + 10000, 0) || 50000,
+        };
+        context += formatStrategyContext(risk, 3);
+      } catch { /* strategies are best-effort */ }
+    }
+
+    // Add data source quality
+    try {
+      const healthSummary = getSourceHealthSummary();
+      if (healthSummary) context += '\n## 📡 数据源健康\n' + healthSummary;
+    } catch { /* health is best-effort */ }
 
     return context;
   } catch (err) {

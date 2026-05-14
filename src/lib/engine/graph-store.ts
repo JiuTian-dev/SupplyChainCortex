@@ -393,6 +393,143 @@ export function getUpstream(graph: SupplyChainGraph, nodeId: string, depth = 2):
   };
 }
 
+// ─── Incremental Mutations ───────────────────────────────────────────────────────
+
+/** Add or update a node in the cached graph */
+export function upsertNode(node: GraphNode): void {
+  if (!cachedGraph) return;
+  cachedGraph.nodes.set(node.id, node);
+  if (!cachedGraph.adjacency.has(node.id)) {
+    cachedGraph.adjacency.set(node.id, []);
+    cachedGraph.reverseAdjacency.set(node.id, []);
+    cachedGraph.outgoingEdges.set(node.id, []);
+  }
+  cachedGraph.nodeCount = cachedGraph.nodes.size;
+}
+
+/** Add or update an edge with weight */
+export function upsertEdge(edge: GraphEdge): void {
+  if (!cachedGraph) return;
+  // Replace existing edge between same from→to with same type
+  const existing = cachedGraph.outgoingEdges.get(edge.from) || [];
+  const idx = existing.findIndex(e => e.to === edge.to && e.type === edge.type);
+  if (idx >= 0) {
+    existing[idx] = edge;
+  } else {
+    existing.push(edge);
+    cachedGraph.adjacency.get(edge.from)?.push(edge.to);
+    cachedGraph.reverseAdjacency.get(edge.to)?.push(edge.from);
+    cachedGraph.edges.push(edge);
+  }
+  cachedGraph.outgoingEdges.set(edge.from, existing);
+  cachedGraph.edgeCount = cachedGraph.edges.length;
+}
+
+/**
+ * Adjust an edge's weight based on feedback.
+ * Positive delta = reinforce (user accepted), negative = weaken (user rejected).
+ */
+export function adjustEdgeWeight(
+  fromId: string,
+  toId: string,
+  edgeType: string,
+  delta: number,
+): { oldWeight: number; newWeight: number } | null {
+  if (!cachedGraph) return null;
+  const edges = cachedGraph.outgoingEdges.get(fromId) || [];
+  const edge = edges.find(e => e.to === toId && e.type === edgeType);
+  if (!edge) return null;
+
+  const oldWeight = edge.weight;
+  edge.weight = Math.max(0.01, Math.min(1.0, oldWeight + delta));
+  edge.properties = { ...edge.properties, lastAdjustedAt: new Date().toISOString(), adjustmentDelta: delta };
+
+  // Also update the edge in the global edges array
+  const globalEdge = cachedGraph.edges.find(
+    e => e.from === fromId && e.to === toId && e.type === edgeType
+  );
+  if (globalEdge) globalEdge.weight = edge.weight;
+
+  return { oldWeight, newWeight: edge.weight };
+}
+
+/**
+ * Merge two similar nodes into one. Transfers all edges to the surviving node.
+ */
+export function mergeNodes(keepId: string, removeId: string): boolean {
+  if (!cachedGraph) return false;
+  const keepNode = cachedGraph.nodes.get(keepId);
+  const removeNode = cachedGraph.nodes.get(removeId);
+  if (!keepNode || !removeNode) return false;
+  if (keepNode.type !== removeNode.type) return false;
+
+  // Reroute incoming edges from remove → keep
+  const incomingSources = cachedGraph.reverseAdjacency.get(removeId) || [];
+  for (const source of [...incomingSources]) {
+    const outEdges = cachedGraph.outgoingEdges.get(source) || [];
+    for (const e of outEdges) {
+      if (e.to === removeId) {
+        e.to = keepId;
+        cachedGraph.reverseAdjacency.get(keepId)?.push(source);
+      }
+    }
+  }
+
+  // Reroute outgoing edges from remove → keep
+  const outEdges = cachedGraph.outgoingEdges.get(removeId) || [];
+  for (const e of [...outEdges]) {
+    e.from = keepId;
+    cachedGraph.outgoingEdges.get(keepId)?.push(e);
+    cachedGraph.adjacency.get(keepId)?.push(e.to);
+    cachedGraph.reverseAdjacency.get(e.to)?.push(keepId);
+  }
+
+  // Remove the old node
+  cachedGraph.nodes.delete(removeId);
+  cachedGraph.adjacency.delete(removeId);
+  cachedGraph.reverseAdjacency.delete(removeId);
+  cachedGraph.outgoingEdges.delete(removeId);
+  cachedGraph.nodeCount = cachedGraph.nodes.size;
+
+  // Clean up reverse adjacency duplicates
+  for (const [nodeId, sources] of cachedGraph.reverseAdjacency) {
+    cachedGraph.reverseAdjacency.set(nodeId, [...new Set(sources)]);
+  }
+
+  keepNode.properties = { ...keepNode.properties, mergedFrom: removeNode.label, mergedAt: new Date().toISOString() };
+  return true;
+}
+
+// ─── Dual Memory Tracking ────────────────────────────────────────────────────────
+
+interface MemoryTrace {
+  factId: string;
+  status: 'success' | 'failure';
+  graphNodeIds: string[];
+  graphEdgeKeys: string[];
+  timestamp: string;
+}
+
+const successTraces: MemoryTrace[] = [];
+const failureTraces: MemoryTrace[] = [];
+const MAX_TRACES = 200;
+
+/** Record a successful fact (user accepted the claim) */
+export function recordSuccessTrace(factId: string, nodeIds: string[], edgeKeys: string[]): void {
+  successTraces.push({ factId, status: 'success', graphNodeIds: nodeIds, graphEdgeKeys: edgeKeys, timestamp: new Date().toISOString() });
+  if (successTraces.length > MAX_TRACES) successTraces.splice(0, successTraces.length - MAX_TRACES);
+}
+
+/** Record a failed fact (user rejected the claim) */
+export function recordFailureTrace(factId: string, nodeIds: string[], edgeKeys: string[]): void {
+  failureTraces.push({ factId, status: 'failure', graphNodeIds: nodeIds, graphEdgeKeys: edgeKeys, timestamp: new Date().toISOString() });
+  if (failureTraces.length > MAX_TRACES) failureTraces.splice(0, failureTraces.length - MAX_TRACES);
+}
+
+export function getMemoryTraces(): { success: MemoryTrace[]; failure: MemoryTrace[] } {
+  return { success: [...successTraces], failure: [...failureTraces] };
+}
+
 /** Get graph summary for prompt injection */
 export function summarizeGraph(graph: SupplyChainGraph): string {
   const nodeTypeCounts: Record<string, number> = {};
