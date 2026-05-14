@@ -527,7 +527,7 @@ export function ChatPanel() {
 
         {/* Messages Area */}
         <CardContent className="p-0">
-          <div className="p-3 overflow-y-auto custom-scrollbar" style={{ height: `${panelResize.size.h - 140}px` }} ref={scrollRef}>
+          <div className="p-3 overflow-y-auto custom-scrollbar" style={{ height: `${panelResize.size.h - 140}px` }} ref={scrollRef} suppressHydrationWarning>
             {messages.length === 0 && (
               <div className="text-center py-6">
                 <div className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-950/30 dark:to-rose-950/30 flex items-center justify-center mx-auto mb-3"><Bot className="h-6 w-6 text-orange-500 dark:text-orange-400" /></div>

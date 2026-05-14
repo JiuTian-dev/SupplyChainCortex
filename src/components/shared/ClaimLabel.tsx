@@ -120,10 +120,15 @@ export function parseClaimsFromText(content: string): ClaimData[] {
   const claims: ClaimData[] = [];
   const claimRegex = /\[claim-(\d+)\]\s*([^\[]*?)(?=\[claim-|$)/g;
   let match;
+  const seenIds = new Set<string>();
 
   while ((match = claimRegex.exec(content)) !== null) {
     const claimNum = match[1];
     const body = match[2].trim();
+
+    // Skip duplicates (agent sometimes repeats claim numbers)
+    if (seenIds.has(`claim-${claimNum}`)) continue;
+    seenIds.add(`claim-${claimNum}`);
 
     // Skip if body is too short (fragment)
     if (body.length < 5) continue;
