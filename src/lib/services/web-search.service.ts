@@ -1,128 +1,203 @@
 /**
- * Web Search Service — multi-source free web search.
+ * Web Search Service — Multi-provider architecture.
  *
- * Priority (no API keys required):
- *   1. Wikipedia API — factual/encyclopedic queries (always works)
- *   2. Google News RSS — current events (free, no key)
- *   3. DuckDuckGo Lite — fallback (may be blocked from some regions)
+ * Provider Router: SearXNG (self-hosted) | Brave | Tavily | Jina Search
+ * Content Extraction: Jina Reader (shared across all providers)
+ * Fallback chain: primary → Reddit → GitHub → Hacker News
  *
- * IMPORTANT: For commodity prices, freight rates, carbon prices, recalls —
- * use the dedicated MCP tools (query_commodities, query_scfis, etc.) instead
- * of web search. Those have direct market data access. Web search is for
- * news, policy changes, and general information.
+ * .env config:
+ *   SEARCH_PROVIDER=searxng|brave|tavily|jina
+ *   SEARXNG_BASE_URL=http://localhost:8081
+ *   BRAVE_API_KEY=...
+ *   TAVILY_API_KEY=...
  */
 
-interface SearchResult {
+// ─── Types ────────────────────────────────────────────────────────────────────────
+
+export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  /** Full page content (only populated in deep mode via Jina Reader) */
+  content?: string;
+  source?: string;
+  publishedAt?: string;
 }
 
-// ─── Wikipedia API ──────────────────────────────────────────────────────────────
+export type SearchProvider = 'searxng' | 'brave' | 'tavily' | 'jina' | 'ddg';
 
-async function searchWikipedia(query: string): Promise<SearchResult[]> {
+interface ProviderConfig {
+  provider: SearchProvider;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
+// ─── URL Safety ───────────────────────────────────────────────────────────────────
+
+const BLOCKED_HOSTS = ['127.0.0.1', 'localhost', '0.0.0.0', '::1', '[::1]',
+  '169.254.', '10.', '172.16.', '172.17.', '172.18.', '172.19.',
+  '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.',
+  '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.',
+  '192.168.', 'metadata.google.internal'];
+
+function isSafeUrl(url: string): boolean {
   try {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=8&origin=*`;
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { 'User-Agent': 'SupplyChainCortex/2.9' },
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as {
-      query?: { search?: Array<{ title: string; snippet: string; pageid: number }> };
-    };
-    return (data.query?.search || []).map(r => ({
-      title: r.title,
-      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}`,
-      snippet: stripHtml(r.snippet),
-    }));
-  } catch {
-    return [];
-  }
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    if (BLOCKED_HOSTS.some(h => u.hostname === h || u.hostname.startsWith(h))) return false;
+    return true;
+  } catch { return false; }
 }
 
-// ─── Google News RSS ─────────────────────────────────────────────────────────────
-
-async function searchGoogleNews(query: string): Promise<SearchResult[]> {
-  try {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
-
-    const results: SearchResult[] = [];
-    const items = xml.split('<item>').slice(1);
-    for (const item of items.slice(0, 8)) {
-      const titleMatch = item.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/);
-      const linkMatch = item.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/);
-      const descMatch = item.match(/<description>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/description>/);
-
-      if (titleMatch) {
-        results.push({
-          title: decodeEntities(titleMatch[1]),
-          url: linkMatch?.[1] || '',
-          snippet: descMatch ? stripHtml(decodeEntities(descMatch[1])).slice(0, 300) : '',
-        });
-      }
-    }
-    return results;
-  } catch {
-    return [];
-  }
+function sanitizeQuery(query: string): string {
+  return query.replace(/[<>"']/g, '').slice(0, 500);
 }
 
-// ─── DuckDuckGo Lite (fallback) ──────────────────────────────────────────────────
-
-async function searchDuckDuckGoLite(query: string): Promise<SearchResult[]> {
-  try {
-    const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    // Parse Lite results: <a rel="nofollow" href="...">title</a><span class="result-snippet">snippet</span>
-    const results: SearchResult[] = [];
-    const linkRegex = /<a[^>]*rel="nofollow"[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
-    const snippetRegex = /<span[^>]*class="result-snippet"[^>]*>([^<]+)<\/span>/gi;
-
-    const links: Array<{ url: string; title: string }> = [];
-    let m;
-    while ((m = linkRegex.exec(html)) !== null) {
-      const url = m[1];
-      if (url.startsWith('http') && !url.includes('duckduckgo.com')) {
-        links.push({ url: decodeEntities(url), title: decodeEntities(m[2].trim()) });
-      }
-    }
-
-    const snippets: string[] = [];
-    while ((m = snippetRegex.exec(html)) !== null) {
-      snippets.push(decodeEntities(m[1].trim()));
-    }
-
-    for (let i = 0; i < Math.min(links.length, 8); i++) {
-      results.push({
-        title: links[i].title,
-        url: links[i].url,
-        snippet: snippets[i] || '',
-      });
-    }
-    return results;
-  } catch {
-    return [];
-  }
+function hasChinese(text: string): boolean {
+  return /[一-鿿]/.test(text);
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────────
+/**
+ * Extract English keywords from a Chinese query for fallback search.
+ * Maps common Chinese supply chain terms to English equivalents.
+ */
+function extractEnglishKeywords(query: string): string {
+  const termMap: Record<string, string> = {
+    '关税': 'tariff', '贸易战': 'trade war', '中美': 'US China',
+    '供应链': 'supply chain', '小家电': 'small appliance',
+    '运价': 'freight rate', '运费': 'shipping cost', '集装箱': 'container',
+    '铜价': 'copper price', '铜': 'copper', '铝价': 'aluminum price', '铝': 'aluminum',
+    '钢价': 'steel price', '螺纹钢': 'steel rebar', '碳价': 'carbon price',
+    '碳关税': 'CBAM carbon', '召回': 'recall CPSC', '港口': 'port congestion',
+    '汇率': 'exchange rate', '人民币': 'CNY USD', '美元': 'USD',
+    '出口': 'export', '进口': 'import', '政策': 'policy regulation',
+    '合规': 'compliance', '认证': 'certification', '库存': 'inventory',
+    '物流': 'logistics', '供应商': 'supplier', '销售': 'sales',
+    '成本': 'cost', '风险': 'risk', '新闻': 'news', '最新': 'latest',
+    '动态': 'update', '变化': 'change', '2026': '2026', '2025': '2025',
+  };
+  let result = query;
+  for (const [zh, en] of Object.entries(termMap)) {
+    result = result.replace(new RegExp(zh, 'g'), en);
+  }
+  // Remove remaining Chinese characters and clean up
+  result = result.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return result || query.replace(/[一-鿿]/g, '').trim() || 'supply chain';
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────────
+
+function getConfig(): ProviderConfig {
+  const baseUrl = process.env.SEARXNG_BASE_URL || 'http://localhost:8081';
+  // Note: isSafeUrl NOT applied here — baseUrl is admin-configured (not user input).
+  // isSafeUrl is used only in fetchPageContent for user-supplied URLs from search results.
+  return {
+    provider: (process.env.SEARCH_PROVIDER as SearchProvider) || 'searxng',
+    baseUrl,
+    apiKey: process.env.BRAVE_API_KEY || process.env.TAVILY_API_KEY || undefined,
+  };
+}
+
+// ─── SearXNG ──────────────────────────────────────────────────────────────────────
+
+async function searchSearXNG(query: string, baseUrl: string): Promise<SearchResult[]> {
+  const url = `${baseUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&language=en`;
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(8000),
+    headers: { 'Accept': 'application/json', 'User-Agent': 'SupplyChainCortex/2.9' },
+  });
+  if (!res.ok) throw new Error(`SearXNG returned ${res.status}`);
+  const data = await res.json() as {
+    results?: Array<{ title: string; url: string; content: string; publishedDate?: string }>;
+  };
+  if (!data.results?.length) return [];
+  return data.results.slice(0, 8).map(r => ({
+    title: r.title,
+    url: r.url,
+    snippet: (r.content || '').slice(0, 500),
+    publishedAt: r.publishedDate,
+  }));
+}
+
+// ─── Brave Search ──────────────────────────────────────────────────────────────────
+
+async function searchBrave(query: string, apiKey: string): Promise<SearchResult[]> {
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=8`;
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(8000),
+    headers: {
+      'Accept': 'application/json',
+      'Accept-Encoding': 'gzip',
+      'X-Subscription-Token': apiKey,
+    },
+  });
+  if (!res.ok) throw new Error(`Brave returned ${res.status}`);
+  const data = await res.json() as {
+    web?: { results?: Array<{ title: string; url: string; description: string; published_date?: string }> };
+  };
+  if (!data.web?.results?.length) return [];
+  return data.web.results.slice(0, 8).map(r => ({
+    title: r.title,
+    url: r.url,
+    snippet: r.description || '',
+    publishedAt: r.published_date,
+  }));
+}
+
+// ─── Tavily ────────────────────────────────────────────────────────────────────────
+
+async function searchTavily(query: string, apiKey: string): Promise<SearchResult[]> {
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    signal: AbortSignal.timeout(10000),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      api_key: apiKey,
+      search_depth: 'basic',
+      max_results: 8,
+      include_raw_content: false,
+    }),
+  });
+  if (!res.ok) throw new Error(`Tavily returned ${res.status}`);
+  const data = await res.json() as {
+    results?: Array<{ title: string; url: string; content: string; published_date?: string }>;
+  };
+  if (!data.results?.length) return [];
+  return data.results.slice(0, 8).map(r => ({
+    title: r.title,
+    url: r.url,
+    snippet: r.content || '',
+    publishedAt: r.published_date,
+  }));
+}
+
+// ─── Jina Search ───────────────────────────────────────────────────────────────────
+
+async function searchJina(query: string): Promise<SearchResult[]> {
+  const base = 'https://s.jina.ai';
+  const url = `${base}/${encodeURIComponent(query)}`;
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(12000),
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'SupplyChainCortex/2.9',
+    },
+  });
+  if (!res.ok) throw new Error(`Jina Search returned ${res.status}`);
+  const data = await res.json() as {
+    data?: Array<{ title: string; url: string; content: string; publishedDate?: string }>;
+  };
+  if (!data.data?.length) return [];
+  return data.data.slice(0, 8).map(r => ({
+    title: r.title,
+    url: r.url,
+    snippet: (r.content || '').slice(0, 500),
+    publishedAt: r.publishedDate,
+  }));
+}
+
+// ─── HTML Helpers ──────────────────────────────────────────────────────────────────
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -138,72 +213,368 @@ function decodeEntities(text: string): string {
     .replace(/&mdash;/g, '—').replace(/&ndash;/g, '–');
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────────
+// ─── DuckDuckGo HTML Search — free, no API key, no Docker ──────────────────────────
 
-function hasChinese(text: string): boolean {
-  return /[一-鿿]/.test(text);
+async function searchDuckDuckGoHTML(query: string): Promise<SearchResult[]> {
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept': 'text/html',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    // Parse DDG HTML results: <a rel="nofollow" class="result__a" href="...">title</a>
+    // and <a class="result__snippet">snippet</a>
+    const results: SearchResult[] = [];
+    // Match result links with titles
+    const linkRegex = /<a[^>]*rel="nofollow"[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    const snippetRegex = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+
+    const links: Array<{ url: string; title: string }> = [];
+    let m;
+    while ((m = linkRegex.exec(html)) !== null) {
+      const url = m[1];
+      // Skip internal DDG links
+      if (url.startsWith('http') && !url.includes('duckduckgo.com')) {
+        links.push({ url: decodeEntities(url), title: decodeEntities(stripHtml(m[2]).trim()) });
+      }
+    }
+
+    const snippets: string[] = [];
+    while ((m = snippetRegex.exec(html)) !== null) {
+      snippets.push(decodeEntities(stripHtml(m[1]).trim()));
+    }
+
+    for (let i = 0; i < Math.min(links.length, 8); i++) {
+      if (links[i].title) {
+        results.push({
+          title: links[i].title,
+          url: links[i].url,
+          snippet: snippets[i] || '',
+        });
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
 }
+
+// ─── Jina Reader — shared content extraction ───────────────────────────────────────
+
+async function fetchPageContent(url: string): Promise<string | undefined> {
+  if (!isSafeUrl(url)) return undefined;
+  try {
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        'Accept': 'text/markdown',
+        'User-Agent': 'SupplyChainCortex/2.9',
+      },
+    });
+    if (!res.ok) return undefined;
+    const text = await res.text();
+    return text.slice(0, 6000); // Cap at 6KB to avoid token overflow
+  } catch {
+    return undefined;
+  }
+}
+
+// ─── Supplementary Sources ─────────────────────────────────────────────────────────
+
+async function searchReddit(query: string): Promise<SearchResult[]> {
+  try {
+    const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&limit=8&sort=relevance`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'SupplyChainCortex/2.9' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      data?: { children?: Array<{ data: { title: string; permalink: string; selftext: string; created_utc: number } }> };
+    };
+    if (!data.data?.children?.length) return [];
+    return data.data.children.slice(0, 8).map(c => c.data).map(r => ({
+      title: r.title,
+      url: `https://www.reddit.com${r.permalink}`,
+      snippet: (r.selftext || '').slice(0, 500),
+      publishedAt: new Date(r.created_utc * 1000).toISOString(),
+    }));
+  } catch { return []; }
+}
+
+async function searchGitHub(query: string): Promise<SearchResult[]> {
+  try {
+    const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=8`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept': 'application/json', 'User-Agent': 'SupplyChainCortex/2.9' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      items?: Array<{ full_name: string; html_url: string; description: string; updated_at: string; stargazers_count: number }>;
+    };
+    if (!data.items?.length) return [];
+    return data.items.slice(0, 8).map(r => ({
+      title: `${r.full_name} (${r.stargazers_count} stars)`,
+      url: r.html_url,
+      snippet: r.description || '',
+      publishedAt: r.updated_at,
+    }));
+  } catch { return []; }
+}
+
+async function searchHackerNews(query: string): Promise<SearchResult[]> {
+  try {
+    const url = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&hitsPerPage=8`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'SupplyChainCortex/2.9' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      hits?: Array<{ title: string; url?: string; objectID: string; points: number; created_at: string; comment_text?: string }>;
+    };
+    if (!data.hits?.length) return [];
+    return data.hits.slice(0, 8).map(r => ({
+      title: `${r.title} (${r.points} pts)`,
+      url: r.url || `https://news.ycombinator.com/item?id=${r.objectID}`,
+      snippet: r.comment_text || '',
+      publishedAt: r.created_at,
+    }));
+  } catch { return []; }
+}
+
+// ─── Provider Router ───────────────────────────────────────────────────────────────
+
+async function searchByProvider(query: string, config: ProviderConfig): Promise<{ results: SearchResult[]; source: string }> {
+  const { provider, baseUrl, apiKey } = config;
+
+  switch (provider) {
+    case 'searxng':
+      return { results: await searchSearXNG(query, baseUrl || 'http://localhost:8081'), source: 'SearXNG' };
+    case 'brave': {
+      if (!apiKey) throw new Error('BRAVE_API_KEY is required for Brave provider. Set it in .env or switch to SEARCH_PROVIDER=searxng');
+      return { results: await searchBrave(query, apiKey), source: 'Brave Search' };
+    }
+    case 'tavily': {
+      if (!apiKey) throw new Error('TAVILY_API_KEY is required for Tavily provider. Set it in .env or switch to SEARCH_PROVIDER=searxng');
+      return { results: await searchTavily(query, apiKey), source: 'Tavily' };
+    }
+    case 'jina':
+      return { results: await searchJina(query), source: 'Jina Search' };
+    case 'ddg':
+      return { results: await searchDuckDuckGoHTML(query), source: 'DuckDuckGo' };
+    default:
+      // Fallback: try DDG (no setup needed)
+      return { results: await searchDuckDuckGoHTML(query), source: 'DuckDuckGo (fallback)' };
+  }
+}
+
+// ─── Public API ────────────────────────────────────────────────────────────────────
 
 /**
- * Translate common Chinese supply chain terms to English keywords.
- * Uses Unicode escapes to avoid Turbopack encoding issues.
+ * Web search with multi-provider support + fallback chain.
+ *
+ * Priority:
+ *   1. Primary provider (SEARCH_PROVIDER env var or SearXNG)
+ *   2. Reddit (free, no key)
+ *   3. GitHub (free, no key)
+ *   4. HackerNews (free, no key)
  */
-function translateChineseKeywords(query: string): string {
-  const terms: [string, string][] = [
-    ['中美贸易战', 'US China trade war '],  // 中美贸易战
-    ['中美', 'US China '],                                // 中美
-    ['关税', 'tariff '],                                  // 关税
-    ['贸易战', 'trade war '],                         // 贸易战
-    ['运价|运费', 'freight rate '],              // 运价|运费
-    ['集装箱', 'container '],                         // 集装箱
-    ['铜价|铜', 'copper price '],                     // 铜价|铜
-    ['铝价|铝', 'aluminum price '],                   // 铝价|铝
-    ['钢价|钢|螺纹钢', 'steel price '],  // 钢价|钢|螺纹钢
-    ['碳价|碳关税', 'carbon price EUA '],    // 碳价|碳关税
-    ['召回', 'product recall CPSC '],                     // 召回
-    ['港口', 'port '],                                     // 港口
-    ['供应链', 'supply chain '],                      // 供应链
-    ['家电|小家电', 'appliance '],            // 家电|小家电
-    ['出口', 'export '],                                   // 出口
-    ['进口', 'import '],                                   // 进口
-    ['变化|最新|动态|新闻|最近|有什么', ''], // 变化|最新|动态|新闻|最近|有什么
-    ['政策', 'policy '],                                   // 政策
-  ];
-  let result = query;
-  for (const [zh, en] of terms) {
-    result = result.replace(new RegExp(zh, 'g'), en);
+/**
+ * Run all search tiers with a given query.
+ */
+async function tryAllSources(query: string, config: ProviderConfig): Promise<{ results: SearchResult[]; source: string }> {
+  // Tier 1: Primary provider
+  try {
+    const result = await searchByProvider(query, config);
+    if (result.results.length > 0) return result;
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error';
+    console.warn('[web-search] Primary provider failed:', msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***'));
   }
-  return result.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Tier 2: Reddit
+  try {
+    const reddit = await searchReddit(query);
+    if (reddit.length > 0) return { results: reddit, source: 'Reddit' };
+  } catch { /* continue */ }
+
+  // Tier 3: GitHub
+  try {
+    const github = await searchGitHub(query);
+    if (github.length > 0) return { results: github, source: 'GitHub' };
+  } catch { /* continue */ }
+
+  // Tier 4: Hacker News
+  try {
+    const hn = await searchHackerNews(query);
+    if (hn.length > 0) return { results: hn, source: 'Hacker News' };
+  } catch { /* continue */ }
+
+  return { results: [], source: 'none' };
 }
 
-// ─── Main Export ─────────────────────────────────────────────────────────────────
-
 export async function webSearch(query: string): Promise<{ results: SearchResult[]; source: string }> {
-  // Auto-translate Chinese queries to English
-  const searchQuery = hasChinese(query) ? translateChineseKeywords(query) : query;
-  const isChinese = hasChinese(query);
+  const q = sanitizeQuery(query);
+  if (!q) return { results: [], source: 'none' };
 
-  // Wikipedia first for factual queries
-  const wiki = await searchWikipedia(searchQuery);
-  if (wiki.length >= 3) return { results: wiki, source: 'Wikipedia' };
+  const config = getConfig();
 
-  // Google News RSS for current events
-  const news = await searchGoogleNews(searchQuery);
-  if (news.length > 0) return { results: news, source: 'Google News' };
+  // First attempt with original query
+  const firstTry = await tryAllSources(q, config);
+  if (firstTry.results.length > 0) return firstTry;
 
-  // Last resort
-  const ddg = await searchDuckDuckGoLite(searchQuery);
-  if (ddg.length > 0) return { results: ddg, source: 'DuckDuckGo Lite' };
+  // If query contains Chinese and got 0 results, retry with English keywords
+  if (hasChinese(q)) {
+    const enKeywords = extractEnglishKeywords(q);
+    if (enKeywords && enKeywords !== q) {
+      console.log('[web-search] Chinese query got 0 results, retrying with:', enKeywords);
+      const retry = await tryAllSources(enKeywords, config);
+      if (retry.results.length > 0) return retry;
+    }
+  }
 
   return { results: [], source: 'none' };
 }
 
 /**
- * Format search results as context for LLM prompt
+ * Deep search: primary provider + Jina Reader for full page content.
+ * Fetches up to 3 top results' full content via Jina Reader concurrently.
+ */
+export async function deepSearch(query: string): Promise<{ results: SearchResult[]; source: string }> {
+  const { results, source } = await webSearch(query);
+  if (results.length === 0) return { results: [], source };
+
+  // Fetch full content for top 3 results concurrently
+  const enriched = await Promise.all(
+    results.slice(0, 3).map(async (r) => {
+      const content = await fetchPageContent(r.url);
+      return { ...r, content };
+    })
+  );
+
+  // Merge: enriched first, then rest
+  return {
+    results: [...enriched, ...results.slice(3)],
+    source: `${source} + Jina Reader`,
+  };
+}
+
+/**
+ * Search supplementary sources only (no primary provider).
+ * Used when the user specifically wants community/developer content.
+ */
+export async function searchSupplementary(query: string): Promise<{ reddit: SearchResult[]; github: SearchResult[]; hn: SearchResult[] }> {
+  const q = sanitizeQuery(query);
+  const [reddit, github, hn] = await Promise.all([
+    searchReddit(q),
+    searchGitHub(q),
+    searchHackerNews(q),
+  ]);
+  return { reddit, github, hn };
+}
+
+/**
+ * Format search results as context for LLM prompt injection.
  */
 export function formatSearchContext(results: SearchResult[]): string {
-  if (results.length === 0) return '（未找到搜索结果。建议使用专用MCP工具查询具体数据：query_commodities(大宗商品)、query_scfis(运价)、query_carbon_price(碳价)、query_cpsc_recalls(召回)）';
-  return results.map((r, i) =>
-    `[${i + 1}] ${r.title}\n${r.snippet}\n${r.url}`
-  ).join('\n\n');
+  if (results.length === 0) {
+    const provider = getConfig().provider;
+    if (provider === 'searxng') {
+      return `未找到搜索结果。\n\n💡 SearXNG 容器可能未启动。运行 \`docker compose up -d searxng\` 即可。\n也可用内置MCP工具：query_commodities(大宗商品)、query_scfis(运价)、query_carbon_price(碳价)、query_cpsc_recalls(召回)、query_tariff(关税)、query_exchange_rates(汇率)`;
+    }
+    return `未找到搜索结果（当前 provider: ${provider}）。建议使用专用MCP工具查询具体数据。`;
+  }
+
+  // Filter out low-quality domains
+  const LOW_QUALITY_DOMAINS = ['reddit.com', 'forum.adrenaline.com.br', 'quora.com', 'answers.com'];
+  const filtered = results.filter(r => {
+    try {
+      const host = new URL(r.url).hostname.replace('www.', '');
+      return !LOW_QUALITY_DOMAINS.some(d => host.includes(d));
+    } catch { return true; }
+  });
+
+  // Tag results with authority level + freshness
+  const now = Date.now();
+  const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
+  const STALE_MS = 90 * 24 * 60 * 60 * 1000;
+  const HIGH_AUTHORITY = ['wikipedia.org', '.gov', 'who.int', 'un.org', 'ustr.gov', 'cpsc.gov',
+    'reuters.com', 'bloomberg.com', 'bbc.com', 'ft.com', 'wsj.com', 'chinabriefing.com',
+    'scmp.com', 'nrf.com', 'freightos.com', 'project44.com'];
+
+  // Score and sort by freshness × authority
+  const scored = filtered.map(r => {
+    let freshnessScore = 0.5;
+    if (r.publishedAt) {
+      const age = now - new Date(r.publishedAt).getTime();
+      if (age < FRESH_MS) freshnessScore = 1.0;
+      else if (age < 30 * 24 * 60 * 60 * 1000) freshnessScore = 0.85;
+      else if (age < STALE_MS) freshnessScore = 0.6;
+      else freshnessScore = 0.3;
+    }
+    return { result: r, freshnessScore };
+  });
+
+  scored.sort((a, b) => {
+    if ((a.freshnessScore < 0.4) !== (b.freshnessScore < 0.4)) return a.freshnessScore < 0.4 ? 1 : -1;
+    return b.freshnessScore - a.freshnessScore;
+  });
+
+  const tagged = scored.map((s, i) => {
+    const r = s.result;
+    let authority = '';
+    try {
+      const host = new URL(r.url).hostname.replace('www.', '');
+      if (HIGH_AUTHORITY.some(d => host.includes(d))) authority = ' [权威]';
+      else if (host.includes('linkedin.com') || host.includes('medium.com')) authority = ' [博客]';
+      else if (host.includes('github.com') || host.includes('ycombinator.com')) authority = ' [社区]';
+    } catch { /* ignore */ }
+    if (s.freshnessScore >= 1.0) authority += ' [最新]';
+    else if (s.freshnessScore < 0.4) authority += ' ⚠️[过时]';
+
+    const parts = [`[${i + 1}]${authority} ${r.title}`, r.snippet, r.url];
+    if (r.content) parts.push(`\n全文:\n${r.content.slice(0, 1500)}`);
+    if (r.publishedAt) {
+      const ageDays = Math.round((now - new Date(r.publishedAt).getTime()) / 86400000);
+      parts.push(`📅 ${r.publishedAt} (${ageDays}天前)`);
+    } else {
+      parts.push(`📅 发布日期未知`);
+    }
+    return parts.join('\n');
+  });
+
+  const header = `📡 联网搜索结果 (${tagged.length}条，[权威]=政府/媒体/机构 [博客]=个人分析 [社区]=论坛)。
+⚠️ 优先使用内置MCP工具的精准数据。搜索结果用于补充政策背景和行业动态，可能包含过时或主观内容。\n`;
+
+  return header + tagged.join('\n\n');
+}
+
+/**
+ * Return the currently configured provider name.
+ */
+export function getSearchProvider(): SearchProvider {
+  return getConfig().provider;
+}
+
+/**
+ * Return all available providers with their status.
+ */
+export function getAvailableProviders(): Array<{ name: SearchProvider; available: boolean; reason: string }> {
+  const config = getConfig();
+  return [
+    { name: 'ddg', available: true, reason: 'DuckDuckGo — free, no API key, no Docker' },
+    { name: 'searxng', available: true, reason: 'Self-hosted — requires Docker' },
+    { name: 'brave', available: !!process.env.BRAVE_API_KEY, reason: process.env.BRAVE_API_KEY ? 'Configured' : 'Set BRAVE_API_KEY in .env' },
+    { name: 'tavily', available: !!process.env.TAVILY_API_KEY, reason: process.env.TAVILY_API_KEY ? 'Configured' : 'Set TAVILY_API_KEY in .env' },
+    { name: 'jina', available: !!process.env.JINA_API_KEY, reason: process.env.JINA_API_KEY ? 'Configured' : 'Needs JINA_API_KEY (free tier available)' },
+  ];
 }

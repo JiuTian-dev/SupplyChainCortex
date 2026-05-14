@@ -98,27 +98,42 @@ function buildReActSystemPrompt(context?: string): string {
 ## 核心原则
 
 1. **先查数据再回答** — 绝不编造数字。任何关于库存、成本、物流、汇率的陈述必须有工具查询结果支撑。
-2. **多维度交叉分析** — 铜价涨→查含铜SKU→算毛利影响→建议锁价。不要孤立地看数据。
-3. **每条结论标注来源** — 使用 [claim-N] 格式标记，注明数据来源和置信度。
-4. **联网搜索用英文** — web_search 必须用英文关键词。
+2. **多维度交叉分析** — 铜价涨→查含铜SKU→算毛利影响→建议锁价。不要孤立看数据。每个结论至少交叉2个数据源。
+3. **每条结论标注来源+日期** — 使用 [claim-N] 格式标记，注明数据来源**和信息的发布日期**。搜索结果的日期决定其可信度。
+4. **联网搜索用英文** — web_search 必须用英文关键词。首次搜索后，如数据不足，换个角度再搜一轮。
 5. **中文回复** — 金额用美元/人民币，数字保留合理精度。
+
+## ⚠️ 时效性检查（每次必须执行）
+
+1. 对于联网搜索结果: 检查每条的发布日期。超过7天的标记"[最新]"，超过90天的标记"⚠️过时"且不作为主要依据。
+2. 对于系统数据: query_* 返回的是实时数据，置信度为高。搜索结果中的数字如与系统数据冲突，以系统数据为准。
+3. **绝对禁止** 使用过时的关税/政策数字。关税税率必须先查 query_tariff 获取当前适用税率。不同HS编码的税率不同——家电行业(HS 8509等)的关税和钢铁/半导体完全不同。
+4. 对于新闻事件类信息: 构建时间线。先搜"最新进展"，再搜"背景"。区分"正在发生"、"已停火"、"已解除"。
 
 ## 推理流程
 
-对于每个用户问题：
-1. 思考需要什么数据来全面回答问题
-2. 调用工具获取数据（可多轮，每次最多调用3个工具）
-3. 交叉分析不同数据源，发现关联和矛盾
-4. 给出带数据来源的结论和可执行建议
+对于复杂问题（涉及多个领域或需要外部信息）：
+1. **第一轮**: 并行调用系统工具获取实时数据（库存/成本/物流/风险）+ 联网搜索最新事件
+2. **第二轮**: 根据第一轮发现，深入查询具体SKU/HS编码/历史对比
+3. **第三轮**: 交叉分析，发现矛盾或缺口，补充查询
+4. **最终轮**: 给出结论。如果数据足够，不要无意义地继续调工具。
+
+对于简单问题（单一领域，不需要外部信息）：直接1-2轮完成。
+
+## 输出规划（写报告前先规划结构）
+
+对于需要生成完整报告的问题，先在心里规划报告结构：
+- 如果需要历史对比 → 查询去年同期/上月数据做对比
+- 如果需要关税分析 → 先用 query_tariff 查具体HS编码的适用税率
+- 如果需要财务影响 → 先查具体SKU的成本和毛利
+- 规划好后再逐段输出，最后给出带优先级的建议
 
 ## 工具调用协议
-
-当你需要查询数据时，在回复中使用以下格式：
 
 <tool>工具名称</tool>
 <params>{"key": "value"}</params>
 
-一次可以调用多个工具，依次写出即可。系统会执行所有工具并返回结果，然后你继续分析。
+一次可并行调用多个工具，依次写出即可。系统会执行所有工具后返回结果。
 
 ${buildToolRegistryPrompt()}
 
@@ -126,17 +141,25 @@ ${context || ''}
 
 ## 输出格式
 
-最终回复使用以下结构：
+最终报告使用以下结构：
 
 ## 分析
-[claim-1] 事实陈述。数据源: tool_name, 日期。置信度: 高/中/低
+### 一、[背景/事件概述]
+[claim-1] 事实陈述。数据源: tool_name。📅 日期。置信度: 高/中/低
 [claim-2] ...
 
+### 二、[对供应链的传导路径]
+每条路径标注直接影响和间接影响
+
+### 三、[情景推演]（如适用）
+乐观/基准/悲观三种情景
+
 ## 结论
-综合判断
+综合判断，突出核心矛盾
 
 ## 建议
-可执行的操作建议，按优先级排列`;
+按优先级排列: 🔴紧急 / 🟡短期 / 🟢中期
+每条建议标注参考的系统策略（如有）`;
 }
 
 // ─── Tool Call Parser ────────────────────────────────────────────────────────────
@@ -315,7 +338,7 @@ export async function* runReActAgent(
     for await (const chunk of chatCompletionStream({
       provider, model, messages, stream: true,
       apiKey: options.apiKey,
-      maxTokens: options.maxTokens || 4000,
+      maxTokens: options.maxTokens || 6000,
       temperature: options.temperature || 0.7,
     })) {
       if (chunk.type === 'token' && chunk.content) {
@@ -392,47 +415,49 @@ export async function* runReActAgent(
       return;
     }
 
-    // Execute tool calls (routed through policy engine for write operations)
+    // Execute tool calls in parallel (independent calls don't depend on each other)
     const toolOutputTexts: string[] = [];
     const pendingConfirmations: Array<Record<string, unknown>> = [];
 
+    // Auto-fill actions before execution
     for (const tc of toolCalls) {
-      step.toolName = tc.name;
-      step.toolParams = tc.params;
-      toolsUsed.push(tc.name);
-
-      // Auto-fill action when omitted
       if (!tc.params.action && DEFAULT_TOOL_ACTIONS[tc.name]) {
         tc.params.action = DEFAULT_TOOL_ACTIONS[tc.name];
       }
+      toolsUsed.push(tc.name);
+    }
 
-      // Route through policy engine
-      const policyResult = await executeWithPolicy(tc.name, tc.params);
+    // Emit all tool_call events upfront
+    for (const tc of toolCalls) {
+      yield { type: 'tool_call', tool: tc.name, params: tc.params };
+    }
 
+    // Execute all tool calls in parallel
+    const executions = await Promise.all(
+      toolCalls.map(async (tc) => {
+        const policyResult = await executeWithPolicy(tc.name, tc.params);
+        return { tc, policyResult };
+      })
+    );
+
+    // Process results in original order
+    for (const { tc, policyResult } of executions) {
       if (policyResult.needsConfirmation && policyResult.confirmationCard) {
-        // Write operation requiring human confirmation
         step.toolResult = `⏳ 等待确认: ${policyResult.confirmationCard.title}`;
         toolOutputTexts.push(`[${tc.name} 等待确认]\n${policyResult.confirmationCard.description}`);
         pendingConfirmations.push(policyResult.confirmationCard);
         yield { type: 'confirm_required', confirmationCard: policyResult.confirmationCard };
         yield { type: 'tool_result', tool: tc.name, result: '⏳ 此操作需要人工确认' };
       } else if (policyResult.executed) {
-        // Auto-executed (read ops or low-risk write ops within policy limits)
-        yield { type: 'tool_call', tool: tc.name, params: tc.params };
-
         try {
           const formatted = formatToolResult(tc.name, tc.params.action as string || '', policyResult.result);
-          step.toolResult = formatted;
           toolOutputTexts.push(`[${tc.name} 结果]\n${formatted.slice(0, 2000)}`);
           yield { type: 'tool_result', tool: tc.name, result: formatted.slice(0, 300) };
         } catch (err) {
-          step.toolError = (err as Error).message;
           toolOutputTexts.push(`[${tc.name} 错误]\n${(err as Error).message}`);
           yield { type: 'tool_result', tool: tc.name, error: (err as Error).message };
         }
       } else {
-        // Policy forbade execution
-        step.toolError = policyResult.error || '策略禁止';
         toolOutputTexts.push(`[${tc.name} 被拒绝]\n${policyResult.error}`);
         yield { type: 'tool_result', tool: tc.name, error: policyResult.error };
       }
@@ -458,7 +483,7 @@ export async function* runReActAgent(
       for await (const chunk of chatCompletionStream({
         provider, model, messages, stream: true,
         apiKey: options.apiKey,
-        maxTokens: options.maxTokens || 4000,
+        maxTokens: options.maxTokens || 6000,
         temperature: options.temperature || 0.7,
       })) {
         if (chunk.type === 'token' && chunk.content) {
