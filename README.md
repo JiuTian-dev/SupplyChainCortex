@@ -1,12 +1,13 @@
-# SupplyChain Cortex
+# SupplyChain Cortex v0.8.0
 
-**MCP-driven supply chain decision intelligence engine for cross-border e-commerce.**
+**MCP-driven supply chain decision intelligence for cross-border small-appliance e-commerce.**
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-0%20errors-blue)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-308%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-356%20passed-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-0.8.0-orange)]()
 
-Cascading risk propagation, formalized decision graph, Bayesian self-calibration, and enterprise resilience — all running locally.
+**Five-layer supply chain intelligence: Clean real-time data → Algorithmic prediction → Expert chat agent → Semi-automated decision → Closed-loop learning.**
 
 ---
 
@@ -19,97 +20,142 @@ Cross-border supply chains face compounded risks: weather disruptions at ports, 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                   Frontend (Next.js 16)               │
-│   Monitor → Analysis → Decision → Simulation         │
-├──────────────────────────────────────────────────────┤
-│                   MCP Protocol Layer                  │
-│         21 tools (inventory, cost, risk, FX...)       │
-├──────────────────────────────────────────────────────┤
-│                  Decision Engines                     │
-│  ┌──────────────┬────────────┬───────────────────┐  │
-│  │Cascade Risk  │ Decision   │ Tariff/Cost        │  │
-│  │Propagation   │ Graph      │ Simulation         │  │
-│  └──────────────┴────────────┴───────────────────┘  │
-├──────────────────────────────────────────────────────┤
-│              Enterprise Resilience                   │
-│  CircuitBreaker · Timeout · Retry · Fallback · Cache │
-├──────────────────────────────────────────────────────┤
-│              Self-Evolving Pipeline                  │
-│  Feedback → Bayesian Posterior → Weight Calibration  │
-├──────────────────────────────────────────────────────┤
-│              Data Layer (Prisma + SQLite)             │
-│         23 models · 46 API endpoints                 │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    Frontend (Next.js 16)                      │
+│     Monitor → Analysis → Decision → Simulation               │
+├──────────────────────────────────────────────────────────────┤
+│                    MCP Protocol Layer                         │
+│           27 tools (inventory, cost, risk, FX...)             │
+├──────────────────────────────────────────────────────────────┤
+│           Decision Engines (Hybrid Determinism)               │
+│  ┌─────────────┬──────────────┬──────────────────────────┐  │
+│  │ Cascade Risk│ Decision     │ Tariff/Cost Simulation   │  │
+│  │ Propagation │ Graph        │                          │  │
+│  └─────────────┴──────────────┴──────────────────────────┘  │
+├──────────────────────────────────────────────────────────────┤
+│      2026 Agent Layer (ReAct + Dynamic Context + Policy)     │
+│  ┌─────────────┬──────────────┬──────────────────────────┐  │
+│  │ ReAct Loop  │ Evidence-    │ Policy-as-Code           │  │
+│  │             │ Level Feedb. │ Bounded Autonomy         │  │
+│  └─────────────┴──────────────┴──────────────────────────┘  │
+├──────────────────────────────────────────────────────────────┤
+│               Enterprise Resilience                          │
+│   CircuitBreaker · Timeout · Retry · Fallback · Cache        │
+├──────────────────────────────────────────────────────────────┤
+│               Self-Evolving Pipeline                         │
+│   Feedback → Bayesian Posterior → Weight Calibration         │
+├──────────────────────────────────────────────────────────────┤
+│          Data Layer (Prisma + PostgreSQL / SQLite)           │
+│   23 models · 9 external data sources · 50+ API endpoints    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-## Key Features
+---
 
-### Core Decision Engines
+## Five-Layer Decision Intelligence
 
-| Engine | Description |
-|---|---|
-| **Cascade Risk Propagation** | Directed graph propagation with multi-source anomaly fusion (Open-Meteo weather + Frankfurter FX + DB). Calibrated attenuation factors from historical data. |
-| **Decision Graph** | Encoded supply chain decisions as traversable decision trees with conditions, outcomes, confidence scoring, and urgency classification. |
-| **Tariff Simulation** | HS code lookup, scenario simulation (baseline, trade_war, typhoon_season, perfect_storm), per-product duty calculation. |
-| **Workflow Orchestration** | MCP tool execution with skip/abort/fallback failure modes, step-level timing, and context passing. |
+### Layer 1: Clean Real-Time Data
 
-### Enterprise Resilience (D1-D4)
+| Source | Type | Data |
+|--------|------|------|
+| **Internal DB** | Products, Inventory, Sales, Shipments, Costs | 23 Prisma models |
+| **Exchange Rates** | Frankfurter API + PBOC ALAPI | USD/CNY, EUR/CNY, JPY/CNY |
+| **Commodities** | Alpha Vantage + FRED | Copper, Aluminum, Steel, PP, LLDPE, PVC |
+| **Freight** | SCFIS Futures | Shanghai-Europe container freight index |
+| **Carbon** | EU ETS | EUA carbon price + CBAM calculation |
+| **Tariffs** | USTR Scraper | Section 301 + HS code duty rates |
+| **Recalls** | CPSC Scraper | US consumer product safety recalls |
+| **Weather** | Open-Meteo | 10 global port marine weather |
+| **Financial** | Yahoo Finance | QQQ, SPY, SMH, ^IXIC |
 
-- **Circuit Breaker** — auto-open after N failures, half-open probe after cooldown
-- **Timeout + Retry** — jittered exponential backoff, AbortController isolation
-- **Decision Passport** — every output carries audit ID, 5-source provenance chain, confidence score, alternative comparison
-- **Deterministic Simulation** — mulberry32 seeded PRNG, seed-replay for reproducibility
-- **Feedback Loop** — user accept/reject → Prisma FeedbackLog → Bayesian weight calibration
-- **Anomaly Detection** — Z-score monitoring on 7-day rolling window, auto-rollback recommendation
+### Layer 2: Algorithmic Prediction
 
-### Frontend
+| Engine | Technique | Output |
+|--------|-----------|--------|
+| **Cascade Risk** | Directed graph propagation + multi-source anomaly fusion | 4D risk score (depth × breadth × criticality × centrality) |
+| **Decision Graph** | Traversable decision trees | Actions with confidence + urgency + expected impact |
+| **Tariff Simulation** | Scenario-based (baseline / trade_war / typhoon / perfect_storm) | Per-product duty + landed cost |
+| **Anomaly Detection** | Z-score on 7-day rolling window | Auto-rollback recommendation |
+| **Deterministic Engine** | mulberry32 seeded PRNG | Seed-replay for reproducibility + audit |
 
-- **4-layer decision flow**: Monitor → Analysis → Decision → Simulation (tab-based)
-- **6 operational tabs**: Inventory, Cost, Logistics, Supplier, Risk, Dashboard
-- **Configurable metrics**: Power-BI-style ConfigToolbar (currency, risk thresholds, time horizon)
-- **Decision cards**: Accept/Reject with reason, wired to `/api/engine-feedback`
-- **Passport panel**: Collapsible provenance chain with 5-source status indicators
-- **Sandbox replay**: Seed input for reproducible simulation runs
+### Layer 3: Expert Chat Agent
+
+| Capability | Implementation |
+|------------|---------------|
+| **ReAct Reasoning** | Multi-round think → call tools → observe → analyze loop |
+| **Dynamic Context** | Live supply chain state injected per-request (alerts, inventory, shipments, compliance) |
+| **MCP Tool Suite** | 27 domain tools queryable by the agent in natural language |
+| **RAG Knowledge Base** | 50+ hand-curated domain chunks (tariff, logistics, compliance, safety, payments) |
+| **Multi-Provider** | DeepSeek / OpenAI / Anthropic / Ollama via unified abstraction |
+| **Progressive Disclosure** | Skills loaded on-demand; 50+ available, only relevant ones consume context |
+
+### Layer 4: Semi-Automated Decision
+
+| Level | Description | Status |
+|-------|-------------|--------|
+| **Assisted** | Agent recommends with data provenance + confidence | ✅ Live |
+| **Automated** | Agent executes within policy guardrails | ✅ Policy-as-Code |
+| **Autonomous** | End-to-end with human-on-the-loop oversight | 🔄 Planned |
+
+Every decision carries a **Decision Passport**: audit ID → 5-source provenance chain → confidence score → alternative comparison → execution trace.
+
+### Layer 5: Closed-Loop Learning
+
+```
+Agent suggestion → User accept/reject/modify → Evidence-level feedback
+    → Source reliability update (Bayesian) → Knowledge weight calibration
+    → Next suggestion improved
+```
+
+---
+
+## 2026 Upgrades (v0.8.0)
+
+| Module | What it replaces | Key innovation |
+|--------|-----------------|----------------|
+| **ReAct Agent Loop** | Keyword-based `matchToolsToQuery()` | LLM decides which tools to call. `<tool>/<params>` XML protocol avoids DeepSeek function-calling bugs. Up to 5 reasoning rounds. |
+| **Dynamic System Context** | Static 50-line system prompt | Real-time DB query builds context: critical alerts, inventory warnings, shipment delays, compliance deadlines, supplier risks. |
+| **Evidence-Level Feedback** | Response-level accept/reject | `[claim-N]` tags link every claim to its data source. Users mark individual claims. Bayesian source-reliability tracking. |
+| **Policy-as-Code** | No guardrails | `auto` / `confirm` / `forbid` per tool. Value limits, daily caps, confirmation cards. Read ops auto, write ops confirm. |
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
-- npm or bun
+- Node.js 20+ / Bun
+- Docker (for PostgreSQL + SearXNG)
 
-### Installation
-
-```bash
-git clone https://github.com/YOUR_USERNAME/supplychain-cortex.git
-cd supplychain-cortex
-npm install
-```
-
-### Configure Environment
+### Quick Start
 
 ```bash
+git clone git@github.com:JiuTian-dev/SupplyChainCortex.git
+cd SupplyChainCortex
+
+# Install
+bun install
+
+# Configure
 cp .env.example .env
-# Edit .env — at minimum, set a NEXTAUTH_SECRET
-```
+# Edit .env — set DEEPSEEK_API_KEY at minimum
 
-### Setup Database
+# Start infrastructure
+docker compose up -d postgres
 
-```bash
-npx prisma generate
-npx prisma db push
-npx prisma db seed  # Populate with sample supply chain data
-```
+# Setup database
+bun run db:push
+bun run db:seed
 
-### Run
+# Optional: start self-hosted search engine
+docker compose up -d searxng
 
-```bash
-npm run dev
+# Run
+bun run dev
 # Open http://localhost:3000
 ```
 
-### API Health Check
+### Health Check
 
 ```bash
 curl http://localhost:3000/api/engine-health
@@ -119,64 +165,148 @@ curl http://localhost:3000/api/engine-health
 ### Run Tests
 
 ```bash
-npm test              # 308 unit tests
-npx playwright test   # 7 e2e tests
+bun test                    # 356 unit tests (Vitest)
+npx playwright test         # end-to-end tests
 ```
+
+---
 
 ## API Quick Reference
 
+### Decision Engines
+
 | Endpoint | Description |
-|---|---|
-| `GET /api/cascade-risk?scenario=auto` | Risk propagation analysis with passport |
-| `GET /api/decision-graph?query=库存` | Structured decision recommendations |
-| `GET /api/sandbox?scenario=perfect_storm&seed=42` | Deterministic scenario simulation |
-| `POST /api/engine-feedback` | Record user feedback on AI suggestions |
-| `GET /api/engine-calibrate?action=apply` | Auto-calibrate Bayesian weights |
+|----------|-------------|
+| `POST /api/chat` | ReAct agent chat (streaming SSE supported) |
+| `GET /api/cascade-risk?scenario=auto` | Risk propagation with passport |
+| `GET /api/decision-graph?query=库存` | Decision recommendations |
+| `GET /api/sandbox?scenario=perfect_storm&seed=42` | Deterministic simulation |
+
+### Feedback & Learning
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/engine-feedback` | Record user feedback (response-level or evidence-level with `claims` array) |
+| `POST /api/engine-feedback/extract-claims` | Parse `[claim-N]` tags from agent response |
+| `GET /api/engine-feedback?action=evidence-stats` | Per-source reliability scores |
+| `GET /api/engine-calibrate?action=apply` | Trigger Bayesian weight calibration |
 | `GET /api/engine-health?action=quality` | Decision quality anomaly detection |
 | `GET /api/engine-health?action=audit&format=csv` | Export full audit trail |
-| `GET /api/mcp` | List all 21 MCP tools |
+
+### Autonomy Policy
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/autonomy-policy` | Current policy configuration |
+| `GET /api/autonomy-policy?action=stats` | Daily execution counts by tool |
+| `PATCH /api/autonomy-policy` | Update policy levels and limits |
+
+### MCP Tools
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/mcp` | List all 27 MCP tools with schemas |
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) |
+|-------|-----------|
+| Framework | Next.js 16 (App Router, Turbopack) |
 | Language | TypeScript (strict, 0 errors) |
-| Database | SQLite (MySQL/Postgres schemas available) |
+| Database | PostgreSQL 16 (SQLite/MySQL schemas available) |
 | ORM | Prisma 6 |
+| AI Providers | DeepSeek V4 Pro / OpenAI / Anthropic / Ollama |
 | State | Zustand 5 + TanStack React Query 5 |
-| UI | shadcn/ui + Tailwind CSS 4 + Recharts |
-| Testing | Vitest 4 + Playwright |
-| Container | Docker + Caddy |
+| UI | shadcn/ui + Tailwind CSS 4 + Recharts 2 |
+| Testing | Vitest 4 (356 tests) + Playwright |
+| Container | Docker + Caddy + docker-compose |
+| Search | SearXNG (self-hosted, 70+ engines) |
+
+---
 
 ## Project Structure
 
 ```
 src/
-├── app/api/           # 46 API route handlers
+├── app/api/
+│   ├── chat/                    # ReAct agent endpoint
+│   ├── autonomy-policy/         # Policy-as-code API
+│   ├── engine-feedback/         # Evidence-level feedback API
+│   ├── engine-calibrate/        # Bayesian calibration API
+│   ├── engine-health/           # Engine health + audit API
+│   ├── cascade-risk/            # Risk propagation
+│   ├── decision-graph/          # Decision recommendations
+│   ├── sandbox/                 # Simulation sandbox
+│   └── ...                      # 50+ API route handlers
 ├── lib/
-│   ├── engine/        # 10 production modules (resilience, passport, calibration...)
-│   ├── services/      # 24 business logic services
-│   ├── queries/       # 20 query modules (data access)
-│   ├── mcp/           # MCP tool registry (21 tools in 4 domain files)
-│   ├── utils/         # Shared utilities (date, format)
-│   └── dashboard/     # Config-driven metrics system
+│   ├── engine/
+│   │   ├── react-agent.ts       # ReAct reasoning loop (NEW v0.8)
+│   │   ├── context-builder.ts   # Dynamic system prompt (NEW v0.8)
+│   │   ├── evidence-feedback.ts # Claim-level feedback (NEW v0.8)
+│   │   ├── autonomy-policy.ts   # Bounded autonomy (NEW v0.8)
+│   │   ├── passport.ts          # Decision provenance
+│   │   ├── deterministic.ts     # Seeded PRNG simulation
+│   │   ├── calibration.ts       # Bayesian weight calibration
+│   │   ├── resilience.ts        # Circuit breaker, retry, timeout
+│   │   ├── feedback.ts          # Response-level feedback
+│   │   ├── memory.ts            # Agent shared context
+│   │   ├── rag.ts               # 50-chunk domain knowledge base
+│   │   ├── causal-reasoning.ts  # Counterfactual analysis
+│   │   └── ...
+│   ├── services/                # 24 business logic services
+│   ├── sources/                 # 9 external data source scrapers
+│   ├── mcp/                     # 27 MCP tools in 4 domain files
+│   └── dashboard/               # Config-driven metrics system
 ├── components/
-│   ├── dashboard/     # Decision flow (MonitorStrip, DecisionCenter, ConfigToolbar...)
-│   ├── inventory/     # Inventory management tab
-│   ├── risk/          # Risk analysis (CascadeRiskPanel)
-│   └── ...
-└── hooks/             # React hooks (use-supply-chain-data, use-filtered-data...)
+│   ├── dashboard/               # Decision flow (Monitor → Analysis → Decision → Simulation)
+│   ├── inventory/               # Inventory management
+│   ├── cost/                    # Cost simulation + waterfall
+│   ├── logistics/               # Shipment tracking + route maps
+│   ├── risk/                    # Cascade risk + matrix heatmap
+│   ├── supplier/                # Supplier analytics + comparison
+│   ├── sales/                   # Demand forecasting
+│   ├── quality/                 # Returns + defects + warranty
+│   └── shared/                  # ChatPanel, Search, Notifications, etc.
+└── hooks/                       # React hooks
 ```
+
+---
 
 ## Roadmap
 
-- [x] Phase 1: Core engines (cascade risk, decision graph, tariff, workflow)
-- [x] Phase 2: Enterprise resilience (circuit breaker, passport, deterministic)
-- [x] Phase 3: Self-evolving pipeline (feedback, calibration, anomaly detection)
-- [ ] Phase 4: Multi-tenant RBAC
-- [ ] Phase 5: AI provider integration (DeepSeek, OpenAI, Anthropic, Ollama)
-- [ ] Phase 6: K8s Helm chart + monitoring dashboards
+### ✅ Completed
+
+| Phase | Feature |
+|-------|---------|
+| **v0.1–0.4** | Core engines: cascade risk, decision graph, tariff simulation, workflow |
+| **v0.5** | Enterprise resilience: circuit breaker, retry, cache, passport, deterministic engine |
+| **v0.6** | Self-evolving pipeline: feedback loop, Bayesian calibration, anomaly detection |
+| **v0.7** | Frontend: 4-layer decision flow, 6 operational tabs, passport panel, sandbox replay |
+| **v0.7.2** | AI provider integration: DeepSeek, OpenAI, Anthropic, Ollama. Streaming chat. 27 MCP tools. |
+| **v0.8.0** | 2026 upgrades: ReAct agent loop, dynamic context, evidence feedback, policy-as-code autonomy |
+
+### 🔄 In Progress
+
+| Priority | Feature |
+|----------|---------|
+| **High** | Multi-turn conversation memory in chat agent |
+| **High** | Knowledge base auto-evolution from evidence feedback |
+| **Medium** | Graph-RAG for supply chain relationship reasoning (Neo4j) |
+| **Medium** | Graduated autonomy: Stage 3 (Autonomous) for low-risk decisions |
+
+### 📋 Planned
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-tenant RBAC** | Role-based access control for team deployments |
+| **Real-time alerts** | WebSocket push notifications for critical supply chain events |
+| **Supplier discovery** | AI-driven alternative supplier search and evaluation |
+| **Mobile PWA** | Progressive web app for on-the-go monitoring |
+| **Integration hub** | Native connectors for Amazon Seller Central, Shopify, ERP systems |
+
+---
 
 ## Contributing
 

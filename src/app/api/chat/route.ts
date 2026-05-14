@@ -1,5 +1,9 @@
 /**
  * Universal Chat API Route — Supports DeepSeek, OpenAI, Anthropic, local Ollama.
+ *
+ * 2026 upgrade: ReAct agent loop replaces keyword-based tool matching.
+ * Uses <tool>/<params> XML protocol for DeepSeek compatibility.
+ *
  * Streaming SSE: POST /api/chat  { message, stream: true, provider, model, apiKey }
  */
 
@@ -10,6 +14,8 @@ import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
+import { runReActAgent } from '@/lib/engine/react-agent';
+import { buildDynamicSystemContext } from '@/lib/engine/context-builder';
 import {
   chatCompletionStream,
   chatCompletion,
@@ -20,7 +26,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-// ─── System Prompt ──────────────────────────────────────────────────────────────
+// ─── System Prompt (legacy, kept for backward compatibility) ──────────────────────
 
 const SYSTEM_PROMPT = `你是"SupplyChain Cortex"的智能供应链决策助手，专门为跨境小家电供应链提供深度分析和决策支持。
 
@@ -44,15 +50,18 @@ MCP 工具清单：
 【供应商】query_suppliers (list/performance)
 【风险】query_risk · query_cascade_risk (9种场景) · query_decision_graph
 【综合】query_dashboard · execute_workflow · query_tariff · run_sandbox
-【联网】web_search — 搜索最新公开信息。支持英文(Wikipedia+Google News)。中文查询会自动翻译为英文后搜索，结果翻译回中文呈现。
+【金融】query_financial_index — 纳斯达克100(QQQ)、标普500(SPY)、半导体指数(SMH)、纳斯达克综合(^IXIC)
+【联网】web_search — 搜索最新公开信息，英文优先。
 【操作】create_reorder · adjust_inventory · create_note · update_shipment_status
 
 分析原则：
-1. 先查数据再回答，绝不编造数字
-2. 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
-3. **联网搜索必须使用英文关键词，禁止使用中文**。正确: web_search("US China tariff 2026")。错误: web_search("中美关税")。如果搜索结果提示需要英文，立即用英文关键词重新搜索，不要放弃。
-4. 用中文回复，金额用美元/人民币单位，数字保留合理精度
-5. 回复末尾可提出后续分析建议`;
+1. **数据优先级：MCP内置工具 > RAG知识库 > 联网搜索**。MCP工具直连API/交易所，数据最准。联网搜索结果标记了[权威]/[博客]/[社区]标签，[博客]和[社区]来源仅供参考，不可作为决策依据。
+2. 先查数据再回答，绝不编造数字。内置工具查不到再考虑联网搜索。
+3. 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
+4. **联网搜索必须使用英文关键词**。正确: web_search("US China tariff 2026")。错误: web_search("中美关税")
+5. 如果搜索结果内容与MCP工具数据冲突，以MCP工具为准，并在回复中标注差异。
+6. 用中文回复，金额用美元/人民币，数字保留合理精度
+7. 回复末尾可提出后续分析建议`;
 
 // ─── SSE Helpers ────────────────────────────────────────────────────────────────
 
@@ -152,7 +161,251 @@ function formatToolResult(tool: string, action: string, result: unknown): string
     case 'query_port_congestion': {
       return `⚓ 港口拥堵: 全球${data.globalLevel}级, 热点: ${(data.affectedRoutes as string[])?.join(', ') || '无'}`;
     }
+    case 'query_financial_index': {
+      return `📈 金融指数:\n${(data.summary as string) || JSON.stringify(data.indices)}`;
+    }
     default: return `查询完成: ${JSON.stringify(data).substring(0, 800)}`;
+  }
+}
+
+// ─── DeepSeek Tool Call Text Detection ────────────────────────────────────────────
+
+/** Known tool names for detecting when DeepSeek emits tool calls as text */
+const KNOWN_TOOL_NAMES = [
+  'query_inventory', 'query_cost', 'query_sales', 'query_logistics',
+  'query_suppliers', 'query_dashboard', 'query_risk', 'query_analytics',
+  'query_exchange_rates', 'query_weather', 'query_tariff', 'query_cascade_risk',
+  'query_decision_graph', 'query_commodities', 'query_scfis', 'query_carbon_price',
+  'query_cpsc_recalls', 'query_port_congestion', 'query_financial_index',
+  'execute_workflow', 'run_sandbox',
+  'web_search', 'adjust_inventory', 'create_reorder', 'create_note', 'update_shipment_status',
+];
+
+/**
+ * Check if a text token looks like it might be the start of a tool call
+ * (DeepSeek bug: emits function calls as plain text)
+ */
+function isToolCallText(token: string): boolean {
+  for (const name of KNOWN_TOOL_NAMES) {
+    if (token.includes(name + '(') || token.startsWith(name)) return true;
+  }
+  return false;
+}
+
+/**
+ * Extract tool calls that DeepSeek emitted as plain text instead of tool_calls.
+ * Matches patterns like: `tool_name({"key": "value"})`
+ */
+function extractToolCallsFromText(text: string): Array<{ id: string; function: { name: string; arguments: string } }> {
+  const results: Array<{ id: string; function: { name: string; arguments: string } }> = [];
+  const toolNames = KNOWN_TOOL_NAMES.join('|');
+  const regex = new RegExp(`(${toolNames})\\s*\\(\\s*(\\{[\\s\\S]*?\\})\\s*\\)`, 'g');
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    results.push({
+      id: crypto.randomUUID(),
+      function: { name: match[1], arguments: match[2].trim() },
+    });
+  }
+  return results;
+}
+
+// ─── Default Tool Actions ─────────────────────────────────────────────────────────
+
+const DEFAULT_TOOL_ACTIONS: Record<string, string> = {
+  query_inventory: 'overview',
+  query_cost: 'overview',
+  query_sales: 'overview',
+  query_logistics: 'stats',
+  query_suppliers: 'list',
+  query_dashboard: 'summary',
+  query_risk: 'dashboard',
+  query_exchange_rates: 'latest',
+  query_weather: 'summary',
+  query_analytics: 'supplier_performance',
+  query_tariff: 'overview',
+  query_cascade_risk: 'auto',
+  query_decision_graph: 'cross_domain',
+  query_commodities: '',
+  query_scfis: '',
+  query_carbon_price: '',
+  query_cpsc_recalls: '',
+  query_port_congestion: '',
+  execute_workflow: 'wf-full-health',
+  web_search: '',
+};
+
+// ─── Auto-Search Detection ────────────────────────────────────────────────────────
+
+const TIME_SENSITIVE_KEYWORDS = [
+  '最新', '最近', '今天', '昨天', '本周', '本月', '今年',
+  '新闻', '动态', '变化', '更新', '突发', '刚发布', '刚公布',
+  '当前', '现在', 'latest', 'recent', 'today', 'this week',
+  'news', 'update', 'breaking', 'just announced', 'current',
+  '多少', '是多少', '什么价格', '什么价', '多少钱',
+  'SCFI', 'SCFIS', '运价', '运费', '碳价', '铜价', '铝价', '钢价',
+  '汇率', '关税', '政策', '召回', '港口',
+];
+
+function shouldAutoSearch(query: string): boolean {
+  const q = query.toLowerCase();
+  // Check time-sensitive keywords
+  for (const kw of TIME_SENSITIVE_KEYWORDS) {
+    if (q.includes(kw.toLowerCase())) return true;
+  }
+  // Check for questions asking about current data
+  if (/what('s| is) the (current |latest |price of )/i.test(q)) return true;
+  return false;
+}
+
+// ─── ReAct Agent Stream Handler ──────────────────────────────────────────────────
+
+async function handleReActStream(
+  message: string,
+  history: ChatMessage[],
+  provider: string,
+  model: string,
+  apiKey?: string,
+  webSearchEnabled?: boolean,
+): Promise<Response> {
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enqueue = (event: string, data: unknown) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      };
+
+      try {
+        // Build dynamic context from live supply chain state
+        enqueue('thinking', { status: 'context' });
+        const dynamicContext = await buildDynamicSystemContext();
+
+        enqueue('thinking', { status: 'analyzing' });
+
+        const eventStream = runReActAgent(message, history, dynamicContext, {
+          provider,
+          model,
+          apiKey,
+          enableWebSearch: webSearchEnabled,
+          enableRAG: true,
+          maxRounds: 5,
+          temperature: 0.7,
+          maxTokens: 4000,
+        });
+
+        for await (const event of eventStream) {
+          switch (event.type) {
+            case 'thinking':
+              enqueue('thinking', { status: event.content });
+              break;
+            case 'tool_call':
+              enqueue('tool_call', { tool: event.tool, params: event.params });
+              break;
+            case 'tool_result':
+              if (event.error) {
+                enqueue('tool_result', { tool: event.tool, error: event.error });
+              } else {
+                enqueue('tool_result', { tool: event.tool, result: event.result });
+              }
+              break;
+            case 'token':
+              enqueue('token', { content: event.content });
+              break;
+            case 'done':
+              enqueue('done', {
+                toolsUsed: event.toolsUsed,
+                steps: event.steps?.length,
+                durationMs: event.durationMs,
+                claimsExtracted: event.content ? JSON.parse(event.content).claimsExtracted : 0,
+              });
+              break;
+            case 'error':
+              enqueue('error', { message: event.error });
+              break;
+          }
+        }
+      } catch (err) {
+        enqueue('error', { message: (err as Error).message || 'ReAct Agent processing failed' });
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+}
+
+// ─── ReAct Non-Streaming Handler ──────────────────────────────────────────────────
+
+async function handleReActNonStream(
+  message: string,
+  history: ChatMessage[],
+  provider: string,
+  model: string,
+  apiKey?: string,
+  webSearchEnabled?: boolean,
+): Promise<NextResponse> {
+  let fullResponse = '';
+  const toolsUsed: string[] = [];
+  const steps: unknown[] = [];
+  let durationMs = 0;
+  let hadError = false;
+  let errorMsg = '';
+
+  try {
+    const dynamicContext = await buildDynamicSystemContext();
+
+    const eventStream = runReActAgent(message, history, dynamicContext, {
+      provider,
+      model,
+      apiKey,
+      enableWebSearch: webSearchEnabled,
+      enableRAG: true,
+      maxRounds: 5,
+    });
+
+    for await (const event of eventStream) {
+      if (event.type === 'token' && event.content) {
+        fullResponse += event.content;
+      }
+      if (event.type === 'error') {
+        hadError = true;
+        errorMsg = event.error || 'Unknown ReAct error';
+        console.error('[ReAct] Agent error:', errorMsg);
+      }
+      if (event.type === 'done') {
+        if (event.toolsUsed) toolsUsed.push(...event.toolsUsed);
+        if (event.steps) steps.push(...event.steps);
+        if (event.durationMs) durationMs = event.durationMs;
+      }
+    }
+
+    // If ReAct produced no content (likely API error), fall back to hybrid
+    if (!fullResponse.trim() && hadError) {
+      console.warn('[ReAct] No content produced, falling back to hybrid mode. Error:', errorMsg);
+      return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        reply: fullResponse,
+        toolsUsed,
+        steps: steps.length,
+        durationMs,
+        mode: 'react',
+      },
+    });
+  } catch (err) {
+    console.error('[ReAct] Exception, falling back to hybrid:', err);
+    return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
   }
 }
 
@@ -168,7 +421,8 @@ async function handlePost(request: NextRequest) {
   const model = (body.model as string) || getDefaultModel(provider);
   const apiKey = body.apiKey as string | undefined;
   const history = (body.history as ChatMessage[]) || [];
-  const webSearchEnabled = body.webSearch === true;
+  // Auto-enable web search for time-sensitive / real-time queries, unless explicitly disabled
+  const webSearchEnabled = body.webSearch === false ? false : (body.webSearch === true || shouldAutoSearch(message));
 
   if (!message) {
     return apiError('请输入消息内容');
@@ -187,10 +441,10 @@ async function handlePost(request: NextRequest) {
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   if (stream) {
-    if (hasApiKey) return handleHybridStream(message, history, provider, model, apiKey, webSearchEnabled);
+    if (hasApiKey) return handleReActStream(message, history, provider, model, apiKey, webSearchEnabled);
     return handleLocalModeStream(message);
   }
-  if (hasApiKey) return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
+  if (hasApiKey) return handleReActNonStream(message, history, provider, model, apiKey, webSearchEnabled);
   return handleLocalMode(message);
 }
 
@@ -230,7 +484,7 @@ async function handleHybrid(
   const ragResults = retrieveKnowledge(message, 2);
   const ragContext = augmentPrompt(message, ragResults);
 
-  // Web search (if enabled)
+  // Web search (if enabled) — auto-retries with English keywords internally
   let webContext = '';
   if (webSearchEnabled) {
     const searchResult = await webSearch(message);
@@ -300,12 +554,14 @@ function handleHybridStream(
 
         let webContext = '';
         if (webSearchEnabled) {
-          const searchResult = await webSearch(message);
+          let searchResult = await webSearch(message);
+          // If Chinese query got 0 results, webSearch auto-retries with English keywords internally
           if (searchResult.results.length > 0) {
             webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
             enqueue('tool_call', { tool: 'web_search' });
-            enqueue('tool_result', { tool: 'web_search', result: '完成' });
+            enqueue('tool_result', { tool: 'web_search', result: `从 ${searchResult.source} 获取 ${searchResult.results.length} 条结果` });
           }
+          // If still 0 results, send a diagnostic event (not error) so frontend knows search was attempted
         }
 
         // Build LLM messages
@@ -319,10 +575,12 @@ function handleHybridStream(
         const MAX_ROUNDS = 3;
         const toolsUsed: string[] = [];
         let accumulatedContent = '';
+        let allToolResults: string[] = [];  // accumulate across rounds for fallback
 
         for (let round = 0; round < MAX_ROUNDS; round++) {
           let toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
           let roundContent = '';
+          let streamedTokens = false;
 
           for await (const chunk of chatCompletionStream({
             provider, model, messages: llmMessages, stream: true, apiKey,
@@ -330,12 +588,30 @@ function handleHybridStream(
           })) {
             if (chunk.type === 'token' && chunk.content) {
               roundContent += chunk.content;
-              if (!toolCalls.length) enqueue('token', { content: chunk.content });
+              if (!toolCalls.length && !isToolCallText(chunk.content)) {
+                streamedTokens = true;
+                enqueue('token', { content: chunk.content });
+              }
             }
             if (chunk.type === 'tool_call' && chunk.toolCall) {
               toolCalls.push({ id: crypto.randomUUID(), function: chunk.toolCall });
             }
             if (chunk.type === 'done') break;
+          }
+
+          // DeepSeek bug: tool calls emitted as plain text instead of tool_calls field
+          if (toolCalls.length === 0) {
+            const extracted = extractToolCallsFromText(roundContent);
+            if (extracted.length > 0) {
+              toolCalls = extracted;
+              roundContent = '';
+              streamedTokens = false;
+            }
+          }
+
+          // Stream buffered tokens that were held back (real text, not tool calls)
+          if (!streamedTokens && toolCalls.length === 0 && roundContent) {
+            enqueue('token', { content: roundContent });
           }
 
           // No tool calls → final answer done
@@ -352,6 +628,10 @@ function handleHybridStream(
             const name = tc.function.name;
             let params: Record<string, unknown> = {};
             try { params = JSON.parse(tc.function.arguments); } catch { /* use empty */ }
+            // Auto-fill action when LLM omits it (common with DeepSeek function calling)
+            if (!params.action && DEFAULT_TOOL_ACTIONS[name]) {
+              params.action = DEFAULT_TOOL_ACTIONS[name];
+            }
             toolsUsed.push(name);
             enqueue('tool_call', { tool: name, params: params.action || Object.keys(params)[0] });
 
@@ -359,15 +639,18 @@ function handleHybridStream(
               const data = await executeTool(name, params);
               const formatted = formatToolResult(name, params.action as string || '', data);
               toolOutputs.push({ role: 'tool', tool_call_id: tc.id, content: formatted.slice(0, 2000) });
+              allToolResults.push(formatted);
               enqueue('tool_result', { tool: name, result: formatted.slice(0, 300) });
             } catch (err) {
               toolOutputs.push({ role: 'tool', tool_call_id: tc.id, content: `错误: ${(err as Error).message}` });
+              allToolResults.push(`错误: ${(err as Error).message}`);
             }
           }
 
           // Feed tool results back into conversation for next round
+          // Use null content (not empty string) when assistant only called tools — avoids DeepSeek API error
           llmMessages.push({
-            role: 'assistant', content: roundContent,
+            role: 'assistant', content: roundContent || null,
             tool_calls: toolCalls.map(tc => ({
               id: tc.id, type: 'function' as const,
               function: { name: tc.function.name, arguments: tc.function.arguments },
@@ -378,13 +661,22 @@ function handleHybridStream(
           } as ChatMessage)));
         }
 
-        // Max rounds — force final summary
-        llmMessages.push({ role: 'user', content: '请基于以上工具调用结果，给出最终综合分析。' });
+        // Max rounds — force final summary (without tools to guarantee text output)
+        llmMessages.push({ role: 'user', content: '请基于以上所有工具调用结果，用中文给出综合分析。不要继续调用工具，直接回答。' });
+        let forceContent = '';
         for await (const chunk of chatCompletionStream({
           provider, model, messages: llmMessages, stream: true, apiKey,
-          maxTokens: 4000, temperature: 0.7,
+          maxTokens: 4000, temperature: 0.7,  // no tools — force text-only response
         })) {
-          if (chunk.type === 'token' && chunk.content) enqueue('token', { content: chunk.content });
+          if (chunk.type === 'token' && chunk.content) {
+            forceContent += chunk.content;
+            enqueue('token', { content: chunk.content });
+          }
+        }
+        // If LLM still returned nothing, generate a basic summary from tool results
+        if (!forceContent.trim()) {
+          const fallback = allToolResults.join('\n\n');
+          enqueue('token', { content: '\n\n基于工具查询结果:\n\n' + fallback });
         }
         enqueue('done', { toolsUsed, rounds: MAX_ROUNDS });
 

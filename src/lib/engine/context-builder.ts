@@ -1,0 +1,308 @@
+/**
+ * Dynamic System Prompt Builder — injects real-time supply chain state
+ * into the agent's system prompt so it starts each conversation aware of
+ * current alerts, warnings, and priorities.
+ *
+ * Architecture:
+ *   DB query (Prisma) → AgentBriefing → buildDynamicSystemContext()
+ *   → injected into ReAct system prompt as contextual preamble
+ */
+
+import { db } from '@/lib/db';
+
+// ─── Types ───────────────────────────────────────────────────────────────────────
+
+export interface AgentBriefing {
+  /** ISO timestamp of briefing generation */
+  generatedAt: string;
+  /** Overall supply chain health score */
+  healthScore: number;
+  /** Critical alerts needing immediate attention */
+  criticalAlerts: string[];
+  /** SKUs below safety stock */
+  inventoryWarnings: Array<{ sku: string; name: string; quantity: number; safetyStock: number }>;
+  /** Shipments with high/critical risk or significant delays */
+  shipmentConcerns: Array<{ tracking: string; status: string; delayDays: number; riskLevel: string }>;
+  /** Products with gross margin drop >5% recently */
+  costAnomalies: Array<{ sku: string; name: string; margin: number; change: number }>;
+  /** Certificates expiring within 30 days */
+  complianceDeadlines: Array<{ certName: string; sku: string; expiryDate: string; daysLeft: number }>;
+  /** Suppliers with rating drop or status change */
+  supplierRisks: Array<{ name: string; rating: number; status: string }>;
+  /** Recent user feedback patterns */
+  feedbackInsight: string;
+  /** Active regulation changes with high impact */
+  regulationChanges: string[];
+}
+
+// ─── Briefing Builder ────────────────────────────────────────────────────────────
+
+export async function gatherBriefing(): Promise<AgentBriefing> {
+  const now = new Date();
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const [
+    inventoryWarnings,
+    shipmentConcerns,
+    complianceDeadlines,
+    supplierRisks,
+    criticalEvents,
+    costData,
+    regulationChanges,
+  ] = await Promise.all([
+    // Low stock inventory
+    db.inventory.findMany({
+      where: {
+        stockStatus: { in: ['warning', 'critical'] },
+      },
+      select: { sku: true, productName: true, quantity: true, safetyStock: true },
+      take: 10,
+    }),
+
+    // High risk or delayed shipments
+    db.shipmentItem.findMany({
+      where: {
+        OR: [
+          { riskLevel: { in: ['high', 'critical'] } },
+          { delayDays: { gte: 3 } },
+        ],
+      },
+      select: { trackingNumber: true, status: true, delayDays: true, riskLevel: true },
+      take: 10,
+    }),
+
+    // Expiring compliance certs
+    db.complianceCert.findMany({
+      where: {
+        expiryDate: { lte: thirtyDaysFromNow.toISOString().split('T')[0] },
+        status: 'active',
+      },
+      select: { certName: true, sku: true, expiryDate: true },
+      take: 10,
+    }),
+
+    // Supplier issues
+    db.supplier.findMany({
+      where: {
+        OR: [
+          { rating: { lt: 3.0 } },
+          { status: { in: ['suspended', 'inactive'] } },
+        ],
+      },
+      select: { name: true, rating: true, status: true },
+      take: 10,
+    }),
+
+    // Recent critical events (last 24h)
+    db.supplyChainEvent.findMany({
+      where: {
+        severity: 'critical',
+        createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+        isRead: false,
+      },
+      select: { title: true, description: true },
+      take: 10,
+    }),
+
+    // Cost anomalies — products with low margin
+    db.costRecord.findMany({
+      where: {
+        grossMargin: { lt: 0.15 },
+      },
+      select: { sku: true, productName: true, grossMargin: true },
+      take: 10,
+    }),
+
+    // High impact regulation changes
+    db.regulationChange.findMany({
+      where: {
+        impactLevel: 'high',
+        status: 'new',
+      },
+      select: { title: true },
+      take: 5,
+    }),
+  ]);
+
+  // ── Build health score ──────────────────────────────────────────────────────
+  let healthScore = 100;
+  healthScore -= inventoryWarnings.length * 3;
+  healthScore -= shipmentConcerns.length * 2;
+  healthScore -= complianceDeadlines.length * 2;
+  healthScore -= supplierRisks.length * 5;
+  healthScore -= criticalEvents.length * 10;
+  healthScore -= regulationChanges.length * 5;
+  healthScore = Math.max(0, Math.min(100, healthScore));
+
+  // ── Critical alerts ─────────────────────────────────────────────────────────
+  const criticalAlerts: string[] = [];
+
+  for (const evt of criticalEvents) {
+    criticalAlerts.push(`${evt.title}: ${evt.description}`);
+  }
+
+  if (inventoryWarnings.filter(i => i.quantity === 0).length > 0) {
+    criticalAlerts.push('存在零库存SKU，需紧急补货');
+  }
+
+  if (shipmentConcerns.filter(s => s.riskLevel === 'critical').length > 0) {
+    criticalAlerts.push('存在严重风险货运批次');
+  }
+
+  // ── Compliance deadlines ────────────────────────────────────────────────────
+  const nowStr = now.toISOString().split('T')[0];
+  const deadlineList = complianceDeadlines.map(c => {
+    const daysLeft = Math.ceil(
+      (new Date(c.expiryDate).getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+    );
+    return { certName: c.certName, sku: c.sku || 'N/A', expiryDate: c.expiryDate, daysLeft };
+  });
+
+  // ── Cost anomalies ──────────────────────────────────────────────────────────
+  const costAnomaliesList = costData.map(c => ({
+    sku: c.sku,
+    name: c.productName,
+    margin: c.grossMargin,
+    change: 0, // would need historical comparison
+  }));
+
+  // ── Regulation changes ──────────────────────────────────────────────────────
+  const regulationChangeList = regulationChanges.map(r => r.title);
+
+  // ── Feedback insight ────────────────────────────────────────────────────────
+  let feedbackInsight = '暂无足够的反馈数据来总结模式。';
+  try {
+    const recentFeedback = await db.feedbackLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { action: true, userNotes: true, engine: true },
+    });
+
+    const rejected = recentFeedback.filter(f => f.action === 'rejected');
+    if (rejected.length > 0) {
+      const rejectReasons = rejected
+        .filter(f => f.userNotes)
+        .map(f => f.userNotes)
+        .slice(0, 5);
+      if (rejectReasons.length > 0) {
+        feedbackInsight = `最近被拒绝的建议及原因: ${rejectReasons.join('; ')}`;
+      } else {
+        feedbackInsight = `最近 ${rejected.length} 条建议被拒绝（未注明原因），建议优化对应引擎的置信度判断。`;
+      }
+    } else {
+      feedbackInsight = `最近 ${recentFeedback.length} 条建议均被接受，引擎表现良好。`;
+    }
+  } catch {
+    // FeedbackLog table may not exist in all DB configs
+  }
+
+  return {
+    generatedAt: now.toISOString(),
+    healthScore,
+    criticalAlerts,
+    inventoryWarnings: inventoryWarnings.map(i => ({
+      sku: i.sku,
+      name: i.productName,
+      quantity: i.quantity,
+      safetyStock: i.safetyStock,
+    })),
+    shipmentConcerns: shipmentConcerns.map(s => ({
+      tracking: s.trackingNumber,
+      status: s.status,
+      delayDays: s.delayDays,
+      riskLevel: s.riskLevel,
+    })),
+    costAnomalies: costAnomaliesList,
+    complianceDeadlines: deadlineList,
+    supplierRisks: supplierRisks.map(s => ({
+      name: s.name,
+      rating: s.rating,
+      status: s.status,
+    })),
+    feedbackInsight,
+    regulationChanges: regulationChangeList,
+  };
+}
+
+// ─── Context Formatter ───────────────────────────────────────────────────────────
+
+/**
+ * Build a compact context string from a briefing for injection into
+ * the agent's system prompt. Kept concise to minimize token usage.
+ */
+export function formatBriefingContext(briefing: AgentBriefing): string {
+  const lines: string[] = [];
+
+  lines.push(`\n## 当前系统状态 (${new Date(briefing.generatedAt).toLocaleString('zh-CN')})`);
+  lines.push(`供应链健康评分: ${briefing.healthScore}/100`);
+
+  if (briefing.criticalAlerts.length > 0) {
+    lines.push(`\n### ⚠️ 紧急事项`);
+    for (const alert of briefing.criticalAlerts.slice(0, 5)) {
+      lines.push(`- ${alert}`);
+    }
+  }
+
+  if (briefing.inventoryWarnings.length > 0) {
+    lines.push(`\n### 📦 库存预警 (${briefing.inventoryWarnings.length} SKU)`);
+    for (const inv of briefing.inventoryWarnings.slice(0, 5)) {
+      lines.push(`- ${inv.sku} ${inv.name}: 库存${inv.quantity}, 安全库存${inv.safetyStock}`);
+    }
+  }
+
+  if (briefing.shipmentConcerns.length > 0) {
+    lines.push(`\n### 🚢 货运关注 (${briefing.shipmentConcerns.length} 批)`);
+    for (const sh of briefing.shipmentConcerns.slice(0, 5)) {
+      lines.push(`- ${sh.tracking}: ${sh.status}, 延误${sh.delayDays}天, 风险${sh.riskLevel}`);
+    }
+  }
+
+  if (briefing.costAnomalies.length > 0) {
+    lines.push(`\n### 💰 成本异常 (${briefing.costAnomalies.length} 产品)`);
+    for (const co of briefing.costAnomalies.slice(0, 5)) {
+      lines.push(`- ${co.sku} ${co.name}: 毛利率${(co.margin * 100).toFixed(1)}%`);
+    }
+  }
+
+  if (briefing.complianceDeadlines.length > 0) {
+    lines.push(`\n### 📋 合规提醒 (${briefing.complianceDeadlines.length} 项)`);
+    for (const dl of briefing.complianceDeadlines.slice(0, 5)) {
+      lines.push(`- ${dl.certName}: ${dl.sku}, ${dl.expiryDate}到期 (剩余${dl.daysLeft}天)`);
+    }
+  }
+
+  if (briefing.supplierRisks.length > 0) {
+    lines.push(`\n### 🏭 供应商风险 (${briefing.supplierRisks.length} 家)`);
+    for (const sr of briefing.supplierRisks.slice(0, 5)) {
+      lines.push(`- ${sr.name}: 评分${sr.rating}/5, ${sr.status}`);
+    }
+  }
+
+  if (briefing.regulationChanges.length > 0) {
+    lines.push(`\n### ⚖️ 法规变更`);
+    for (const rc of briefing.regulationChanges.slice(0, 3)) {
+      lines.push(`- ${rc}`);
+    }
+  }
+
+  if (briefing.feedbackInsight) {
+    lines.push(`\n### 🔄 最近学习`);
+    lines.push(briefing.feedbackInsight);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * One-shot: gather briefing and format it for prompt injection.
+ * Returns empty string on failure (graceful degradation).
+ */
+export async function buildDynamicSystemContext(): Promise<string> {
+  try {
+    const briefing = await gatherBriefing();
+    return formatBriefingContext(briefing);
+  } catch (err) {
+    console.error('[ContextBuilder] Failed to gather briefing:', err);
+    return '';
+  }
+}

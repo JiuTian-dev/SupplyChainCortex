@@ -100,3 +100,63 @@ export type {
   FeedbackStats,
   FeedbackAction,
 } from './feedback';
+
+// Causal Reasoning (Direction A)
+export {
+  buildCausalEdges,
+  runCounterfactual as runDeepCounterfactual,
+  generateCausalSummary,
+} from './causal-reasoning';
+export type {
+  CausalEdge,
+  CausalFactor,
+  CounterfactualQuery,
+  CounterfactualResult,
+} from './causal-reasoning';
+
+// ReAct Agent (2026 upgrade)
+export {
+  runReActAgent,
+  runReActAgentSync,
+  parseToolCalls as parseReActToolCalls,
+} from './react-agent';
+export type {
+  ReActStep,
+  ReActResult,
+  ReActOptions,
+} from './react-agent';
+
+// Dynamic Context Builder (2026 upgrade)
+export {
+  gatherBriefing,
+  formatBriefingContext,
+  buildDynamicSystemContext,
+} from './context-builder';
+export type { AgentBriefing } from './context-builder';
+
+// Evidence-Level Feedback (2026 upgrade)
+export {
+  evidenceTracker,
+  recordEvidenceFeedback,
+  extractClaims,
+  getSourceReliabilityMap,
+  buildFeedbackInsight,
+} from './evidence-feedback';
+export type {
+  ClaimVerdict,
+  ClaimAnnotation,
+  SourceWeight,
+  EvidenceFeedbackStats,
+} from './evidence-feedback';
+
+// Policy-as-Code Bounded Autonomy (2026 upgrade)
+export {
+  DEFAULT_POLICY,
+  autonomyPolicy,
+  executeWithPolicy,
+} from './autonomy-policy';
+export type {
+  AutonomyLevel,
+  ToolPolicy,
+  AutonomyPolicy,
+} from './autonomy-policy';
