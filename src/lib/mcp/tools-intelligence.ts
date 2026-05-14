@@ -584,4 +584,130 @@ export const intelligenceTools: MCPTool[] = [
       };
     },
   },
+
+  // ── Compliance Auto-Check ──────────────────────────────────────────────────
+  {
+    name: 'query_compliance_check',
+    description: '产品合规自动检查 — 输入产品名+目标市场，输出该品类需要的全部认证、费用估算、时间线。覆盖美国/欧盟/英国/日本的小家电品类。数据源: DB合规证书 + 内置合规数据库。',
+    parameters: {
+      type: 'object',
+      properties: {
+        product_name: { type: 'string', description: '产品名称，如 "蓝牙音箱" 或 "智能咖啡机"' },
+        market: { type: 'string', description: '目标市场: US, EU, UK, JP' },
+        description: { type: 'string', description: '产品补充描述(可选)' },
+        action: { type: 'string', description: 'single(单市场) | multi(多市场对比)' },
+      },
+      required: ['product_name', 'market'],
+    },
+    handler: async (params) => {
+      const { checkCompliance, checkMultiMarketCompliance } = await import('@/lib/engine/compliance-check');
+      const productName = params.product_name as string;
+      const market = (params.market as string) || 'US';
+      const desc = params.description as string | undefined;
+      const action = params.action as string || 'single';
+
+      if (action === 'multi') {
+        const results = await checkMultiMarketCompliance(productName, ['US', 'EU', 'UK', 'JP'], desc);
+        return {
+          product: productName,
+          markets: Object.entries(results).map(([m, r]) => ({
+            market: m,
+            totalCostRange: `$${r.totalCostLow.toLocaleString()} - $${r.totalCostHigh.toLocaleString()}`,
+            timelineWeeks: r.totalTimelineWeeks,
+            mandatoryCount: r.requirements.filter(req => req.mandatory).length,
+            missingCerts: r.missingCerts,
+            warnings: r.warnings,
+          })),
+          note: '多市场合规对比。详细认证清单请按单个市场查询。',
+        };
+      }
+
+      const result = await checkCompliance(productName, market, desc);
+      return {
+        ...result,
+        note: `认证总费用: $${result.totalCostLow.toLocaleString()} - $${result.totalCostHigh.toLocaleString()}。最长认证周期: ${result.totalTimelineWeeks}周。数据基于行业标准估算，具体费用以检测机构报价为准。`,
+      };
+    },
+  },
+
+  // ── Financial Simulator ─────────────────────────────────────────────────────
+  {
+    name: 'query_financial_sim',
+    description: 'What-If财务模拟器 — 输入采购价/售价/销量/市场，输出到岸成本、12月P&L、盈亏平衡点、关税情景分析。帮助判断"这个品能不能做"。',
+    parameters: {
+      type: 'object',
+      properties: {
+        product_name: { type: 'string', description: '产品名称' },
+        procurement_price_cny: { type: 'number', description: '1688/工厂采购价(人民币/台)' },
+        selling_price_usd: { type: 'number', description: '平台售价(美元)' },
+        monthly_sales: { type: 'number', description: '预估月销量(台)' },
+        market: { type: 'string', description: '目标市场: US, EU, UK, JP' },
+        weight_kg: { type: 'number', description: '产品重量(kg)' },
+        tariff_rate_pct: { type: 'number', description: '关税税率%(可选，默认17.5%)' },
+        action: { type: 'string', description: 'full(完整报告) | quick(快速判断)' },
+      },
+      required: ['procurement_price_cny', 'selling_price_usd', 'monthly_sales'],
+    },
+    handler: async (params) => {
+      const { runSimulation, quickCheck } = await import('@/lib/engine/financial-simulator');
+      const action = params.action as string || 'full';
+
+      const input = {
+        productName: (params.product_name as string) || '未命名产品',
+        procurementPriceCny: params.procurement_price_cny as number,
+        sellingPriceUsd: params.selling_price_usd as number,
+        monthlySales: (params.monthly_sales as number) || 300,
+        market: (params.market as string || 'US') as 'US' | 'EU' | 'UK' | 'JP',
+        weightKg: (params.weight_kg as number) || 1.5,
+        tariffRatePct: params.tariff_rate_pct as number | undefined,
+      };
+
+      if (action === 'quick') {
+        const qc = quickCheck(input);
+        return { ...qc, input };
+      }
+
+      const result = runSimulation(input);
+      return {
+        ...result,
+        note: '本模拟器基于行业标准费用估算(FBA/海运/平台费)。实际费用因货代/季节/平台政策变动而异。建议作为决策参考而非财务承诺。',
+      };
+    },
+  },
+
+  // ── Product Feed Generator ──────────────────────────────────────────────────
+  {
+    name: 'query_product_feed',
+    description: '生成AI代理可读的商品Feed — schema.org JSON-LD格式，用于让ChatGPT/Claude等AI购物代理发现和推荐你的商品。支持json-api/google-merchant/json-ld三种格式。',
+    parameters: {
+      type: 'object',
+      properties: {
+        format: { type: 'string', description: '输出格式: json-api | json-ld | google-merchant' },
+        sku: { type: 'string', description: '单个SKU查询(可选，留空则输出全部)' },
+        max_products: { type: 'number', description: '最大产品数(默认50)' },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { generateProductFeed, getProductAgentCard } = await import('@/lib/engine/product-feed');
+      const format = (params.format as string || 'json-api') as 'json-ld' | 'json-api' | 'google-merchant';
+      const sku = params.sku as string | undefined;
+      const maxProducts = (params.max_products as number) || 50;
+
+      if (sku) {
+        const card = await getProductAgentCard(sku);
+        return {
+          product: card,
+          note: '此Feed格式可被AI购物代理(如ChatGPT/Claude Shopping)直接解析和推荐。',
+        };
+      }
+
+      const feed = await generateProductFeed(format, maxProducts);
+      return {
+        format,
+        feed: feed.slice(0, 30000), // truncate for chat context
+        note: `已生成 ${format} 格式商品Feed。可直接嵌入网站<head>或提交至Google Merchant Center。2026年AI代理购物流量同比+393%，结构化Feed是GEO(生成式引擎优化)的基础。`,
+      };
+    },
+  },
 ];

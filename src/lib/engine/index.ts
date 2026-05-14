@@ -211,3 +211,15 @@ export type { SourceHealth } from './connector-health';
 // Push Hub (v0.14)
 export { pushHub } from './push-hub';
 export type { PushNotification, GraphChangeEvent, PushEvent } from './push-hub';
+
+// Compliance Check (v0.16)
+export { checkCompliance, checkMultiMarketCompliance } from './compliance-check';
+export type { ComplianceRequirement, ComplianceCheckResult } from './compliance-check';
+
+// Financial Simulator (v0.16)
+export { runSimulation, quickCheck } from './financial-simulator';
+export type { SimInput, SimResult, ScenarioResult } from './financial-simulator';
+
+// Product Feed (v0.16)
+export { generateProductFeed, getProductAgentCard } from './product-feed';
+export type { AgentProductFeed, AgentProductEntry } from './product-feed';
