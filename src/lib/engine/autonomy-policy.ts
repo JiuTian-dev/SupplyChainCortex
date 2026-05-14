@@ -84,6 +84,19 @@ export const DEFAULT_POLICY: AutonomyPolicy = {
     // ── Search — auto with rate limit ─────────────────────────────────────────
     web_search:            { level: 'auto', maxDaily: 50, rationale: '联网搜索，需控制API成本' },
 
+    // ── Competitor & Sentiment (v0.15) — auto with rate limits ────────────────
+    query_amazon_competitors: { level: 'auto', maxDaily: 30, rationale: '免费竞品查询，基于公开搜索+PricePilot MCP' },
+    query_brand_sentiment:    { level: 'auto', maxDaily: 20, rationale: '免费舆情查询，基于公开搜索' },
+
+    // ── Business Intelligence (v0.16-v0.17) — auto, read-only ────────────────
+    query_compliance_check:  { level: 'auto', maxDaily: 30, rationale: '合规检查，只读查询' },
+    query_financial_sim:     { level: 'auto', maxDaily: 50, rationale: '财务模拟，只读计算' },
+    query_product_feed:      { level: 'auto', maxDaily: 20, rationale: '商品Feed生成，只读导出' },
+    query_arbitrage:         { level: 'auto', maxDaily: 30, rationale: '套利分析，只读查询+计算' },
+    query_coherence_audit:   { level: 'auto', maxDaily: 10, rationale: '一致性审计，只读分析' },
+    query_recall_risk:       { level: 'auto', maxDaily: 10, rationale: '召回风险分析，只读查询' },
+    query_supplier_discovery:{ level: 'auto', maxDaily: 20, rationale: '供应商发现，基于公开搜索' },
+
     // ── Write operations — require confirmation ───────────────────────────────
     create_reorder: {
       level: 'confirm',
