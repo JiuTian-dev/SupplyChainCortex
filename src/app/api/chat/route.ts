@@ -312,12 +312,16 @@ async function handleReActStream(
             case 'token':
               enqueue('token', { content: event.content });
               break;
+            case 'confirm_required':
+              enqueue('confirm_required', { confirmationCard: event.confirmationCard });
+              break;
             case 'done':
               enqueue('done', {
                 toolsUsed: event.toolsUsed,
                 steps: event.steps?.length,
                 durationMs: event.durationMs,
                 claimsExtracted: event.content ? JSON.parse(event.content).claimsExtracted : 0,
+                passport: event.passport,
               });
               break;
             case 'error':
@@ -358,6 +362,7 @@ async function handleReActNonStream(
   let durationMs = 0;
   let hadError = false;
   let errorMsg = '';
+  let passport: Record<string, unknown> | undefined;
 
   try {
     const dynamicContext = await buildDynamicSystemContext();
@@ -384,6 +389,7 @@ async function handleReActNonStream(
         if (event.toolsUsed) toolsUsed.push(...event.toolsUsed);
         if (event.steps) steps.push(...event.steps);
         if (event.durationMs) durationMs = event.durationMs;
+        if (event.passport) passport = event.passport;
       }
     }
 
@@ -406,6 +412,7 @@ async function handleReActNonStream(
         steps: steps.length,
         durationMs,
         mode: 'react',
+        passport,
       },
     });
   } catch (err) {

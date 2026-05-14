@@ -30,6 +30,7 @@ import {
   fetchOllamaModels, fmtBytes,
 } from './ChatPanel.helpers';
 import { ClaimLabel, parseClaimsFromText, type ClaimData, type ClaimVerdict, type FeedbackClaimsMap } from './ClaimLabel';
+import { ActionCard, type ConfirmationCardData } from './ActionCard';
 
 // ─── ChatPanel Component ──────────────────────────────────────────────────────
 
@@ -51,6 +52,9 @@ export function ChatPanel() {
   const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedbackMap, setFeedbackMap] = useState<FeedbackClaimsMap>({});
+  const [confirmationCards, setConfirmationCards] = useState<Record<string, ConfirmationCardData[]>>({});
+  const [passports, setPassports] = useState<Record<string, Record<string, unknown>>>({});
+  const [expandedPassports, setExpandedPassports] = useState<Record<string, boolean>>({});
   const [testingConnection, setTestingConnection] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [scanningOllama, setScanningOllama] = useState(false);
@@ -280,9 +284,23 @@ export function ChatPanel() {
               }
               break;
             }
+            case 'confirm_required': {
+              const confirmCard = sseEvent.data.confirmationCard as ConfirmationCardData;
+              if (confirmCard) {
+                setConfirmationCards(prev => ({
+                  ...prev,
+                  [assistantMsgId]: [...(prev[assistantMsgId] || []), confirmCard],
+                }));
+              }
+              break;
+            }
             case 'done': {
               const finalToolsUsed = sseEvent.data.toolsUsed as string[] || toolsUsedSet;
+              const passport = sseEvent.data.passport as Record<string, unknown> | undefined;
               setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: accumulatedContent || '查询完成，但未能生成回复。', toolsUsed: finalToolsUsed, data: Object.keys(toolResults).length > 0 ? toolResults : undefined } : msg));
+              if (passport) {
+                setPassports(prev => ({ ...prev, [assistantMsgId]: passport }));
+              }
               break;
             }
             case 'error': {
@@ -553,6 +571,61 @@ export function ChatPanel() {
                               />
                             ))}
                           </div>
+                        </div>
+                      );
+                    })()}
+                    {/* Confirmation cards for pending write operations */}
+                    {msg.role === 'assistant' && confirmationCards[msg.id] && confirmationCards[msg.id].length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-[10px] text-muted-foreground">🛡️ 待确认操作:</p>
+                        {confirmationCards[msg.id].map((card, i) => (
+                          <ActionCard key={`${msg.id}-action-${i}`} card={card} msgId={msg.id} />
+                        ))}
+                      </div>
+                    )}
+                    {/* Decision passport panel */}
+                    {msg.role === 'assistant' && passports[msg.id] && (() => {
+                      const passport = passports[msg.id];
+                      const isExpanded = expandedPassports[msg.id];
+                      return (
+                        <div className="mt-1">
+                          <button
+                            onClick={() => setExpandedPassports(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                            className="text-[10px] text-muted-foreground hover:text-orange-500 transition-colors flex items-center gap-1"
+                          >
+                            <Shield className="h-3 w-3" />
+                            Passport · 置信度 {((passport.confidence as number) * 100).toFixed(0)}%
+                            · audit: {(passport.auditId as string)?.slice(-8)}
+                          </button>
+                          {isExpanded && (
+                            <Card className="mt-1 border-dashed">
+                              <CardContent className="p-2 text-[10px] space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Audit ID:</span>
+                                  <span className="font-mono">{passport.auditId as string}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Time:</span>
+                                  <span>{passport.generatedAt as string}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Provenance:</span>
+                                  <div className="flex flex-wrap gap-1 mt-0.5">
+                                    {((passport.dataProvenance as Array<{ source: string; status: string }>) || []).map((p, i) => (
+                                      <Badge key={i} variant="secondary" className={`text-[9px] h-4 ${p.status === 'ok' ? 'bg-emerald-50 text-emerald-600' : p.status === 'degraded' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>
+                                        {p.source} · {p.status}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                {((passport.warnings as string[]) || []).length > 0 && (
+                                  <div className="text-amber-600">
+                                    ⚠ {(passport.warnings as string[]).join(', ')}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
                         </div>
                       );
                     })()}

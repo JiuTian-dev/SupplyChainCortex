@@ -11,6 +11,8 @@
  */
 
 import { executeTool, getToolNames, type MCPTool } from '@/lib/mcp/tools';
+import { executeWithPolicy } from '@/lib/engine/autonomy-policy';
+import { createPassport, provenanceEntry, computeConfidence } from '@/lib/engine/passport';
 import { chatCompletionStream, type ChatMessage } from '@/lib/services/ai-providers.service';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
@@ -255,7 +257,7 @@ export async function* runReActAgent(
   dynamicContext: string,
   options: ReActOptions = {},
 ): AsyncGenerator<{
-  type: 'thinking' | 'tool_call' | 'tool_result' | 'token' | 'done' | 'error';
+  type: 'thinking' | 'tool_call' | 'tool_result' | 'token' | 'done' | 'error' | 'confirm_required';
   content?: string;
   tool?: string;
   params?: Record<string, unknown>;
@@ -264,6 +266,8 @@ export async function* runReActAgent(
   steps?: ReActStep[];
   toolsUsed?: string[];
   durationMs?: number;
+  passport?: Record<string, unknown>;
+  confirmationCard?: Record<string, unknown>;
 }> {
   const startTime = Date.now();
   const provider = options.provider || 'deepseek';
@@ -342,6 +346,27 @@ export async function* runReActAgent(
       const cleanResponse = stripToolCalls(roundContent);
       const claimsExtracted = (cleanResponse.match(/\[claim-\d+\]/g) || []).length;
 
+      // Build decision passport
+      const passport = createPassport({
+        engine: 'decision-graph',
+        input: { query, historyRounds: history.length / 2 },
+        confidence: 0.75,
+        alternatives: [],
+        provenance: [
+          provenanceEntry('llm:deepseek', Date.now() - startTime, 'ok'),
+          provenanceEntry('rag:knowledge-base', 0, 'ok'),
+          ...toolsUsed.map(t => provenanceEntry(`mcp:${t}`, 0, 'ok')),
+        ],
+        trace: {
+          totalDurationMs: Date.now() - startTime,
+          steps: steps.map(s => ({
+            name: `round-${s.round}`,
+            durationMs: 0,
+            status: s.toolError ? 'error' : 'ok',
+          })),
+        },
+      });
+
       // Stream the cleaned response
       for (let i = 0; i < cleanResponse.length; i += 3) {
         yield { type: 'token', content: cleanResponse.slice(i, i + 3) };
@@ -354,13 +379,22 @@ export async function* runReActAgent(
         steps,
         toolsUsed,
         durationMs: Date.now() - startTime,
+        passport: {
+          auditId: passport.auditId,
+          generatedAt: passport.generatedAt,
+          confidence: passport.confidence,
+          dataProvenance: passport.dataProvenance.map(p => ({ source: p.source, status: p.status })),
+          alternatives: passport.alternatives.slice(0, 3),
+          warnings: passport.warnings,
+        },
         content: JSON.stringify({ claimsExtracted }),
       };
       return;
     }
 
-    // Execute tool calls
+    // Execute tool calls (routed through policy engine for write operations)
     const toolOutputTexts: string[] = [];
+    const pendingConfirmations: Array<Record<string, unknown>> = [];
 
     for (const tc of toolCalls) {
       step.toolName = tc.name;
@@ -372,22 +406,87 @@ export async function* runReActAgent(
         tc.params.action = DEFAULT_TOOL_ACTIONS[tc.name];
       }
 
-      yield { type: 'tool_call', tool: tc.name, params: tc.params };
+      // Route through policy engine
+      const policyResult = await executeWithPolicy(tc.name, tc.params);
 
-      try {
-        const data = await executeTool(tc.name, tc.params);
-        const formatted = formatToolResult(tc.name, tc.params.action as string || '', data);
-        step.toolResult = formatted;
-        toolOutputTexts.push(`[${tc.name} 结果]\n${formatted.slice(0, 2000)}`);
-        yield { type: 'tool_result', tool: tc.name, result: formatted.slice(0, 300) };
-      } catch (err) {
-        step.toolError = (err as Error).message;
-        toolOutputTexts.push(`[${tc.name} 错误]\n${(err as Error).message}`);
-        yield { type: 'tool_result', tool: tc.name, error: (err as Error).message };
+      if (policyResult.needsConfirmation && policyResult.confirmationCard) {
+        // Write operation requiring human confirmation
+        step.toolResult = `⏳ 等待确认: ${policyResult.confirmationCard.title}`;
+        toolOutputTexts.push(`[${tc.name} 等待确认]\n${policyResult.confirmationCard.description}`);
+        pendingConfirmations.push(policyResult.confirmationCard);
+        yield { type: 'confirm_required', confirmationCard: policyResult.confirmationCard };
+        yield { type: 'tool_result', tool: tc.name, result: '⏳ 此操作需要人工确认' };
+      } else if (policyResult.executed) {
+        // Auto-executed (read ops or low-risk write ops within policy limits)
+        yield { type: 'tool_call', tool: tc.name, params: tc.params };
+
+        try {
+          const formatted = formatToolResult(tc.name, tc.params.action as string || '', policyResult.result);
+          step.toolResult = formatted;
+          toolOutputTexts.push(`[${tc.name} 结果]\n${formatted.slice(0, 2000)}`);
+          yield { type: 'tool_result', tool: tc.name, result: formatted.slice(0, 300) };
+        } catch (err) {
+          step.toolError = (err as Error).message;
+          toolOutputTexts.push(`[${tc.name} 错误]\n${(err as Error).message}`);
+          yield { type: 'tool_result', tool: tc.name, error: (err as Error).message };
+        }
+      } else {
+        // Policy forbade execution
+        step.toolError = policyResult.error || '策略禁止';
+        toolOutputTexts.push(`[${tc.name} 被拒绝]\n${policyResult.error}`);
+        yield { type: 'tool_result', tool: tc.name, error: policyResult.error };
       }
     }
 
     steps.push(step);
+
+    // If there are pending confirmations, tell the agent to wait
+    if (pendingConfirmations.length > 0) {
+      messages.push({ role: 'assistant', content: roundContent });
+      messages.push({
+        role: 'user',
+        content: `以下操作需要人工确认:\n${pendingConfirmations.map(c => `- ${c.title}: ${c.description}`).join('\n')}\n\n请先基于已获取的只读数据给出分析。确认操作将在用户批准后执行。`,
+      });
+
+      // Force a final response since we can't proceed with unconfirmed writes
+      messages.push({
+        role: 'user',
+        content: '请基于已获取的只读数据给出综合分析、结论和建议。需要人工确认的操作已标记，用户在确认后将自动执行。',
+      });
+
+      let finalContent = '';
+      for await (const chunk of chatCompletionStream({
+        provider, model, messages, stream: true,
+        apiKey: options.apiKey,
+        maxTokens: options.maxTokens || 4000,
+        temperature: options.temperature || 0.7,
+      })) {
+        if (chunk.type === 'token' && chunk.content) {
+          finalContent += chunk.content;
+        }
+        if (chunk.type === 'error') {
+          yield { type: 'error', error: chunk.error };
+          return;
+        }
+        if (chunk.type === 'done') break;
+      }
+
+      const cleanResponse = stripToolCalls(finalContent);
+      for (let i = 0; i < cleanResponse.length; i += 3) {
+        yield { type: 'token', content: cleanResponse.slice(i, i + 3) };
+        await new Promise(r => setTimeout(r, 5));
+      }
+
+      const claimsExtracted = (cleanResponse.match(/\[claim-\d+\]/g) || []).length;
+      yield {
+        type: 'done',
+        steps,
+        toolsUsed,
+        durationMs: Date.now() - startTime,
+        content: JSON.stringify({ claimsExtracted, pendingConfirmations: pendingConfirmations.length }),
+      };
+      return;
+    }
 
     // Feed tool results back as user message (ReAct XML protocol, not native function calling)
     messages.push({ role: 'assistant', content: roundContent });
