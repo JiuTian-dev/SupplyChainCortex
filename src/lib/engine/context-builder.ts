@@ -11,6 +11,8 @@
 import { db } from '@/lib/db';
 import { agentMemory, type SharedContext } from '@/lib/engine/memory';
 import { buildGraphContext, formatGraphContext } from '@/lib/engine/graph-rag';
+import { episodeStore, formatEpisodeContext } from '@/lib/engine/episode-store';
+import { formatConsolidatedFactsContext } from '@/lib/engine/memory-consolidation';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -330,6 +332,22 @@ export async function buildDynamicSystemContext(query?: string): Promise<string>
         context += '\n' + formatGraphContext(graphCtx);
       } catch { /* graph is best-effort */ }
     }
+
+    // Add episodic memory — relevant past conversations
+    if (query) {
+      try {
+        const relatedEpisodes = episodeStore.retrieve(query, 3);
+        if (relatedEpisodes.length > 0) {
+          context += formatEpisodeContext(relatedEpisodes);
+        }
+      } catch { /* memory is best-effort */ }
+    }
+
+    // Add consolidated facts (top 5)
+    try {
+      const factsCtx = formatConsolidatedFactsContext(5);
+      if (factsCtx) context += factsCtx;
+    } catch { /* facts are best-effort */ }
 
     return context;
   } catch (err) {

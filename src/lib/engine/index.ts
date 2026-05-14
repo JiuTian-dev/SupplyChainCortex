@@ -183,3 +183,13 @@ export {
   buildGraphContext, formatGraphContext,
 } from './graph-rag';
 export type { GraphContext } from './graph-rag';
+
+// Episodic Memory (v0.12)
+export {
+  episodeStore, formatEpisodeContext,
+} from './episode-store';
+export type { Episode, ConsolidatedFact } from './episode-store';
+export {
+  runConsolidation, formatConsolidatedFactsContext,
+} from './memory-consolidation';
+export type { ConsolidationReport } from './memory-consolidation';

@@ -16,6 +16,7 @@ import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
 import { runReActAgent } from '@/lib/engine/react-agent';
 import { buildDynamicSystemContext, rememberConversationTurn } from '@/lib/engine/context-builder';
+import { episodeStore } from '@/lib/engine/episode-store';
 import {
   chatCompletionStream,
   chatCompletion,
@@ -402,6 +403,15 @@ async function handleReActNonStream(
     // Remember this conversation turn for multi-turn context
     if (fullResponse.trim()) {
       rememberConversationTurn(message, fullResponse);
+
+      // Record as episodic memory
+      try {
+        episodeStore.record({
+          userQuery: message,
+          agentResponse: fullResponse,
+          toolsUsed,
+        });
+      } catch { /* non-blocking */ }
     }
 
     return NextResponse.json({

@@ -14,7 +14,7 @@
  *   FX:       "30 * * * *"    = 每半小时
  */
 
-import { fetchSCFI, scfiToFreightRates } from '@/lib/sources/scfi-scraper';
+import { fetchSCFIWithCache, scfiToFreightRates } from '@/lib/sources/scfi-scraper';
 import { getPBOCMidpoints } from '@/lib/sources/pboc-exchange-rate';
 import { fetchDailyCommodities } from '@/lib/sources/alphavantage-commodities';
 import { db } from '@/lib/db';
@@ -33,8 +33,14 @@ interface JobResult {
 async function jobSCFI(): Promise<JobResult> {
   const start = Date.now();
   try {
-    const data = await fetchSCFI();
+    const { data, cachedAt, stale } = await fetchSCFIWithCache();
     if (!data) return { job: 'SCFI', status: 'no_data', durationMs: Date.now() - start };
+
+    if (cachedAt) {
+      console.log(
+        `[Scheduler] SCFI: using cached data from ${cachedAt}${stale ? ' (STALE — >24h)' : ''}`
+      );
+    }
 
     // Store freight rates into DB supply chain events for persistence
     await db.supplyChainEvent.create({
@@ -45,6 +51,7 @@ async function jobSCFI(): Promise<JobResult> {
           compositeIndex: data.compositeIndex,
           weeklyChangePct: data.weeklyChangePct,
           routes: scfiToFreightRates(data),
+          ...(cachedAt ? { cachedAt, stale } : {}),
         }),
         icon: '🚢',
         color: data.weeklyChangePct > 0 ? '#ef4444' : '#22c55e',
@@ -151,25 +158,16 @@ async function jobCarbonPrice(): Promise<JobResult> {
   }
 }
 
-async function jobCPSC(): Promise<JobResult> {
+async function jobCPSCRecallSync(): Promise<JobResult> {
   const start = Date.now();
   try {
     const { syncCPSCToDB } = await import('@/lib/sources/cpsc-recall');
     const count = await syncCPSCToDB();
-    return { job: 'CPSC', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
+    console.log(`[Scheduler] CPSCRecallSync: ${count} new recalls synced (${Date.now() - start}ms)`);
+    return { job: 'CPSCRecallSync', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
   } catch (err) {
-    return { job: 'CPSC', status: 'error', durationMs: Date.now() - start, error: String(err) };
-  }
-}
-
-async function jobAmazonCompetitor(): Promise<JobResult> {
-  const start = Date.now();
-  try {
-    const { syncCompetitorToDB } = await import('@/lib/sources/amazon-competitor');
-    const count = await syncCompetitorToDB();
-    return { job: 'Amazon', status: count > 0 ? 'ok' : 'no_data', durationMs: Date.now() - start };
-  } catch (err) {
-    return { job: 'Amazon', status: 'error', durationMs: Date.now() - start, error: String(err) };
+    console.error(`[Scheduler] CPSCRecallSync failed:`, err);
+    return { job: 'CPSCRecallSync', status: 'error', durationMs: Date.now() - start, error: String(err) };
   }
 }
 
@@ -261,6 +259,21 @@ export async function jobWeather(): Promise<JobResult> {
   }
 }
 
+async function jobMemoryConsolidation(): Promise<JobResult> {
+  const start = Date.now();
+  try {
+    const { runConsolidation } = await import('@/lib/engine/memory-consolidation');
+    const report = runConsolidation();
+    if (report.actions.length === 1 && report.actions[0]?.startsWith('无需')) {
+      return { job: 'MemoryConsolidation', status: 'no_data', durationMs: Date.now() - start };
+    }
+    console.log(`[MemoryConsolidation] ${report.actions.join('; ')}`);
+    return { job: 'MemoryConsolidation', status: 'ok', durationMs: Date.now() - start };
+  } catch (err) {
+    return { job: 'MemoryConsolidation', status: 'error', durationMs: Date.now() - start, error: String(err) };
+  }
+}
+
 async function jobFX(): Promise<JobResult> {
   const start = Date.now();
   try {
@@ -281,10 +294,10 @@ const JOBS: Record<string, () => Promise<JobResult>> = {
   PBOC: jobPBOC,
   Commodities: jobCommodities,
   CarbonPrice: jobCarbonPrice,
-  CPSC: jobCPSC,
+  CPSCRecallSync: jobCPSCRecallSync,
   SupplierScores: jobSupplierScores,
-  Amazon: jobAmazonCompetitor,
   AlertCheck: jobAlertCheck,
+  MemoryConsolidation: jobMemoryConsolidation,
   AutoBacktest: jobAutoBacktest,
   Weather: jobWeather,
   FX: jobFX,
@@ -308,7 +321,7 @@ export function startScheduler(): void {
     { name: 'Weather', delay: 8000 },
     { name: 'Commodities', delay: 12000 },
     { name: 'PBOC', delay: 16000 },
-    { name: 'CPSC', delay: 20000 },
+    { name: 'CPSCRecallSync', delay: Math.floor(Math.random() * 300000) },
     { name: 'SCFI', delay: 24000 },
   ];
 
@@ -336,9 +349,9 @@ export function startScheduler(): void {
     { name: 'Weather', ms: 60 * 60 * 1000 },
     { name: 'Commodities', ms: 6 * 60 * 60 * 1000 },
     { name: 'PBOC', ms: 6 * 60 * 60 * 1000 },
-    { name: 'CPSC', ms: 12 * 60 * 60 * 1000 },
+    { name: 'CPSCRecallSync', ms: 6 * 60 * 60 * 1000 },
     { name: 'SupplierScores', ms: 24 * 60 * 60 * 1000 }, // daily
-    { name: 'Amazon', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
+    { name: 'MemoryConsolidation', ms: 30 * 60 * 1000 }, // every 30 min
     { name: 'AutoBacktest', ms: 7 * 24 * 60 * 60 * 1000 }, // weekly
     { name: 'SCFI', ms: 6 * 60 * 60 * 1000 },
   ];
