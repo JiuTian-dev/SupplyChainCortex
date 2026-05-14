@@ -93,7 +93,14 @@ const PLATFORM_FEE_PCT: Record<string, number> = {
 };
 
 const DEFAULT_EXCHANGE_RATE: Record<string, number> = {
-  US: 7.2, EU: 7.6, UK: 9.1, JP: 0.048,
+  US: 7.25, EU: 7.85, UK: 9.2, JP: 0.046,
+};
+
+const DEFAULT_TARIFF_RATE: Record<string, number> = {
+  US: 0.175,  // 10% Section 122 + 7.5% Section 301 consumer goods
+  EU: 0.05,   // EU MFN rate for small appliances
+  UK: 0.05,   // UK MFN
+  JP: 0.0,    // RCEP zero tariff for many appliances
 };
 
 const SEA_FREIGHT_PER_CBM_CNY = 6000;
@@ -103,7 +110,7 @@ const OVERHEAD_PCT = 0.05; // 5% overhead
 
 export function runSimulation(input: SimInput): SimResult {
   const exRate = input.exchangeRate || DEFAULT_EXCHANGE_RATE[input.market] || 7.2;
-  const tariffRate = input.tariffRatePct !== undefined ? input.tariffRatePct / 100 : 0.175; // default 17.5%
+  const tariffRate = input.tariffRatePct !== undefined ? input.tariffRatePct / 100 : (DEFAULT_TARIFF_RATE[input.market] || 0.05);
 
   // Volume estimation
   const dims = input.dimensionsCm || { l: 30, w: 20, h: 15 };

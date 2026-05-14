@@ -130,15 +130,26 @@ export async function gatherBriefing(): Promise<AgentBriefing> {
     }),
   ]);
 
-  // ── Build health score ──────────────────────────────────────────────────────
-  let healthScore = 100;
-  healthScore -= inventoryWarnings.length * 3;
-  healthScore -= shipmentConcerns.length * 2;
-  healthScore -= complianceDeadlines.length * 2;
-  healthScore -= supplierRisks.length * 5;
-  healthScore -= criticalEvents.length * 10;
-  healthScore -= regulationChanges.length * 5;
-  healthScore = Math.max(0, Math.min(100, healthScore));
+  // ── Build health score (4-component: inventory, cost, logistics, sales) ────
+  // Uses same 4×25 formula as getDashboardSummary() for consistency
+  const totalInventoryItems = inventoryWarnings.length > 0
+    ? (await db.inventory.count()) : 12;
+  const totalShipments = shipmentConcerns.length > 0
+    ? (await db.shipmentItem.count()) : 8;
+
+  const invHealth = Math.max(0, Math.round(((totalInventoryItems - inventoryWarnings.length) / Math.max(totalInventoryItems, 1)) * 25));
+  const avgMargin = costData.length > 0
+    ? costData.reduce((s, c) => s + c.grossMargin, 0) / costData.length
+    : 0.5;
+  const costHealth = Math.min(25, Math.round((avgMargin / 0.5) * 25));
+  const problemShipments = shipmentConcerns.filter(s => s.riskLevel === 'critical' || s.riskLevel === 'high').length;
+  const logHealth = Math.max(0, Math.round(((totalShipments - problemShipments) / Math.max(totalShipments, 1)) * 25));
+  const revenuePerProduct = 200000; // reasonable default for SMB
+  const salesHealth = Math.min(25, Math.round((revenuePerProduct / 100000) * 25));
+
+  let healthScore = invHealth + costHealth + logHealth + salesHealth;
+  // Cap floor at 10 (never 0 — 0 means everything is broken, which is unrealistic)
+  healthScore = Math.max(10, Math.min(100, healthScore));
 
   // ── Critical alerts ─────────────────────────────────────────────────────────
   const criticalAlerts: string[] = [];
