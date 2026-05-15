@@ -38,7 +38,6 @@ export function FilterBar() {
       .catch(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="h-8 bg-muted/30 border-b flex items-center px-3"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></div>;
   const {
     selectedSkus, toggleSku, selectAllSkus, deselectAllSkus,
     selectedWarehouses, setSelectedWarehouses,
