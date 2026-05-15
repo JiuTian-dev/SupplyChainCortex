@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Search, X, Check, ChevronDown, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Search, X, Check, ChevronDown, RotateCcw, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -19,11 +20,13 @@ interface ProductFilterProps {
   selected: string[];
   /** Called when selection changes */
   onChange: (skus: string[]) => void;
+  /** Called with SKU→label map after products load */
+  onLabelsLoad?: (labels: Record<string, string>) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────────
 
-export function ProductFilter({ selected, onChange }: ProductFilterProps) {
+export function ProductFilter({ selected, onChange, onLabelsLoad }: ProductFilterProps) {
   const [allSkus, setAllSkus] = useState<SkuInfo[]>([]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -34,11 +37,16 @@ export function ProductFilter({ selected, onChange }: ProductFilterProps) {
       .then(d => {
         const data = d.data || d;
         const items = Array.isArray(data) ? data : (data.inventory || data.items || []);
-        setAllSkus(items.map((i: { sku: string; productName?: string; name?: string; category?: string }) => ({
+        const skus = items.map((i: { sku: string; productName?: string; name?: string; category?: string }) => ({
           sku: i.sku,
           name: i.productName || i.name || i.sku,
           category: i.category || '未分类',
-        })));
+        }));
+        setAllSkus(skus);
+        // Export labels to parent
+        const labels: Record<string, string> = {};
+        for (const s of skus) labels[s.sku] = s.name;
+        onLabelsLoad?.(labels);
       }).catch(() => {});
   }, []);
 

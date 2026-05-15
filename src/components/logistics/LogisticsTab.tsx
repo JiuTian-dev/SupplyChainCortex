@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Ship, Truck, AlertCircle, CheckCircle2, Globe, Clock,
   MapPin, Plane, AlertTriangle, Shield, Target, XCircle,
@@ -257,7 +258,19 @@ function LogisticsRiskCard({ selectedSkus }: { selectedSkus: string[] }) {
 // ==================== Main LogisticsTab Component ====================
 export function LogisticsTab() {
   // React Query hooks
-  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [selectedSkus, setSelectedSkus] = useState<string[]>(() => {
+    const fromUrl = searchParams.get('skus');
+    return fromUrl ? fromUrl.split(',').filter(Boolean) : [];
+  });
+  const updateSkus = useCallback((skus: string[]) => {
+    setSelectedSkus(skus);
+    const params = new URLSearchParams(searchParams.toString());
+    if (skus.length > 0) params.set('skus', skus.join(','));
+    else params.delete('skus');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
@@ -422,7 +435,7 @@ export function LogisticsTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <ProductFilter selected={selectedSkus} onChange={setSelectedSkus} />
+        <ProductFilter selected={selectedSkus} onChange={updateSkus} />
         {selectedSkus.length > 0 && (
           <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
         )}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   DollarSign, TrendingUp, AlertTriangle,
   Download, PieChart, Ship, Globe, Package,
@@ -136,8 +137,20 @@ function FreightBanner({ data }: { data: Record<string, unknown> }) {
 
 // ==================== Main CostTab Component ====================
 export function CostTab() {
-  // Local filter state — per-tab
-  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  // Local filter state with URL persistence
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [selectedSkus, setSelectedSkus] = useState<string[]>(() => {
+    const fromUrl = searchParams.get('skus');
+    return fromUrl ? fromUrl.split(',').filter(Boolean) : [];
+  });
+  const updateSkus = useCallback((skus: string[]) => {
+    setSelectedSkus(skus);
+    const params = new URLSearchParams(searchParams.toString());
+    if (skus.length > 0) params.set('skus', skus.join(','));
+    else params.delete('skus');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
@@ -206,7 +219,7 @@ export function CostTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <ProductFilter selected={selectedSkus} onChange={setSelectedSkus} />
+        <ProductFilter selected={selectedSkus} onChange={updateSkus} />
         {selectedSkus.length > 0 && (
           <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
         )}

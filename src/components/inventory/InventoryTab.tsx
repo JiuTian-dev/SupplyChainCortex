@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   CheckCircle2, AlertTriangle, XCircle, Layers, Warehouse,
   Zap, Eye, Search, Download, Filter, RefreshCw, Activity,
@@ -25,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProductFilter } from '@/components/shared/ProductFilter';
+import { FilterChips } from '@/components/shared/FilterChips';
 import {
   useInventory,
   useWarehouse,
@@ -90,8 +92,23 @@ export function InventoryTab() {
     reorderPriority, setReorderPriority,
   } = useInventoryUIStore();
 
-  // Local filter state — per-tab, no cross-tab dependency
-  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  // Local filter state with URL persistence
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [selectedSkus, setSelectedSkus] = useState<string[]>(() => {
+    const fromUrl = searchParams.get('skus');
+    return fromUrl ? fromUrl.split(',').filter(Boolean) : [];
+  });
+  const [skuLabels, setSkuLabels] = useState<Record<string, string>>({});
+
+  // Sync selected SKUs to URL
+  const updateSkus = useCallback((skus: string[]) => {
+    setSelectedSkus(skus);
+    const params = new URLSearchParams(searchParams.toString());
+    if (skus.length > 0) params.set('skus', skus.join(','));
+    else params.delete('skus');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
@@ -242,11 +259,9 @@ export function InventoryTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <ProductFilter selected={selectedSkus} onChange={setSelectedSkus} />
-        {selectedSkus.length > 0 && (
-          <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
-        )}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ProductFilter selected={selectedSkus} onChange={updateSkus} onLabelsLoad={setSkuLabels} />
+        <FilterChips selected={selectedSkus} labels={skuLabels} onRemove={(sku) => updateSkus(selectedSkus.filter(s => s !== sku))} onClearAll={() => updateSkus([])} />
       </div>
       {/* 库存水位概览 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -307,9 +322,17 @@ export function InventoryTab() {
             <ResponsiveContainer width="100%" height={280}>
               <ComposedChart data={inventory.slice(0, 8).map((i: Inventory) => ({
                 name: i.productName.length > 6 ? i.productName.slice(0, 6) + '...' : i.productName,
+                sku: i.sku,
                 turnoverDays: i.turnoverDays,
                 safetyStock: i.safetyStock,
-              }))} layout="vertical">
+              }))} layout="vertical"
+                onClick={(e: { activePayload?: Array<{ payload?: { sku?: string } }> }) => {
+                  if (e?.activePayload?.[0]?.payload?.sku) {
+                    const sku = e.activePayload[0].payload.sku;
+                    updateSkus(selectedSkus.includes(sku) ? selectedSkus.filter(s => s !== sku) : [...selectedSkus, sku]);
+                  }
+                }}
+                style={{ cursor: 'pointer' }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={80} />
