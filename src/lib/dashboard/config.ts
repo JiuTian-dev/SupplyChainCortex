@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 export const currencySchema = z.enum(['CNY', 'USD', 'EUR']);
 export const unitSchema = z.enum(['pieces', 'TEU', 'tons']);
-export const timeHorizonSchema = z.enum(['7d', '30d', '90d']);
+export const timeHorizonSchema = z.enum(['7d', '30d', '90d', '6M', '1Y']);
 export const aggregationSchema = z.enum(['daily', 'weekly', 'monthly']);
 
 export const riskThresholdsSchema = z.object({
@@ -131,6 +131,22 @@ export const RISK_COLORS: Record<RiskLevel, string> = {
   medium: '#eab308',
   high: '#f97316',
   critical: '#ef4444',
+};
+
+export const TIME_HORIZON_LABELS: Record<TimeHorizon, string> = {
+  '7d': '7天',
+  '30d': '30天',
+  '90d': '90天',
+  '6M': '6个月',
+  '1Y': '1年',
+};
+
+export const TIME_HORIZON_DAYS: Record<TimeHorizon, number> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '6M': 180,
+  '1Y': 365,
 };
 
 export const RISK_BG_COLORS: Record<RiskLevel, string> = {

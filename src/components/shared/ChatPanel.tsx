@@ -31,6 +31,7 @@ import {
 } from './ChatPanel.helpers';
 import { ClaimLabel, parseClaimsFromText, type ClaimData, type ClaimVerdict, type FeedbackClaimsMap } from './ClaimLabel';
 import { ActionCard, type ConfirmationCardData } from './ActionCard';
+import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 
 // ─── ChatPanel Component ──────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export function ChatPanel() {
   const [confirmationCards, setConfirmationCards] = useState<Record<string, ConfirmationCardData[]>>({});
   const [passports, setPassports] = useState<Record<string, Record<string, unknown>>>({});
   const [expandedPassports, setExpandedPassports] = useState<Record<string, boolean>>({});
+  const dashConfig = useDashboardConfigStore(s => s.config);
   const [testingConnection, setTestingConnection] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [scanningOllama, setScanningOllama] = useState(false);
@@ -280,7 +282,7 @@ export function ChatPanel() {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
+        body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, currency: dashConfig.currency, timeHorizon: dashConfig.timeHorizon, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
         signal: abortController.signal,
       });
 
@@ -357,7 +359,7 @@ export function ChatPanel() {
       try {
         const fallbackResponse = await fetch('/api/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text.trim(), history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
+          body: JSON.stringify({ message: text.trim(), history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, currency: dashConfig.currency, timeHorizon: dashConfig.timeHorizon, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
         });
         const result = await fallbackResponse.json();
         if (result.success && result.data) {

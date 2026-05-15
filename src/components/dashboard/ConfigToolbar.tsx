@@ -102,6 +102,8 @@ export function ConfigToolbar() {
             <SelectItem value="7d">7天</SelectItem>
             <SelectItem value="30d">30天</SelectItem>
             <SelectItem value="90d">90天</SelectItem>
+            <SelectItem value="6M">6个月</SelectItem>
+            <SelectItem value="1Y">1年</SelectItem>
           </SelectContent>
         </Select>
       </div>

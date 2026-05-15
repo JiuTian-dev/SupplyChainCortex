@@ -268,6 +268,8 @@ async function handleReActStream(
   model: string,
   apiKey?: string,
   webSearchEnabled?: boolean,
+  currency = 'CNY',
+  timeHorizon = '30d',
 ): Promise<Response> {
   const encoder = new TextEncoder();
 
@@ -281,10 +283,14 @@ async function handleReActStream(
         // Build dynamic context from live supply chain state
         enqueue('thinking', { status: 'context' });
         const dynamicContext = await buildDynamicSystemContext(message);
+    const currencySymbols: Record<string, string> = { CNY: '¥', USD: '$', EUR: '€' };
+    const timeLabels: Record<string, string> = { '7d': '7天', '30d': '30天', '90d': '90天', '6M': '6个月', '1Y': '1年' };
+    const userConfigCtx = `\n## 用户偏好\n- 货币: ${currencySymbols[currency] || currency} (${currency})\n- 分析周期: ${timeLabels[timeHorizon] || timeHorizon}`;
+    const fullContext = userConfigCtx + dynamicContext;
 
         enqueue('thinking', { status: 'analyzing' });
 
-        const eventStream = runReActAgent(message, history, dynamicContext, {
+        const eventStream = runReActAgent(message, history, fullContext, {
           provider,
           model,
           apiKey,
@@ -356,6 +362,8 @@ async function handleReActNonStream(
   model: string,
   apiKey?: string,
   webSearchEnabled?: boolean,
+  currency = 'CNY',
+  timeHorizon = '30d',
 ): Promise<NextResponse> {
   let fullResponse = '';
   const toolsUsed: string[] = [];
@@ -367,8 +375,12 @@ async function handleReActNonStream(
 
   try {
     const dynamicContext = await buildDynamicSystemContext(message);
+    const currencySymbols: Record<string, string> = { CNY: '¥', USD: '$', EUR: '€' };
+    const timeLabels: Record<string, string> = { '7d': '7天', '30d': '30天', '90d': '90天', '6M': '6个月', '1Y': '1年' };
+    const userConfigCtx = `\n## 用户偏好\n- 货币: ${currencySymbols[currency] || currency} (${currency})\n- 分析周期: ${timeLabels[timeHorizon] || timeHorizon}`;
+    const fullContext = userConfigCtx + dynamicContext;
 
-    const eventStream = runReActAgent(message, history, dynamicContext, {
+    const eventStream = runReActAgent(message, history, fullContext, {
       provider,
       model,
       apiKey,
@@ -445,6 +457,8 @@ async function handlePost(request: NextRequest) {
   const history = (body.history as ChatMessage[]) || [];
   // Auto-enable web search for time-sensitive / real-time queries, unless explicitly disabled
   const webSearchEnabled = body.webSearch === false ? false : (body.webSearch === true || shouldAutoSearch(message));
+  const currency = (body.currency as string) || 'CNY';
+  const timeHorizon = (body.timeHorizon as string) || '30d';
 
   if (!message) {
     return apiError('请输入消息内容');
@@ -463,10 +477,10 @@ async function handlePost(request: NextRequest) {
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   if (stream) {
-    if (hasApiKey) return handleReActStream(message, history, provider, model, apiKey, webSearchEnabled);
+    if (hasApiKey) return handleReActStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon);
     return handleLocalModeStream(message);
   }
-  if (hasApiKey) return handleReActNonStream(message, history, provider, model, apiKey, webSearchEnabled);
+  if (hasApiKey) return handleReActNonStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon);
   return handleLocalMode(message);
 }
 
