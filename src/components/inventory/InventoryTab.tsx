@@ -1034,7 +1034,12 @@ export function InventoryTab() {
               </TableHeader>
               <TableBody className="data-grid-stripe">
                 {filteredInventory.map((inv: Inventory, idx: number) => (
-                  <TableRow key={inv.id} className={`data-grid-row cursor-pointer hover:bg-orange-50/50 dark:hover:bg-orange-950/20 group relative border-l-[3px] border-l-transparent hover:border-l-orange-400 transition-colors duration-200`} onClick={() => viewInventoryDetail(inv.sku)}>
+                  <TableRow key={inv.id} className={`data-grid-row cursor-pointer hover:bg-orange-50/50 dark:hover:bg-orange-950/20 group relative border-l-[3px] transition-colors duration-200 ${
+                    inv.stockStatus === 'critical' ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/10' :
+                    inv.stockStatus === 'warning' ? 'border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10' :
+                    inv.stockStatus === 'overstock' ? 'border-l-purple-500 bg-purple-50/30 dark:bg-purple-950/10' :
+                    'border-l-emerald-400'
+                  }`} onClick={() => viewInventoryDetail(inv.sku)}>
                     <TableCell className="font-mono text-xs">{inv.sku}</TableCell>
                     <TableCell className="font-medium">{inv.productName}</TableCell>
                     <TableCell className="hidden sm:table-cell">{inv.warehouse}</TableCell>
