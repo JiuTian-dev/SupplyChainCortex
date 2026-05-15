@@ -19,12 +19,13 @@ import {
 import {
   useCost,
 } from '@/hooks/use-supply-chain-data';
-import { useUIStore } from '@/stores/ui-store';
+import { useFilterStore } from '@/stores/filter-store';
+import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { CHART_COLORS } from '@/lib/constants';
 import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
 import { ExchangeRateMatrix } from '@/components/cost/ExchangeRateMatrix';
 import { exportToCSV } from '@/lib/utils';
-import type { CostRecord } from '@/lib/types';
+import type { CostRecord } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import dynamic from 'next/dynamic';
@@ -136,12 +137,13 @@ function FreightBanner({ data }: { data: Record<string, unknown> }) {
 // ==================== Main CostTab Component ====================
 export function CostTab() {
   // React Query hooks
-  const costListQuery = useCost('list');
-  const costTrendQuery = useCost('trend');
+  const filterParams = useFilterStore(s => s.getFilterParams());
+  const costListQuery = useCost('list', filterParams as Record<string, string | number>);
+  const costTrendQuery = useCost('trend', filterParams as Record<string, string | number>);
 
   // Zustand store
-  const selectedProduct = useUIStore((s) => s.selectedProduct);
-  const setSelectedProduct = useUIStore((s) => s.setSelectedProduct);
+  const selectedProduct = useInventoryUIStore((s) => s.selectedProduct);
+  const setSelectedProduct = useInventoryUIStore((s) => s.setSelectedProduct);
 
   // Cost trend banner — live commodity/freight/carbon data
   const [costTrend, setCostTrend] = useState<Record<string, unknown> | null>(null);

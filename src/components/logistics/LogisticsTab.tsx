@@ -15,9 +15,10 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import {
   useLogistics,
 } from '@/hooks/use-supply-chain-data';
+import { useFilterStore } from '@/stores/filter-store';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_COLORS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
-import type { ShipmentRecord } from '@/lib/types';
+import type { ShipmentItem } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import dynamic from 'next/dynamic';
@@ -29,7 +30,7 @@ const ShipmentStatusUpdateDialog = dynamic(
 import { ShipmentRouteMap } from '@/components/logistics/ShipmentRouteMap';
 
 // ==================== Shipment Card Sub-component ====================
-function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentRecord; onUpdateStatus: (shipment: ShipmentRecord) => void }) {
+function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentItem; onUpdateStatus: (shipment: ShipmentItem) => void }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusIcon = (status: string) => {
@@ -178,7 +179,8 @@ function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentRecord; 
 
 // ==================== Logistics Risk Card Sub-component ====================
 function LogisticsRiskCard() {
-  const { data, isLoading } = useLogistics('risk');
+  const filterParams = useFilterStore(s => s.getFilterParams());
+  const { data, isLoading } = useLogistics('risk', filterParams as Record<string, string | number>);
   const rawData = (data as Record<string, unknown>)?.data ?? data;
   const risks = ((rawData as Record<string, unknown>)?.risks as Record<string, unknown>[] | undefined) || [];
 
@@ -251,13 +253,14 @@ function LogisticsRiskCard() {
 // ==================== Main LogisticsTab Component ====================
 export function LogisticsTab() {
   // React Query hooks
-  const logisticsListQuery = useLogistics('list');
+  const filterParams = useFilterStore(s => s.getFilterParams());
+  const logisticsListQuery = useLogistics('list', filterParams as Record<string, string | number>);
 
   // Shipment status update dialog state
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [selectedShipment, setSelectedShipment] = useState<ShipmentRecord | null>(null);
+  const [selectedShipment, setSelectedShipment] = useState<ShipmentItem | null>(null);
 
-  const handleUpdateStatus = (shipment: ShipmentRecord) => {
+  const handleUpdateStatus = (shipment: ShipmentItem) => {
     setSelectedShipment(shipment);
     setStatusDialogOpen(true);
   };
@@ -270,8 +273,8 @@ export function LogisticsTab() {
 
   // Derive shipments before early return for hooks compliance
   const shipments = useMemo(() => {
-    if (!logisticsData) return [] as ShipmentRecord[];
-    return (logisticsData as Record<string, unknown>)?.shipments as ShipmentRecord[] || [];
+    if (!logisticsData) return [] as ShipmentItem[];
+    return (logisticsData as Record<string, unknown>)?.shipments as ShipmentItem[] || [];
   }, [logisticsData]);
 
   // ETA predictions computed from actual shipment data with realistic business logic
@@ -390,7 +393,7 @@ export function LogisticsTab() {
   }
 
   const statusCounts: Record<string, number> = {};
-  shipments.forEach((s: ShipmentRecord) => {
+  shipments.forEach((s: ShipmentItem) => {
     statusCounts[s.status] = (statusCounts[s.status] || 0) + 1;
   });
 
@@ -480,7 +483,7 @@ export function LogisticsTab() {
               className="h-7 text-xs gap-1"
               onClick={() =>
                 exportToCSV(
-                  shipments.map((s: ShipmentRecord) => ({
+                  shipments.map((s: ShipmentItem) => ({
                     trackingNumber: s.trackingNumber,
                     sku: s.sku,
                     productName: s.productName,
@@ -516,7 +519,7 @@ export function LogisticsTab() {
         <CardContent>
           <VirtualList
             items={shipments}
-            renderItem={(shipment: ShipmentRecord) => (
+            renderItem={(shipment: ShipmentItem) => (
               <ShipmentCard shipment={shipment} onUpdateStatus={handleUpdateStatus} />
             )}
             estimateSize={100}
