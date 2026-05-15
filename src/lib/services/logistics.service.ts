@@ -50,6 +50,7 @@ export interface LogisticsRisk {
 export interface ShipmentListFilters {
   status?: string;
   carrier?: string;
+  skus?: string[];
 }
 
 /** Status update parameters */
@@ -166,12 +167,9 @@ export async function getShipmentList(filters: ShipmentListFilters = {}): Promis
   filters: { status: string | null; carrier: string | null };
 }> {
   const where: Record<string, unknown> = {};
-  if (filters.status) {
-    where.status = filters.status;
-  }
-  if (filters.carrier) {
-    where.carrier = filters.carrier;
-  }
+  if (filters.status) where.status = filters.status;
+  if (filters.carrier) where.carrier = filters.carrier;
+  if (filters.skus && filters.skus.length > 0) where.sku = { in: filters.skus };
 
   const shipments = await db.shipmentItem.findMany({ where });
 

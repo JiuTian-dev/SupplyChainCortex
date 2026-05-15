@@ -20,6 +20,8 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
   const action = searchParams.get("action") || "list";
   const trackingNumber = searchParams.get("trackingNumber");
   const sku = searchParams.get("sku");
+  const skusParam = searchParams.get("skus");
+  const skus = skusParam ? skusParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
   const route = searchParams.get("route") || "CN-US";
 
   // Filter parameters
@@ -33,7 +35,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
   switch (action) {
     case "list": {
-      const result = await getShipmentList({ status, carrier });
+      const result = await getShipmentList({ status, carrier, skus });
       return NextResponse.json(result);
     }
 

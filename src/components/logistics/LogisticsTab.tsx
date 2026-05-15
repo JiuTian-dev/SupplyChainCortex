@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
   Ship, Truck, AlertCircle, CheckCircle2, Globe, Clock,
   MapPin, Plane, AlertTriangle, Shield, Target, XCircle,
@@ -17,6 +17,7 @@ import {
   useLogistics,
 } from '@/hooks/use-supply-chain-data';
 import { ProductFilter } from '@/components/shared/ProductFilter';
+import { FilterChips } from '@/components/shared/FilterChips';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_COLORS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
 import type { ShipmentItem } from '@prisma/client';
@@ -258,24 +259,8 @@ function LogisticsRiskCard({ selectedSkus }: { selectedSkus: string[] }) {
 // ==================== Main LogisticsTab Component ====================
 export function LogisticsTab() {
   // React Query hooks
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [selectedSkus, setSelectedSkus] = useState<string[]>(() => {
-    const fromUrl = searchParams.get('skus');
-    return fromUrl ? fromUrl.split(',').filter(Boolean) : [];
-  });
-  const updateSkus = useCallback((skus: string[]) => {
-    setSelectedSkus(skus);
-    const params = new URLSearchParams(searchParams.toString());
-    if (skus.length > 0) params.set('skus', skus.join(','));
-    else params.delete('skus');
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }, [searchParams, router]);
-  const filterParams = useMemo(() => {
-    const p: Record<string, string | number> = {};
-    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
-    return p;
-  }, [selectedSkus]);
+  const { selectedSkus, updateSkus, filterParams } = useSkuFilter();
+  const [skuLabels, setSkuLabels] = useState<Record<string, string>>({});
   const logisticsListQuery = useLogistics('list', filterParams);
 
   // Shipment status update dialog state
@@ -435,10 +420,8 @@ export function LogisticsTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <ProductFilter selected={selectedSkus} onChange={updateSkus} />
-        {selectedSkus.length > 0 && (
-          <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
-        )}
+        <ProductFilter selected={selectedSkus} onChange={updateSkus} onLabelsLoad={setSkuLabels} />
+        <FilterChips selected={selectedSkus} labels={skuLabels} onRemove={(sku) => updateSkus(selectedSkus.filter(s => s !== sku))} onClearAll={() => updateSkus([])} />
       </div>
       {/* 物流路线图 */}
       <Card

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
   DollarSign, TrendingUp, AlertTriangle,
   Download, PieChart, Ship, Globe, Package,
@@ -21,6 +21,7 @@ import {
   useCost,
 } from '@/hooks/use-supply-chain-data';
 import { ProductFilter } from '@/components/shared/ProductFilter';
+import { FilterChips } from '@/components/shared/FilterChips';
 import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { CHART_COLORS } from '@/lib/constants';
 import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
@@ -138,24 +139,8 @@ function FreightBanner({ data }: { data: Record<string, unknown> }) {
 // ==================== Main CostTab Component ====================
 export function CostTab() {
   // Local filter state with URL persistence
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [selectedSkus, setSelectedSkus] = useState<string[]>(() => {
-    const fromUrl = searchParams.get('skus');
-    return fromUrl ? fromUrl.split(',').filter(Boolean) : [];
-  });
-  const updateSkus = useCallback((skus: string[]) => {
-    setSelectedSkus(skus);
-    const params = new URLSearchParams(searchParams.toString());
-    if (skus.length > 0) params.set('skus', skus.join(','));
-    else params.delete('skus');
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }, [searchParams, router]);
-  const filterParams = useMemo(() => {
-    const p: Record<string, string | number> = {};
-    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
-    return p;
-  }, [selectedSkus]);
+  const { selectedSkus, updateSkus, filterParams } = useSkuFilter();
+  const [skuLabels, setSkuLabels] = useState<Record<string, string>>({});
   const costListQuery = useCost('list', filterParams);
   const costTrendQuery = useCost('trend', filterParams);
 
@@ -219,10 +204,8 @@ export function CostTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <ProductFilter selected={selectedSkus} onChange={updateSkus} />
-        {selectedSkus.length > 0 && (
-          <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
-        )}
+        <ProductFilter selected={selectedSkus} onChange={updateSkus} onLabelsLoad={setSkuLabels} />
+        <FilterChips selected={selectedSkus} labels={skuLabels} onRemove={(sku) => updateSkus(selectedSkus.filter(s => s !== sku))} onClearAll={() => updateSkus([])} />
       </div>
       {/* 成本趋势横幅 — 大宗商品 · 运费 */}
       {costTrend && (

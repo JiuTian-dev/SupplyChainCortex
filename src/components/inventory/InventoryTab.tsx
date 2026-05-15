@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
   CheckCircle2, AlertTriangle, XCircle, Layers, Warehouse,
   Zap, Eye, Search, Download, Filter, RefreshCw, Activity,
@@ -94,27 +94,8 @@ export function InventoryTab() {
   } = useInventoryUIStore();
 
   // Local filter state with URL persistence
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [selectedSkus, setSelectedSkus] = useState<string[]>(() => {
-    const fromUrl = searchParams.get('skus');
-    return fromUrl ? fromUrl.split(',').filter(Boolean) : [];
-  });
+  const { selectedSkus, updateSkus, filterParams } = useSkuFilter();
   const [skuLabels, setSkuLabels] = useState<Record<string, string>>({});
-
-  // Sync selected SKUs to URL
-  const updateSkus = useCallback((skus: string[]) => {
-    setSelectedSkus(skus);
-    const params = new URLSearchParams(searchParams.toString());
-    if (skus.length > 0) params.set('skus', skus.join(','));
-    else params.delete('skus');
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }, [searchParams, router]);
-  const filterParams = useMemo(() => {
-    const p: Record<string, string | number> = {};
-    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
-    return p;
-  }, [selectedSkus]);
   const { data: inventoryData, isLoading: inventoryLoading } = useInventory('list', filterParams);
   const { data: agingResponse } = useWarehouse('aging');
   const { data: warehouseCapacityData } = useWarehouse('capacity');
