@@ -190,12 +190,12 @@ export function InventoryCapitalPanel() {
               <ResponsiveContainer width="100%" height={280} minHeight={200}>
                 <PieChart>
                   <Pie
-                    data={categoryBreakdown.map(c => ({ ...c, name: c.category }))}
+                    data={categoryBreakdown.map(c => ({ name: c.category, value: c.capital }))}
                     cx="50%"
                     cy="50%"
                     innerRadius={45}
                     outerRadius={80}
-                    dataKey="capital"
+                    dataKey="value"
                     nameKey="name"
                     label={({ name, percent }: { name: string; percent: number }) =>
                       `${name} ${(percent * 100).toFixed(0)}%`
@@ -230,12 +230,12 @@ export function InventoryCapitalPanel() {
               <ResponsiveContainer width="100%" height={250} minHeight={200}>
                 <PieChart>
                   <Pie
-                    data={warehouseBreakdown.map(w => ({ ...w, name: w.warehouse }))}
+                    data={warehouseBreakdown.map(w => ({ name: w.warehouse, value: w.capital }))}
                     cx="50%"
                     cy="50%"
                     innerRadius={45}
                     outerRadius={80}
-                    dataKey="capital"
+                    dataKey="value"
                     nameKey="name"
                     label={({ name, percent }: { name: string; percent: number }) =>
                       `${name} ${(percent * 100).toFixed(0)}%`
