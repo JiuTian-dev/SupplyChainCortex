@@ -112,12 +112,6 @@ export const PANEL_REGISTRY: PanelDef[] = [
     category: 'ops', tags: ['all', 'risk', 'executive'],
     defaultEnabled: true, loaderType: 'chart',
   },
-  {
-    id: 'dashboard', label: '概览', icon: Calendar,
-    path: '@/components/sales/SalesTab',
-    category: 'ops', tags: ['all', 'executive'],
-    defaultEnabled: false, loaderType: 'chart',
-  },
 ];
 
 // ─── View Presets ────────────────────────────────────────────────────────────────

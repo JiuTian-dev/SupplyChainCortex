@@ -23,6 +23,8 @@ import {
 import { ProductFilter } from '@/components/shared/ProductFilter';
 import { FilterChips } from '@/components/shared/FilterChips';
 import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
+import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
+import { CURRENCY_SYMBOLS } from '@/lib/dashboard/config';
 import { CHART_COLORS } from '@/lib/constants';
 import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
 import { ExchangeRateMatrix } from '@/components/cost/ExchangeRateMatrix';
@@ -140,6 +142,8 @@ function FreightBanner({ data }: { data: Record<string, unknown> }) {
 export function CostTab() {
   // Local filter state with URL persistence
   const { selectedSkus, updateSkus, filterParams } = useSkuFilter();
+  const currency = useDashboardConfigStore(s => s.config.currency);
+  const sym = CURRENCY_SYMBOLS[currency] || '$';
   const [skuLabels, setSkuLabels] = useState<Record<string, string>>({});
   const costListQuery = useCost('list', filterParams);
   const costTrendQuery = useCost('trend', filterParams);
@@ -219,7 +223,7 @@ export function CostTab() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <MetricCard
           title="平均到岸成本"
-          value={`$${(costs.reduce((s: number, c: CostRecord) => s + c.totalLanded, 0) / costs.length).toFixed(2)}`}
+          value={`${sym}${(costs.reduce((s: number, c: CostRecord) => s + c.totalLanded, 0) / costs.length).toFixed(2)}`}
           icon={<DollarSign className="h-4 w-4" />}
           color="text-orange-600 dark:text-orange-400"
           bgColor="bg-orange-50 dark:bg-orange-950/20"
