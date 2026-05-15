@@ -129,7 +129,7 @@ async function main() {
         destination: 'US',
         totalLanded: landed || 50,
         sellingPrice: (landed || 50) * 3.5,
-        grossMargin: Math.random() * 0.4 + 0.3,
+        grossMargin: 30 + Math.random() * 40, // percentage value (30-70%), consistent with seed.ts
       },
     });
   }
