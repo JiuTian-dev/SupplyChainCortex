@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useFilterStore } from '@/stores/filter-store';
 import {
   useInventory,
   useWarehouse,
@@ -42,10 +43,11 @@ const StockAdjustmentDialog = dynamic(
 );
 import { InventoryAlertTimeline } from '@/components/inventory/InventoryAlertTimeline';
 import { InventoryDataTable } from '@/components/inventory/InventoryDataTable';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
+import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { STATUS_COLORS, STATUS_LABELS, AGING_COLORS, CHART_COLORS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
-import type { InventoryRecord } from '@/lib/types';
+import type { Inventory } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 
@@ -70,23 +72,28 @@ export function InventoryTab() {
   // Stock transfer dialog state
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
-  // Zustand store for UI state
+  // Zustand stores for UI state
   const {
     searchQuery, setSearchQuery,
+    budgetDialogOpen, setBudgetDialogOpen,
+    budgetData, setBudgetData,
+    timelineDialogOpen, setTimelineDialogOpen,
+    timelineData, setTimelineData,
+  } = useDashboardUIStore();
+
+  const {
     inventoryFilter, setInventoryFilter,
     selectedInventorySku, setSelectedInventorySku,
     inventoryDetail, setInventoryDetail,
     reorderQty, setReorderQty,
     reorderWarehouse, setReorderWarehouse,
     reorderPriority, setReorderPriority,
-    budgetDialogOpen, setBudgetDialogOpen,
-    budgetData, setBudgetData,
-    timelineDialogOpen, setTimelineDialogOpen,
-    timelineData, setTimelineData,
-  } = useUIStore();
+  } = useInventoryUIStore();
 
   // React Query hooks for data fetching
-  const { data: inventoryData, isLoading: inventoryLoading } = useInventory('list');
+  const filterParams = useFilterStore(s => s.getFilterParams());
+  const toggleSku = useFilterStore(s => s.toggleSku);
+  const { data: inventoryData, isLoading: inventoryLoading } = useInventory('list', filterParams as Record<string, string | number>);
   const { data: agingResponse } = useWarehouse('aging');
   const { data: warehouseCapacityData } = useWarehouse('capacity');
   const { data: procurementData } = useProcurement('plan');
@@ -128,12 +135,12 @@ export function InventoryTab() {
   }, [agingResponse]);
 
   // Slow-moving products (turnover > 90 days)
-  const slowMoving = useMemo(() => inventory.filter((i: InventoryRecord) => i.turnoverDays > 90), [inventory]);
+  const slowMoving = useMemo(() => inventory.filter((i: Inventory) => i.turnoverDays > 90), [inventory]);
 
   // Filtered inventory for search/filter
   const filteredInventory = useMemo(() => {
     if (!inventory.length) return [];
-    let items = inventory as InventoryRecord[];
+    let items = inventory as Inventory[];
     if (inventoryFilter !== 'all') {
       items = items.filter(i => i.stockStatus === inventoryFilter);
     }
@@ -233,13 +240,13 @@ export function InventoryTab() {
     <div className="space-y-6">
       {/* 库存水位概览 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <MetricCard title="健康库存" value={inventory.filter((i: InventoryRecord) => i.stockStatus === 'healthy').length} icon={<CheckCircle2 className="h-4 w-4" />} color="text-green-600 dark:text-green-400" bgColor="bg-green-50 dark:bg-green-950/20" />
-        <MetricCard title="预警库存" value={inventory.filter((i: InventoryRecord) => i.stockStatus === 'warning').length} icon={<AlertTriangle className="h-4 w-4" />} color="text-yellow-600 dark:text-yellow-400" bgColor="bg-yellow-50 dark:bg-yellow-950/20" />
+        <MetricCard title="健康库存" value={inventory.filter((i: Inventory) => i.stockStatus === 'healthy').length} icon={<CheckCircle2 className="h-4 w-4" />} color="text-green-600 dark:text-green-400" bgColor="bg-green-50 dark:bg-green-950/20" />
+        <MetricCard title="预警库存" value={inventory.filter((i: Inventory) => i.stockStatus === 'warning').length} icon={<AlertTriangle className="h-4 w-4" />} color="text-yellow-600 dark:text-yellow-400" bgColor="bg-yellow-50 dark:bg-yellow-950/20" />
         <div className="glow-border-rose rounded-xl">
-          <MetricCard title="紧急补货" value={inventory.filter((i: InventoryRecord) => i.stockStatus === 'critical').length} icon={<XCircle className="h-4 w-4" />} color="text-red-600 dark:text-red-400" bgColor="bg-red-50 dark:bg-red-950/20" />
+          <MetricCard title="紧急补货" value={inventory.filter((i: Inventory) => i.stockStatus === 'critical').length} icon={<XCircle className="h-4 w-4" />} color="text-red-600 dark:text-red-400" bgColor="bg-red-50 dark:bg-red-950/20" />
         </div>
         <div className="glow-border-emerald rounded-xl">
-          <MetricCard title="库存积压" value={inventory.filter((i: InventoryRecord) => i.stockStatus === 'overstock').length} icon={<Layers className="h-4 w-4" />} color="text-violet-600 dark:text-violet-400" bgColor="bg-violet-50 dark:bg-violet-950/20" />
+          <MetricCard title="库存积压" value={inventory.filter((i: Inventory) => i.stockStatus === 'overstock').length} icon={<Layers className="h-4 w-4" />} color="text-violet-600 dark:text-violet-400" bgColor="bg-violet-50 dark:bg-violet-950/20" />
         </div>
       </div>
 
@@ -288,7 +295,7 @@ export function InventoryTab() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={inventory.slice(0, 8).map((i: InventoryRecord) => ({
+              <ComposedChart data={inventory.slice(0, 8).map((i: Inventory) => ({
                 name: i.productName.length > 6 ? i.productName.slice(0, 6) + '...' : i.productName,
                 turnoverDays: i.turnoverDays,
                 safetyStock: i.safetyStock,
@@ -299,7 +306,7 @@ export function InventoryTab() {
                 <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 <ReferenceLine x={90} stroke="#ef4444" strokeDasharray="5 5" label={{ value: '滞销线', position: 'top', fill: '#ef4444', fontSize: 10 }} />
                 <Bar dataKey="turnoverDays" radius={[0, 4, 4, 0]} className="chart-draw-in">
-                  {inventory.slice(0, 8).map((i: InventoryRecord, index: number) => (
+                  {inventory.slice(0, 8).map((i: Inventory, index: number) => (
                     <Cell key={`cell-${index}`} fill={STATUS_COLORS[i.stockStatus]} style={{ '--bar-index': index } as React.CSSProperties} />
                   ))}
                 </Bar>
@@ -320,7 +327,7 @@ export function InventoryTab() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {slowMoving.map((inv: InventoryRecord) => (
+              {slowMoving.map((inv: Inventory) => (
                 <div key={inv.id} className="bg-card rounded-lg p-3 border border-amber-200 dark:border-amber-800">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{inv.productName}</span>
@@ -940,7 +947,7 @@ export function InventoryTab() {
             <CardTitle className="text-base font-semibold">库存明细</CardTitle>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => exportToCSV(
-                filteredInventory.map((inv: InventoryRecord) => ({
+                filteredInventory.map((inv: Inventory) => ({
                   sku: inv.sku, productName: inv.productName, warehouse: inv.warehouse,
                   quantity: inv.quantity, safetyStock: inv.safetyStock, inTransit: inv.inTransit,
                   turnoverDays: inv.turnoverDays, status: STATUS_LABELS[inv.stockStatus],
@@ -1005,7 +1012,7 @@ export function InventoryTab() {
                 </TableRow>
               </TableHeader>
               <TableBody className="data-grid-stripe">
-                {filteredInventory.map((inv: InventoryRecord, idx: number) => (
+                {filteredInventory.map((inv: Inventory, idx: number) => (
                   <TableRow key={inv.id} className={`data-grid-row cursor-pointer hover:bg-orange-50/50 dark:hover:bg-orange-950/20 group relative border-l-[3px] border-l-transparent hover:border-l-orange-400 transition-colors duration-200`} onClick={() => viewInventoryDetail(inv.sku)}>
                     <TableCell className="font-mono text-xs">{inv.sku}</TableCell>
                     <TableCell className="font-medium">{inv.productName}</TableCell>
