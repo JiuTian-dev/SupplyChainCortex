@@ -136,10 +136,15 @@ function FreightBanner({ data }: { data: Record<string, unknown> }) {
 
 // ==================== Main CostTab Component ====================
 export function CostTab() {
-  // React Query hooks
-  const filterParams = useFilterStore(s => s.getFilterParams());
-  const costListQuery = useCost('list', filterParams as Record<string, string | number>);
-  const costTrendQuery = useCost('trend', filterParams as Record<string, string | number>);
+  // React Query hooks — useMemo to avoid infinite re-render from new object each render
+  const selectedSkus = useFilterStore(s => s.selectedSkus);
+  const filterParams = useMemo(() => {
+    const p: Record<string, string | number> = {};
+    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
+    return p;
+  }, [selectedSkus]);
+  const costListQuery = useCost('list', filterParams);
+  const costTrendQuery = useCost('trend', filterParams);
 
   // Zustand store
   const selectedProduct = useInventoryUIStore((s) => s.selectedProduct);

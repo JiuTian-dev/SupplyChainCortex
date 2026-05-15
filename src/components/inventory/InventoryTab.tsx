@@ -90,10 +90,17 @@ export function InventoryTab() {
     reorderPriority, setReorderPriority,
   } = useInventoryUIStore();
 
-  // React Query hooks for data fetching
-  const filterParams = useFilterStore(s => s.getFilterParams());
+  // React Query hooks for data fetching — select primitives to avoid infinite re-render
+  const selectedSkus = useFilterStore(s => s.selectedSkus);
+  const selectedWarehouses = useFilterStore(s => s.selectedWarehouses);
   const toggleSku = useFilterStore(s => s.toggleSku);
-  const { data: inventoryData, isLoading: inventoryLoading } = useInventory('list', filterParams as Record<string, string | number>);
+  const filterParams = useMemo(() => {
+    const p: Record<string, string | number> = {};
+    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
+    if (selectedWarehouses.length > 0) p.warehouses = selectedWarehouses.join(',');
+    return p;
+  }, [selectedSkus, selectedWarehouses]);
+  const { data: inventoryData, isLoading: inventoryLoading } = useInventory('list', filterParams);
   const { data: agingResponse } = useWarehouse('aging');
   const { data: warehouseCapacityData } = useWarehouse('capacity');
   const { data: procurementData } = useProcurement('plan');

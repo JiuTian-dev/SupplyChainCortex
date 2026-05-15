@@ -179,8 +179,13 @@ function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentItem; on
 
 // ==================== Logistics Risk Card Sub-component ====================
 function LogisticsRiskCard() {
-  const filterParams = useFilterStore(s => s.getFilterParams());
-  const { data, isLoading } = useLogistics('risk', filterParams as Record<string, string | number>);
+  const selectedSkus = useFilterStore(s => s.selectedSkus);
+  const filterParams = useMemo(() => {
+    const p: Record<string, string | number> = {};
+    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
+    return p;
+  }, [selectedSkus]);
+  const { data, isLoading } = useLogistics('risk', filterParams);
   const rawData = (data as Record<string, unknown>)?.data ?? data;
   const risks = ((rawData as Record<string, unknown>)?.risks as Record<string, unknown>[] | undefined) || [];
 
@@ -253,8 +258,13 @@ function LogisticsRiskCard() {
 // ==================== Main LogisticsTab Component ====================
 export function LogisticsTab() {
   // React Query hooks
-  const filterParams = useFilterStore(s => s.getFilterParams());
-  const logisticsListQuery = useLogistics('list', filterParams as Record<string, string | number>);
+  const selectedSkus = useFilterStore(s => s.selectedSkus);
+  const filterParams = useMemo(() => {
+    const p: Record<string, string | number> = {};
+    if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
+    return p;
+  }, [selectedSkus]);
+  const logisticsListQuery = useLogistics('list', filterParams);
 
   // Shipment status update dialog state
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
