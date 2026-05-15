@@ -32,6 +32,8 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
   // Filter parameters
   const warehouse = searchParams.get("warehouse") || undefined;
   const category = searchParams.get("category") || undefined;
+  const skusParam = searchParams.get("skus");
+  const skus = skusParam ? skusParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
   const sortBy = searchParams.get("sortBy") || undefined;
   const sortOrder = searchParams.get("sortOrder") === "desc" ? "desc" : "asc";
 
@@ -40,6 +42,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       const result = await getInventoryList({
         warehouse,
         category,
+        skus,
         sortBy,
         sortOrder,
         page,
@@ -321,6 +324,82 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
         },
         categoryBreakdown,
         warehouseBreakdown,
+      });
+    }
+
+    // ==================== Inventory capital analysis ====================
+    case "inventory_capital": {
+      const threshold = parseInt(searchParams.get("threshold") || "90");
+      const [inventoryRecords, costRecords, salesRecords] = await Promise.all([
+        db.inventory.findMany({ include: { product: true }, take: 1000 }),
+        db.costRecord.findMany({ take: 1000 }),
+        db.salesRecord.findMany({ take: 5000 }),
+      ]);
+
+      // Cost lookup by productId
+      const costByProduct: Record<string, number> = {};
+      costRecords.forEach(c => { costByProduct[c.productId] = c.totalLanded; });
+
+      // Warehouse capital breakdown
+      const warehouseMap = new Map<string, { capital: number; items: number }>();
+      let totalCapital = 0;
+      for (const inv of inventoryRecords) {
+        const unitCost = costByProduct[inv.productId] ?? inv.product?.unitCost ?? 0;
+        const capital = inv.quantity * unitCost;
+        totalCapital += capital;
+        const w = warehouseMap.get(inv.warehouse) || { capital: 0, items: 0 };
+        w.capital += capital;
+        w.items++;
+        warehouseMap.set(inv.warehouse, w);
+      }
+      const warehouseBreakdown = [...warehouseMap.entries()]
+        .map(([warehouse, v]) => ({
+          warehouse,
+          capital: Math.round(v.capital * 100) / 100,
+          items: v.items,
+          percent: totalCapital > 0 ? Math.round((v.capital / totalCapital) * 1000) / 10 : 0,
+        }))
+        .sort((a, b) => b.capital - a.capital);
+
+      // Turnover ratio = COGS / avg inventory
+      const totalRevenue = salesRecords.reduce((s, r) => s + r.revenue, 0);
+      const daysSpan = salesRecords.length > 1
+        ? Math.max(1, Math.ceil(
+            (new Date(salesRecords[salesRecords.length - 1].date).getTime() -
+             new Date(salesRecords[0].date).getTime()) / 86400000))
+        : 30;
+      const annualizedRevenue = totalRevenue / daysSpan * 365;
+      const turnoverRatio = totalCapital > 0
+        ? Math.round((annualizedRevenue / totalCapital) * 100) / 100
+        : 0;
+
+      // Slow-moving SKUs
+      const slowItems = inventoryRecords
+        .filter(inv => inv.turnoverDays > threshold)
+        .map(inv => ({
+          sku: inv.sku,
+          productName: inv.productName,
+          warehouse: inv.warehouse,
+          quantity: inv.quantity,
+          turnoverDays: inv.turnoverDays,
+          unitCost: costByProduct[inv.productId] ?? inv.product?.unitCost ?? 0,
+          capital: Math.round(inv.quantity * (costByProduct[inv.productId] ?? inv.product?.unitCost ?? 0) * 100) / 100,
+        }))
+        .sort((a, b) => b.turnoverDays - a.turnoverDays);
+
+      const slowCapital = slowItems.reduce((s, i) => s + i.capital, 0);
+
+      return apiSuccess({
+        totalCapital: Math.round(totalCapital * 100) / 100,
+        turnoverRatio,
+        warehouseBreakdown,
+        slowMoving: {
+          threshold,
+          count: slowItems.length,
+          capitalTied: Math.round(slowCapital * 100) / 100,
+          percentOfTotal: totalCapital > 0 ? Math.round((slowCapital / totalCapital) * 1000) / 10 : 0,
+          items: slowItems.slice(0, 30),
+        },
       });
     }
 

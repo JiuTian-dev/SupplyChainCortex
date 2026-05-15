@@ -332,12 +332,13 @@ export async function getCostList(params: {
   minMargin?: number;
   maxMargin?: number;
   category?: string;
+  skus?: string[];
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
 }) {
-  const { minMargin, maxMargin, category, sortBy, sortOrder = 'asc', page = 1, pageSize = 20 } = params;
+  const { minMargin, maxMargin, category, skus, sortBy, sortOrder = 'asc', page = 1, pageSize = 20 } = params;
 
   const where: Record<string, unknown> = {};
   if (minMargin !== undefined || maxMargin !== undefined) {
@@ -347,6 +348,7 @@ export async function getCostList(params: {
     where.grossMargin = marginFilter;
   }
   if (category) where.product = { category };
+  if (skus && skus.length > 0) where.sku = { in: skus };
 
   const costs = await db.costRecord.findMany({ where, include: { product: true }, take: 1000 });
 

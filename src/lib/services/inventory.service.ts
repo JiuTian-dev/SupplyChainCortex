@@ -367,6 +367,7 @@ export async function getAbcAnalysis() {
 export interface InventoryListFilters {
   warehouse?: string;
   category?: string;
+  skus?: string[];  // comma-separated SKU list for multi-select filtering
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -375,14 +376,15 @@ export interface InventoryListFilters {
 
 /** Get paginated/filtered inventory list with distribution */
 export async function getInventoryList(filters: InventoryListFilters = {}) {
-  const { warehouse, category, sortBy, sortOrder = 'asc', page = 1, pageSize = 20 } = filters;
+  const { warehouse, category, skus, sortBy, sortOrder = 'asc', page = 1, pageSize = 20 } = filters;
 
   return cachedFetch(
-    cacheKey('inventory', 'list', warehouse || 'all', category || 'all', sortBy || 'none', sortOrder, page, pageSize),
+    cacheKey('inventory', 'list', warehouse || 'all', category || 'all', sortBy || 'none', sortOrder, page, pageSize, skus?.join(',') || 'all'),
     async () => {
       const where: Record<string, unknown> = {};
       if (warehouse) where.warehouse = warehouse;
       if (category) where.product = { category };
+      if (skus && skus.length > 0) where.sku = { in: skus };
 
       const [inventory, distribution] = await Promise.all([
         db.inventory.findMany({ where, include: { product: true }, take: 1000 }),

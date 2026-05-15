@@ -32,6 +32,8 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
   const minMargin = searchParams.get("minMargin") ? parseFloat(searchParams.get("minMargin")!) : undefined;
   const maxMargin = searchParams.get("maxMargin") ? parseFloat(searchParams.get("maxMargin")!) : undefined;
   const category = searchParams.get("category") || undefined;
+  const skusParam = searchParams.get("skus");
+  const skus = skusParam ? skusParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
   const sortBy = searchParams.get("sortBy") || undefined;
   const sortOrder = searchParams.get("sortOrder") === "desc" ? "desc" : "asc";
 
@@ -60,6 +62,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
         minMargin,
         maxMargin,
         category,
+        skus,
         sortBy,
         sortOrder,
         page,
