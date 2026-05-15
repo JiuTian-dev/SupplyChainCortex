@@ -107,6 +107,18 @@ export function FilterBar() {
                 onClick={deselectAllSkus}>清除</Button>
             </div>
 
+            {/* Quick filter: ABC class */}
+            <div className="flex gap-1 mb-1">
+              <Button variant="ghost" size="sm" className="h-5 text-[9px]" onClick={() => {
+                const aSkus = allSkus.filter(s => s.sku <= 'SKU-020').map(s => s.sku);
+                selectAllSkus(aSkus);
+              }}>A类产品</Button>
+              <Button variant="ghost" size="sm" className="h-5 text-[9px]" onClick={() => {
+                const bSkus = allSkus.filter(s => s.sku > 'SKU-020' && s.sku <= 'SKU-050').map(s => s.sku);
+                selectAllSkus(bSkus);
+              }}>B类产品</Button>
+            </div>
+
             {/* Category filter chips */}
             {allCategories.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
@@ -127,25 +139,39 @@ export function FilterBar() {
               </div>
             )}
 
-            {/* SKU list */}
+            {/* SKU list — grouped by category */}
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
-              {filteredSkus.slice(0, 100).map(s => {
-                const checked = selectedSkus.includes(s.sku) ||
-                  (selectedSkus.length === 0 && selectedCategories.length === 0) ||
-                  (selectedCategories.length > 0 && selectedCategories.includes(s.category));
-                return (
-                  <button
-                    key={s.sku}
-                    className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center gap-1.5 hover:bg-muted/50 ${checked ? 'bg-orange-50 dark:bg-orange-950/20' : ''}`}
-                    onClick={() => toggleSku(s.sku)}
-                  >
-                    {checked && <Check className="h-2.5 w-2.5 text-orange-500 shrink-0" />}
-                    {!checked && <span className="w-2.5 shrink-0" />}
-                    <span className="font-mono text-[9px] text-muted-foreground">{s.sku}</span>
-                    <span className="truncate">{s.name}</span>
-                  </button>
-                );
-              })}
+              {/* Group by category */}
+              {(() => {
+                const grouped = new Map<string, typeof filteredSkus>();
+                for (const s of filteredSkus.slice(0, 100)) {
+                  const g = grouped.get(s.category) || [];
+                  g.push(s);
+                  grouped.set(s.category, g);
+                }
+                return [...grouped.entries()].map(([cat, items]) => (
+                  <div key={cat}>
+                    <div className="text-[9px] text-muted-foreground px-2 py-0.5 font-medium sticky top-0 bg-card">{cat} ({items.length})</div>
+                    {items.map(s => {
+                      const checked = selectedSkus.includes(s.sku) ||
+                        (selectedSkus.length === 0 && selectedCategories.length === 0) ||
+                        (selectedCategories.length > 0 && selectedCategories.includes(s.category));
+                      return (
+                        <button
+                          key={s.sku}
+                          className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center gap-1.5 hover:bg-muted/50 ${checked ? 'bg-orange-50 dark:bg-orange-950/20' : ''}`}
+                          onClick={() => toggleSku(s.sku)}
+                        >
+                          {checked && <Check className="h-2.5 w-2.5 text-orange-500 shrink-0" />}
+                          {!checked && <span className="w-2.5 shrink-0" />}
+                          <span className="font-mono text-[9px] text-muted-foreground">{s.sku}</span>
+                          <span className="truncate">{s.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         )}
