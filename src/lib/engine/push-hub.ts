@@ -48,6 +48,9 @@ export type PushEvent =
 class PushHub {
   private emitter = new EventEmitter();
   private listenerCount = 0;
+  /** Track emitted notification IDs to prevent duplicates */
+  private emittedIds = new Set<string>();
+  private maxEmittedIds = 500;
 
   /** Broadcast an event to all SSE listeners */
   emit(event: PushEvent): void {
@@ -78,6 +81,15 @@ class PushHub {
     id: string; type: string; title: string; description: string;
     severity: string; sku?: string; source: string; createdAt: Date;
   }): void {
+    // Skip duplicate notifications
+    if (this.emittedIds.has(n.id)) return;
+    this.emittedIds.add(n.id);
+    // Trim set if too large
+    if (this.emittedIds.size > this.maxEmittedIds) {
+      const toRemove = [...this.emittedIds].slice(0, this.emittedIds.size - this.maxEmittedIds);
+      for (const id of toRemove) this.emittedIds.delete(id);
+    }
+
     this.emit({
       type: 'notification',
       data: {
@@ -99,15 +111,19 @@ class PushHub {
     severity: string; sku?: string; source: string; createdAt: Date;
   }>): void {
     if (notifications.length === 0) return;
+    let newCount = 0;
     for (const n of notifications) {
+      if (this.emittedIds.has(n.id)) continue;
       this.emitNotification(n);
+      newCount++;
     }
-    // Also emit summary
-    const critical = notifications.filter(n => n.severity === 'critical').length;
+    if (newCount === 0) return; // all duplicates, skip summary
+    // Also emit summary with new counts only
+    const critical = notifications.filter(n => n.severity === 'critical' && !this.emittedIds.has(n.id + '_sum')).length;
     const warning = notifications.filter(n => n.severity === 'warning').length;
     this.emit({
       type: 'alert-summary',
-      data: { critical, warning, total: notifications.length },
+      data: { critical, warning, total: newCount },
     });
   }
 

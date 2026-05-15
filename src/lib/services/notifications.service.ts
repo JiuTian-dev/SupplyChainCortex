@@ -51,12 +51,24 @@ function seededRange(seed: string, min: number, max: number): number {
   return min + (hash % 10000) / 10000 * range;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────────
+
+/** Generate a stable hash-based ID for deduplication */
+function hashId(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return `notif-${Math.abs(hash).toString(36)}`;
+}
+
 // ─── Core Business Logic ───────────────────────────────────────────────────────
 
 /** Build all notifications from various data sources efficiently */
 export async function buildNotifications(): Promise<Notification[]> {
   const notifications: Notification[] = [];
-  let notifId = 0;
 
   // Fetch all data sources in parallel for efficiency
   const [inventoryWarnings, costAlerts, logisticsDelays, currentMonthSales, prevMonthSales] = await Promise.all([
@@ -99,7 +111,7 @@ export async function buildNotifications(): Promise<Notification[]> {
       ? Math.round((deficit / inv.safetyStock) * 100)
       : 0;
     notifications.push({
-      id: `inv-${notifId++}`,
+      id: hashId(`inv-${inv.sku}-${inv.stockStatus}`),
       type: '库存预警',
       title: `${inv.productName} 库存${isCritical ? '紧急' : '不足'}`,
       description: isCritical
@@ -119,7 +131,7 @@ export async function buildNotifications(): Promise<Notification[]> {
   for (const cost of costAlerts) {
     const isVeryLow = cost.grossMargin < 40;
     notifications.push({
-      id: `cost-${notifId++}`,
+      id: hashId(`cost-${cost.sku}`),
       type: '成本预警',
       title: `${cost.productName} 毛利率${isVeryLow ? '严重' : ''}过低`,
       description: isVeryLow
@@ -140,7 +152,7 @@ export async function buildNotifications(): Promise<Notification[]> {
     const isException = shipment.status === 'exception';
     const severeDelay = shipment.delayDays > 5;
     notifications.push({
-      id: `log-${notifId++}`,
+      id: hashId(`log-${shipment.trackingNumber}-${shipment.status}`),
       type: '物流延误',
       title: `${shipment.productName} ${isException ? '物流异常' : '运输延误'}`,
       description: isException
@@ -184,7 +196,7 @@ export async function buildNotifications(): Promise<Notification[]> {
       if (momGrowth < -10) {
         const isSevere = momGrowth < -30;
         notifications.push({
-          id: `sales-${notifId++}`,
+          id: hashId(`sales-${sku}-${new Date().toISOString().slice(0, 7)}`),
           type: '销售异常',
           title: `${data.productName} 销售额环比${isSevere ? '大幅' : ''}下降`,
           description: isSevere
