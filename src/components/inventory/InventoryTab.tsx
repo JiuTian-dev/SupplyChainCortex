@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProductFilter } from '@/components/shared/ProductFilter';
 import { FilterChips } from '@/components/shared/FilterChips';
-import { CardFilter } from '@/components/shared/CardFilter';
+
 import {
   useInventory,
   useWarehouse,
@@ -261,10 +261,7 @@ export function InventoryTab() {
         {/* ABC 分类 */}
         <Card className="card-dashboard chart-container">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">ABC 分类分布</CardTitle>
-              <CardFilter type="category" selected={[]} onChange={() => {}} options={['厨房小家电','清洁家电','环境家电','个人护理','智能家居','户外用品','车载电器','音频设备']} label="品类" />
-            </div>
+            <CardTitle className="text-base font-semibold">ABC 分类分布</CardTitle>
             <CardDescription>基于销售额贡献的产品分级</CardDescription>
           </CardHeader>
           <CardContent>
@@ -300,10 +297,7 @@ export function InventoryTab() {
         {/* 周转天数分布 */}
         <Card className="sm:col-span-2 lg:col-span-2 card-dashboard chart-container">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">产品周转天数</CardTitle>
-              <CardFilter type="warehouse" selected={[]} onChange={() => {}} label="仓库" />
-            </div>
+            <CardTitle className="text-base font-semibold">产品周转天数</CardTitle>
             <CardDescription>周转天数越短代表库存效率越高 | 红色虚线 = 90天滞销线</CardDescription>
           </CardHeader>
           <CardContent>
