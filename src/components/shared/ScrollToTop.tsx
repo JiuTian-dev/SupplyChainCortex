@@ -1,10 +1,10 @@
 'use client';
 
 import { ArrowUp } from 'lucide-react';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 
 export function ScrollToTop() {
-  const showScrollTop = useUIStore((s) => s.showScrollTop);
+  const showScrollTop = useDashboardUIStore((s) => s.showScrollTop);
 
   if (!showScrollTop) return null;
 

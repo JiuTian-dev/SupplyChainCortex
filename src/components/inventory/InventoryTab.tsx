@@ -24,7 +24,7 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { useFilterStore } from '@/stores/filter-store';
+import { ProductFilter } from '@/components/shared/ProductFilter';
 import {
   useInventory,
   useWarehouse,
@@ -90,16 +90,13 @@ export function InventoryTab() {
     reorderPriority, setReorderPriority,
   } = useInventoryUIStore();
 
-  // React Query hooks for data fetching — select primitives to avoid infinite re-render
-  const selectedSkus = useFilterStore(s => s.selectedSkus);
-  const selectedWarehouses = useFilterStore(s => s.selectedWarehouses);
-  const toggleSku = useFilterStore(s => s.toggleSku);
+  // Local filter state — per-tab, no cross-tab dependency
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
-    if (selectedWarehouses.length > 0) p.warehouses = selectedWarehouses.join(',');
     return p;
-  }, [selectedSkus, selectedWarehouses]);
+  }, [selectedSkus]);
   const { data: inventoryData, isLoading: inventoryLoading } = useInventory('list', filterParams);
   const { data: agingResponse } = useWarehouse('aging');
   const { data: warehouseCapacityData } = useWarehouse('capacity');
@@ -245,6 +242,12 @@ export function InventoryTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <ProductFilter selected={selectedSkus} onChange={setSelectedSkus} />
+        {selectedSkus.length > 0 && (
+          <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
+        )}
+      </div>
       {/* 库存水位概览 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard title="健康库存" value={inventory.filter((i: Inventory) => i.stockStatus === 'healthy').length} icon={<CheckCircle2 className="h-4 w-4" />} color="text-green-600 dark:text-green-400" bgColor="bg-green-50 dark:bg-green-950/20" />

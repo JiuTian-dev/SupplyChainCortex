@@ -121,6 +121,12 @@
 
 ---
 
+## 固定开发需求
+
+> **功能不冗余，前端表达精简实用。**
+> 
+> 每新增一个功能前，先检查是否已有类似实现。每做一个前端组件，先问"能不能更简洁地表达同样的信息"。代码比功能数更值得骄傲。
+
 ## 未解决问题或风险，建议下一阶段优先事项
 
 ### 遗留风险
@@ -129,7 +135,7 @@
 3. **MCP连接器数据为静态**：`MCP_CONNECTORS` 常量数据未接入真实监控
 
 ### 待办任务（优先级排序）
-1. **Docker 部署验证**
+1. ~~**Docker 部署验证**~~ ✅
 2. **质量管理板块增强**（退货原因帕累托、质保成本、缺陷分析深化）
 3. **销售分析**（季节性指数功能）
 4. **库存优化**（库存资金占用分析）
@@ -148,6 +154,53 @@
 - `SupplyChainFlowChart` 新增 `nodes`/`links` props 支持动态数据
 - 关键函数补充 JSDoc（`calculateSafetyStock`、`forecastDemand`、`detectSalesAnomaly` 等）
 
+### v0.8.0 — 冗余清理 + 地基建设 + 模块深化（2026-05-13）
+
+#### Phase 0 — 冗余清理
+- **删除 `ui-store.ts`**：迁移 16 个消费者到 `useDashboardUIStore`/`useInventoryUIStore`/`useSupplierUIStore`，无残留引用
+- **`/api/supplier-performance` 重写**：409 行内联逻辑 → 70 行委托 `suppliers.service.ts::getSupplierPerformance()`
+- **MCP `query_risk` + `query_cascade_risk` 合并**：`query_risk` 移除模拟场景，`query_cascade_risk` 扩展至 10 个场景
+- **`lib/types.ts` 去重**：移除 7 个与 Prisma 重复的类型定义，更新 18 个文件导入
+- **`/api/analytics` + `/api/reports` 合并**：统一为 `/api/analytics`，旧路由做别名
+- **`/api/risk` 删除**：风险分析统一到 `/api/cascade-risk`
+- **`/api/search` 移除内嵌 RAG**：搜索和 RAG 解耦
+- **前端组件合并**：CostImpactHeatmap + RiskMatrixHeatmap 提取 `HeatmapGrid`；SalesForecastEnhanced 替代 DemandForecastPanel；DashboardSkeleton + TabSkeleton 合并
+- **`summarize()` 提取**：3 个 MCP 文件重复 → `mcp/helpers.ts`
+- **Amazon scraper 删除**：已自检 block，不可用
+- **`/api/performance` mock 数据清理**
+
+#### Phase 1 — 地基建设
+- **MCP 连接器真实数据接入**：新建 `connector-health.ts`，7 个连接器从静态常量改为实时健康探测
+- **小家电 HS 编码库补全**：8516/8509/8508 三大类 26 个品类，关税规则从 24 条扩至 80 条，覆盖 Section 301 (25%) / IEEPA (10%) / MFN / RCEP / EU
+- **CPSC 召回自动同步**：scheduler 新增 6 小时周期任务
+- **SCFI 加固**：JSON 缓存层，失败时返回缓存数据，超过 24 小时告警
+
+#### Phase 2 — 合规+质量深化
+- **合规证书到期告警**：`check_expiry` 端点，自动创建 SupplyChainEvent 告警
+- **法规影响评估**：新建法规时自动匹配受影响 SKU
+- **质量趋势分析**：按月同比/环比退货/缺陷/质保趋势
+- **根因汇总**：缺陷根因 Pareto，识别系统性问题
+- **质保成本面板**：补入 QualityTab 导航
+
+#### Phase 3 — P2 体验
+- **关税影响报告 API**：`/api/reports/tariff-impact`，SKU 级到岸成本+毛利率+风险标记
+- **库存资金占用分析**：`inventory_capital` 动作，仓库级资金分布+周转率+滞销品识别
+- **贝叶斯校准面板**：`CalibrationPanel.tsx`，展示引擎接受率+权重趋势+数据源稳定性
+
+### v0.9.0 — 因果推理引擎 + 策略沙盘推演（2026-05-14）
+
+#### 方向 A：因果推理引擎
+- **`src/lib/engine/causal-reasoning.ts`** — 结构因果模型(SCM)层：因果边构建（基于 DB 数据的证据链）、反事实查询（替换供应商/加安全库存/改航线）、因果摘要生成
+- **级联传播集成** — BFS 传播后自动调用 `buildCausalEdges`，每条边附带 causalChain 说明传播原因
+- **`/api/cascade-risk` POST** — 新增 `counterfactual` action，返回 baseline vs intervened 对比
+- **证据来源**：库存水位、货运延误天数、供应商评分、港口拥堵数据，均从 DB 查询
+
+#### 方向 C：策略沙盘推演
+- **`src/lib/engine/strategy-templates.ts`** — 10 个供应链策略模板：库存前置、供应商转移、定价转嫁、运价锁定、远期锁汇、航线调整、安全库存上调、品类结构调整、多源采购、关税申诉
+- **`src/lib/engine/strategy-sandbox.ts`** — 策略对比引擎（并行跑多个策略→对比矩阵）、网格搜索参数优化（Pareto 前沿）、LLM 辅助参数建议（调 chatCompletion 解析最优参数）
+- **`/api/sandbox` POST** — 新增 `list_strategies`、`compare_strategies`、`optimize`、`suggest_params` 四个 action
+- **`agent-sandbox.service.ts`** — 导出内部类型和函数供策略引擎复用
+
 ### 版本
-- 当前版本：v0.7.4
+- 当前版本：v0.9.0
 - Git 仓库：`https://github.com/JiuTian-dev/SupplyChainCortex.git` main 分支

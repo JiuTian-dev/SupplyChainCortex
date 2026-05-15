@@ -12,14 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { DEFAULT_ALERT_RULES } from '@/lib/constants';
-import type { AlertRule } from '@/lib/types';
+import type { AlertRule } from '@prisma/client';
 import { toast } from 'sonner';
 
 export function AlertRulesDialog() {
-  const alertRulesOpen = useUIStore((s) => s.alertRulesOpen);
-  const setAlertRulesOpen = useUIStore((s) => s.setAlertRulesOpen);
+  const alertRulesOpen = useDashboardUIStore((s) => s.alertRulesOpen);
+  const setAlertRulesOpen = useDashboardUIStore((s) => s.setAlertRulesOpen);
 
   const [alertRules, setAlertRules] = useState<AlertRule[]>(DEFAULT_ALERT_RULES);
 

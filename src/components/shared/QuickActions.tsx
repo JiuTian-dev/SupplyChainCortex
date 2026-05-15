@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useNotificationStore } from '@/stores/notification-store';
 import { exportToCSV } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -29,11 +29,11 @@ export function QuickActions({
   isRefreshing,
   activeTab,
 }: QuickActionsProps) {
-  const showQuickActions = useUIStore((s) => s.showQuickActions);
-  const badgePop = useUIStore((s) => s.badgePop);
-  const setNotificationOpen = useUIStore((s) => s.setNotificationOpen);
-  const setGlobalSearchOpen = useUIStore((s) => s.setGlobalSearchOpen);
-  const setCompareOpen = useUIStore((s) => s.setCompareOpen);
+  const showQuickActions = useDashboardUIStore((s) => s.showQuickActions);
+  const badgePop = useDashboardUIStore((s) => s.badgePop);
+  const setNotificationOpen = useDashboardUIStore((s) => s.setNotificationOpen);
+  const setGlobalSearchOpen = useDashboardUIStore((s) => s.setGlobalSearchOpen);
+  const setCompareOpen = useDashboardUIStore((s) => s.setCompareOpen);
   const unreadCount = useNotificationStore((s) => s.unreadCount());
 
   if (!showQuickActions) return null;

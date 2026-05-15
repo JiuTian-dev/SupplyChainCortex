@@ -33,7 +33,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useInventory } from '@/hooks/use-supply-chain-data';
-import type { InventoryRecord } from '@/lib/types';
+import type { Inventory } from '@prisma/client';
 
 // ==================== Constants ====================
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
@@ -47,7 +47,7 @@ const ROW_HEIGHT = 44;
 const EXPANDED_ROW_HEIGHT = 76;
 
 // ==================== CSV Export ====================
-function exportCSV(items: InventoryRecord[]) {
+function exportCSV(items: Inventory[]) {
   const headers = ['SKU', '产品名称', '仓库', '数量', '安全库存', '周转率', '状态', '补货点', '在途', '周转天数'];
   const rows = items.map(i => [i.sku, i.productName, i.warehouse, i.quantity, i.safetyStock, i.turnoverRate, STATUS_BADGE[i.stockStatus]?.label ?? i.stockStatus, i.reorderPoint, i.inTransit, i.turnoverDays]);
   const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
@@ -80,7 +80,7 @@ interface InventoryDataTableProps {
 // ==================== Main Component ====================
 export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: InventoryDataTableProps) {
   const { data: inventoryData } = useInventory('list');
-  const inventory = useMemo(() => (inventoryData as any)?.inventory ?? [] as InventoryRecord[], [inventoryData]);
+  const inventory = useMemo(() => (inventoryData as any)?.inventory ?? [] as Inventory[], [inventoryData]);
 
   // UI state
   const [virtualMode, setVirtualMode] = useState(true);
@@ -93,12 +93,12 @@ export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: I
 
   // Derive unique warehouses for filter
   const warehouses = useMemo(() => {
-    const set = new Set(inventory.map((i: InventoryRecord) => i.warehouse));
+    const set = new Set(inventory.map((i: Inventory) => i.warehouse));
     return Array.from(set).sort() as string[];
   }, [inventory]);
 
   // TanStack Table column definitions
-  const columns = useMemo<ColumnDef<InventoryRecord, unknown>[]>(() => [
+  const columns = useMemo<ColumnDef<Inventory, unknown>[]>(() => [
     {
       id: 'select',
       header: ({ table }) => (
@@ -270,7 +270,7 @@ export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: I
   // Custom filter function for global search (SKU + productName)
   const globalFilterFn = useCallback((row: any, _columnId: string, filterValue: string) => {
     const q = filterValue.toLowerCase();
-    const item = row.original as InventoryRecord;
+    const item = row.original as Inventory;
     return item.sku.toLowerCase().includes(q) || item.productName.toLowerCase().includes(q);
   }, []);
 
@@ -313,8 +313,8 @@ export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: I
   }, [tableRows, warehouseFilter, statusFilter]);
 
   // Build flat virtual rows (item + optional expanded detail)
-  type VirtualItemRow = { type: 'item'; row: Row<InventoryRecord>; idx: number };
-  type VirtualDetailRow = { type: 'detail'; item: InventoryRecord; idx: number };
+  type VirtualItemRow = { type: 'item'; row: Row<Inventory>; idx: number };
+  type VirtualDetailRow = { type: 'detail'; item: Inventory; idx: number };
   type VirtualRow = VirtualItemRow | VirtualDetailRow;
 
   const virtualRows = useMemo(() => {
@@ -499,7 +499,7 @@ export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: I
               className="h-7 text-xs gap-1 border-orange-300 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/30"
               onClick={() => {
                 const skus = Object.keys(rowSelection)
-                  .map(id => inventory.find((i: InventoryRecord) => i.id === id)?.sku)
+                  .map(id => inventory.find((i: Inventory) => i.id === id)?.sku)
                   .filter(Boolean);
                 if (skus.length > 0) onAdjustStock?.(skus[0] as string);
               }}

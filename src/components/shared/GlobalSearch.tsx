@@ -12,7 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useProductSearch } from '@/hooks/use-supply-chain-data';
 
 interface SearchProduct {
@@ -35,11 +35,11 @@ export interface GlobalSearchProps {
 }
 
 export function GlobalSearch({ onSelectResult, onViewDetail }: GlobalSearchProps) {
-  const globalSearchOpen = useUIStore((s) => s.globalSearchOpen);
-  const setGlobalSearchOpen = useUIStore((s) => s.setGlobalSearchOpen);
-  const globalSearchQuery = useUIStore((s) => s.globalSearchQuery);
-  const setGlobalSearchQuery = useUIStore((s) => s.setGlobalSearchQuery);
-  const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const globalSearchOpen = useDashboardUIStore((s) => s.globalSearchOpen);
+  const setGlobalSearchOpen = useDashboardUIStore((s) => s.setGlobalSearchOpen);
+  const globalSearchQuery = useDashboardUIStore((s) => s.globalSearchQuery);
+  const setGlobalSearchQuery = useDashboardUIStore((s) => s.setGlobalSearchQuery);
+  const setActiveTab = useDashboardUIStore((s) => s.setActiveTab);
 
   // Debounced query for API search
   const [debouncedQ, setDebouncedQ] = useState('');

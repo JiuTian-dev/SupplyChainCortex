@@ -43,7 +43,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNotes, useCreateNote, useResolveNote, useDeleteNote } from '@/hooks/use-supply-chain-data';
 import { toast } from 'sonner';
-import type { SupplyChainNote } from '@/lib/types';
+import type { SupplyChainNote } from '@prisma/client';
 
 // ==================== Constants ====================
 const CATEGORY_LABELS: Record<string, string> = {

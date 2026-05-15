@@ -1,0 +1,46 @@
+# SearXNG configuration for SupplyChain Cortex
+# Docs: https://docs.searxng.org/admin/settings/
+
+use_default_settings: true
+
+server:
+  secret_key: "${SEARXNG_SECRET}"
+  bind_address: "0.0.0.0"
+  limiter: false
+  image_proxy: false
+  # Enable CORS for local dev
+  method: "GET"
+
+search:
+  formats:
+    - html
+    - json
+  safe_search: 0
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+
+engines:
+  - name: google
+    disabled: false
+  - name: duckduckgo
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: wikipedia
+    disabled: false
+  - name: github
+    disabled: false
+  - name: reddit
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: startpage
+    disabled: false
+
+outgoing:
+  request_timeout: 10.0
+  useragent_suffix: "SupplyChainCortex/2.9"

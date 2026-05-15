@@ -30,21 +30,44 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://supplychain:supplychain@postgres:5432/supply_chain}
+      - DATABASE_URL=postgresql://supplychain:supplychain@postgres:5432/supply_chain
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production-at-least-32-chars-long}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NODE_ENV=${NODE_ENV:-production}
       - DB_TYPE=${DB_TYPE:-postgresql}
+      - SEARCH_PROVIDER=${SEARCH_PROVIDER:-searxng}
+      - SEARXNG_BASE_URL=http://searxng:8080
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - supply-chain-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 10s
       start_period: 30s
+      retries: 3
+
+  # ─── SearXNG — Self-hosted meta search engine (70+ engines, zero API keys) ──
+  searxng:
+    image: searxng/searxng:latest
+    container_name: supply-chain-searxng
+    restart: unless-stopped
+    ports:
+      - "${SEARXNG_PORT:-8081}:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-supply-chain-cortex-searxng-secret-key}
+    networks:
+      - supply-chain-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
       retries: 3
 
   # ─── PostgreSQL 16 ──────────────────────────────────────────────────

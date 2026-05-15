@@ -1,0 +1,9 @@
+# SearXNG rate limiter — disabled for local/internal use
+[botdetection.ip_limit]
+link_token = false
+
+[botdetection.ip_lists]
+pass_ip = [
+  "0.0.0.0/0",
+  "::/0",
+]

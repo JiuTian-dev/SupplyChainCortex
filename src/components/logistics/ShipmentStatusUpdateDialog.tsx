@@ -24,7 +24,7 @@ import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_COLORS } from '@/lib/constants'
 import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateShipmentStatus } from '@/lib/api-client';
-import type { ShipmentRecord } from '@/lib/types';
+import type { ShipmentItem } from '@prisma/client';
 
 // ==================== Status Flow ====================
 const STATUS_FLOW: Record<string, string[]> = {
@@ -86,7 +86,7 @@ function TimelineStep({
 interface ShipmentStatusUpdateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  shipment: ShipmentRecord | null;
+  shipment: ShipmentItem | null;
 }
 
 // ==================== Component ====================

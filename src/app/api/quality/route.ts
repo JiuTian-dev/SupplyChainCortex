@@ -243,6 +243,155 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       });
     }
 
+    // ---- Month-over-month trends for returns / defects / warranty ----
+    case "trends": {
+      const monthsBack = Math.min(parseInt(searchParams.get("months") || "12"), 36);
+
+      // Build month label list
+      const months: string[] = [];
+      const refDate = new Date();
+      for (let i = monthsBack - 1; i >= 0; i--) {
+        const d = new Date(refDate.getFullYear(), refDate.getMonth() - i, 1);
+        months.push(d.toISOString().slice(0, 7));
+      }
+
+      // Fetch all records for trend computation
+      const [allReturns, allDefects, allWarranty] = await Promise.all([
+        db.returnRecord.findMany({
+          select: { createdAt: true, quantity: true, costImpact: true },
+        }),
+        db.defectRecord.findMany({
+          select: { detectedAt: true, quantity: true, severity: true },
+        }),
+        db.warrantyCost.findMany({
+          select: { claimDate: true, cost: true, category: true },
+        }),
+      ]);
+
+      // Helper: compute monthly aggregates from date-keyed records
+      function monthlyAggregate<T extends Record<string, unknown>>(
+        records: T[],
+        dateField: keyof T,
+        valueField?: keyof T,
+      ): Record<string, { count: number; total: number }> {
+        const byMonth: Record<string, { count: number; total: number }> = {};
+        for (const r of records) {
+          const raw = r[dateField];
+          const dateStr = typeof raw === "string" ? raw : String(raw ?? "");
+          const month = dateStr.slice(0, 7);
+          if (!month || month.length < 7) continue;
+          if (!byMonth[month]) byMonth[month] = { count: 0, total: 0 };
+          byMonth[month].count++;
+          if (valueField !== undefined) {
+            const v = r[valueField];
+            byMonth[month].total += typeof v === "number" ? v : Number(v ?? 0);
+          }
+        }
+        return byMonth;
+      }
+
+      const returnsByMonth = monthlyAggregate(allReturns, "createdAt" as keyof typeof allReturns[number], "quantity" as keyof typeof allReturns[number]);
+      const defectsByMonth = monthlyAggregate(allDefects, "detectedAt" as keyof typeof allDefects[number], "quantity" as keyof typeof allDefects[number]);
+      const warrantyByMonth = monthlyAggregate(allWarranty, "claimDate" as keyof typeof allWarranty[number], "cost" as keyof typeof allWarranty[number]);
+
+      // Build monthly trend series
+      const series = months.map((month) => ({
+        month,
+        returns: returnsByMonth[month]?.count || 0,
+        returnQty: returnsByMonth[month]?.total || 0,
+        defects: defectsByMonth[month]?.count || 0,
+        defectQty: defectsByMonth[month]?.total || 0,
+        warranty: warrantyByMonth[month]?.count || 0,
+        warrantyCost: Math.round((warrantyByMonth[month]?.total || 0) * 100) / 100,
+      }));
+
+      // Month-over-month change (most recent vs previous month)
+      const latest = series[series.length - 1];
+      const previous = series[series.length - 2];
+      const momChange = previous
+        ? {
+            returns: latest.returns - previous.returns,
+            returnsPct: previous.returns > 0
+              ? Math.round(((latest.returns - previous.returns) / previous.returns) * 100)
+              : null,
+            defects: latest.defects - previous.defects,
+            defectsPct: previous.defects > 0
+              ? Math.round(((latest.defects - previous.defects) / previous.defects) * 100)
+              : null,
+            warrantyCost: Math.round((latest.warrantyCost - previous.warrantyCost) * 100) / 100,
+            warrantyCostPct: previous.warrantyCost > 0
+              ? Math.round(((latest.warrantyCost - previous.warrantyCost) / previous.warrantyCost) * 100)
+              : null,
+          }
+        : null;
+
+      // YoY comparison (if >= 12 months of data)
+      let yoy: Record<string, unknown> | null = null;
+      if (series.length >= 12) {
+        const currentYearMonths = series.slice(-12);
+        const priorYearMonths = series.length >= 24 ? series.slice(-24, -12) : null;
+        yoy = {
+          currentYear: {
+            returns: currentYearMonths.reduce((s, m) => s + m.returns, 0),
+            defects: currentYearMonths.reduce((s, m) => s + m.defects, 0),
+            warrantyCost: Math.round(currentYearMonths.reduce((s, m) => s + m.warrantyCost, 0) * 100) / 100,
+          },
+          priorYear: priorYearMonths
+            ? {
+                returns: priorYearMonths.reduce((s, m) => s + m.returns, 0),
+                defects: priorYearMonths.reduce((s, m) => s + m.defects, 0),
+                warrantyCost: Math.round(priorYearMonths.reduce((s, m) => s + m.warrantyCost, 0) * 100) / 100,
+              }
+            : null,
+        };
+      }
+
+      return apiSuccess({
+        months: series,
+        summary: {
+          totalReturns: allReturns.length,
+          totalDefects: allDefects.length,
+          totalWarranty: allWarranty.length,
+        },
+        momChange,
+        yoy,
+      });
+    }
+
+    // ---- Root cause summary for defects ----
+    case "root_cause_summary": {
+      const defects = await db.defectRecord.findMany({
+        where: { rootCause: { not: null } },
+        select: { rootCause: true, quantity: true, severity: true },
+      });
+
+      const causeMap = new Map<string, { count: number; totalQty: number; criticalCount: number }>();
+      for (const d of defects) {
+        const cause = d.rootCause || "unknown";
+        const existing = causeMap.get(cause) || { count: 0, totalQty: 0, criticalCount: 0 };
+        existing.count++;
+        existing.totalQty += d.quantity;
+        if (d.severity === "critical") existing.criticalCount++;
+        causeMap.set(cause, existing);
+      }
+
+      const total = defects.length;
+      const causes = Array.from(causeMap.entries())
+        .map(([rootCause, stats]) => ({
+          rootCause,
+          ...stats,
+          percentage: total > 0 ? Math.round((stats.count / total) * 100) : 0,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      return apiSuccess({
+        total,
+        causes,
+        topCauses: causes.slice(0, 5),
+        systemicIssues: causes.filter((c) => c.percentage >= 20),
+      });
+    }
+
     default:
       return apiError(`未知操作: ${action}`, 400, 'UNKNOWN_ACTION');
   }

@@ -4,14 +4,17 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip as UITooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { Flame, Percent, DollarSign } from 'lucide-react';
-import type { CostRecord } from '@/lib/types';
+import {
+  HeatmapWrapper,
+  HeatmapCell,
+  HeatmapLegend,
+  SEVERITY_LEGEND_BG,
+  getHeatmapColor,
+  getLegendColor,
+  SEVERITY_THRESHOLDS,
+} from '@/components/shared/HeatmapGrid';
+import type { CostRecord } from '@prisma/client';
 
 // ==================== Cost categories config ====================
 const COST_CATEGORIES = [
@@ -22,21 +25,13 @@ const COST_CATEGORIES = [
   { key: 'platformFee' as const, label: '平台费' },
 ];
 
-// ==================== Color band thresholds ====================
+// ==================== Color bands (ratio-based) ====================
 function getCellColorClass(ratio: number): { bg: string; text: string } {
-  if (ratio >= 0.9) return { bg: 'bg-red-400 dark:bg-red-600', text: 'text-white' };
-  if (ratio >= 0.75) return { bg: 'bg-red-200 dark:bg-red-800/40', text: 'text-red-900 dark:text-red-100' };
-  if (ratio >= 0.5) return { bg: 'bg-orange-200 dark:bg-orange-800/40', text: 'text-orange-900 dark:text-orange-100' };
-  if (ratio >= 0.25) return { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-900 dark:text-yellow-100' };
-  return { bg: 'bg-green-100 dark:bg-green-900/20', text: 'text-green-900 dark:text-green-100' };
+  return getHeatmapColor(ratio, SEVERITY_THRESHOLDS);
 }
 
 function getLegendColorClass(ratio: number): string {
-  if (ratio >= 0.9) return 'bg-red-400 dark:bg-red-600';
-  if (ratio >= 0.75) return 'bg-red-200 dark:bg-red-800/40';
-  if (ratio >= 0.5) return 'bg-orange-200 dark:bg-orange-800/40';
-  if (ratio >= 0.25) return 'bg-yellow-100 dark:bg-yellow-900/30';
-  return 'bg-green-100 dark:bg-green-900/20';
+  return getLegendColor(ratio, SEVERITY_LEGEND_BG);
 }
 
 // ==================== Props ====================
@@ -53,7 +48,7 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
     const maxes: Record<string, number> = {};
     for (const cat of COST_CATEGORIES) {
       const vals = costs.map((c) => c[cat.key]);
-      maxes[cat.key] = Math.max(...vals, 0.01); // avoid div by zero
+      maxes[cat.key] = Math.max(...vals, 0.01);
     }
     return maxes;
   }, [costs]);
@@ -68,7 +63,6 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
     return avgs;
   }, [costs]);
 
-  // Format value based on view mode
   const formatValue = (amount: number, totalLanded: number): string => {
     if (viewMode === 'percentage') {
       return totalLanded > 0 ? `${((amount / totalLanded) * 100).toFixed(1)}%` : '0%';
@@ -76,21 +70,16 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
     return `$${amount.toFixed(2)}`;
   };
 
-  // Get ratio for cell coloring
   const getRatio = (amount: number, categoryKey: string): number => {
     return amount / categoryMaxes[categoryKey];
   };
 
-  // Average ratio for summary row
   const getAvgRatio = (categoryKey: string): number => {
     return categoryAverages[categoryKey] / categoryMaxes[categoryKey];
   };
 
   return (
-    <Card
-      className="card-dashboard"
-     
-    >
+    <Card className="card-dashboard">
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
@@ -125,9 +114,8 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <TooltipProvider delayDuration={150}>
+        <HeatmapWrapper>
           <div className="max-h-96 overflow-auto custom-scrollbar">
-            {/* Heatmap Grid */}
             <div className="min-w-[640px]">
               {/* Header row */}
               <div className="grid grid-cols-[minmax(140px,1fr)_repeat(5,minmax(80px,1fr))] gap-1 mb-1">
@@ -170,20 +158,11 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
                       : '0';
 
                     return (
-                      <UITooltip key={cat.key}>
-                        <TooltipTrigger asChild>
-                          <div
-                            className={`${bg} ${text} px-2 py-2 rounded-md text-xs font-medium text-center
-                              hover:scale-110 hover:z-10 transition-transform duration-200 cursor-pointer
-                              select-none min-h-[36px] flex items-center justify-center`}
-                          >
-                            {formatValue(amount, cost.totalLanded)}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          className="bg-popover text-popover-foreground border shadow-lg"
-                        >
+                      <HeatmapCell
+                        key={cat.key}
+                        bg={bg}
+                        text={text}
+                        tooltipContent={
                           <div className="space-y-1 text-xs">
                             <p className="font-semibold">{cost.productName}</p>
                             <div className="flex items-center justify-between gap-4">
@@ -199,8 +178,10 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
                               <span className="font-medium">${cost.totalLanded.toFixed(2)}</span>
                             </div>
                           </div>
-                        </TooltipContent>
-                      </UITooltip>
+                        }
+                      >
+                        {formatValue(amount, cost.totalLanded)}
+                      </HeatmapCell>
                     );
                   })}
                 </div>
@@ -236,23 +217,18 @@ export function CostImpactHeatmap({ costs }: CostImpactHeatmapProps) {
           <div className="mt-4 pt-3 border-t border-border">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <span className="text-xs text-muted-foreground font-medium shrink-0">颜色图例:</span>
-              <div className="flex items-center gap-1 flex-wrap">
-                {[
-                  { label: '极低 (0-25%)', ratio: 0.1 },
-                  { label: '低 (25-50%)', ratio: 0.35 },
-                  { label: '中 (50-75%)', ratio: 0.6 },
-                  { label: '高 (75-90%)', ratio: 0.82 },
-                  { label: '极高 (90-100%)', ratio: 0.95 },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-1">
-                    <div className={`w-4 h-4 rounded-sm ${getLegendColorClass(item.ratio)}`} />
-                    <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                  </div>
-                ))}
-              </div>
+              <HeatmapLegend
+                thresholds={[
+                  { label: '极低 (0-25%)', bg: getLegendColorClass(0.1) },
+                  { label: '低 (25-50%)', bg: getLegendColorClass(0.35) },
+                  { label: '中 (50-75%)', bg: getLegendColorClass(0.6) },
+                  { label: '高 (75-90%)', bg: getLegendColorClass(0.82) },
+                  { label: '极高 (90-100%)', bg: getLegendColorClass(0.95) },
+                ]}
+              />
             </div>
           </div>
-        </TooltipProvider>
+        </HeatmapWrapper>
       </CardContent>
     </Card>
   );

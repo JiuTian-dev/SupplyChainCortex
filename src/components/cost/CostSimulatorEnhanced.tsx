@@ -15,7 +15,7 @@ import {
   Legend, ResponsiveContainer, Cell,
 } from 'recharts';
 import { useCost } from '@/hooks/use-supply-chain-data';
-import type { CostRecord } from '@/lib/types';
+import type { CostRecord } from '@prisma/client';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
 
 // ==================== Slider Config ====================

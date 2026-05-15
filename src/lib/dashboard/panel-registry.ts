@@ -15,7 +15,7 @@
 
 import {
   Eye, Search, Zap, Cpu, Boxes, DollarSign, Ship, TrendingUp,
-  Building2, Shield, Calendar, Settings,
+  Building2, Shield, Calendar, Settings, BrainCircuit,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -66,6 +66,12 @@ export const PANEL_REGISTRY: PanelDef[] = [
     id: 'sandbox', label: '沙箱推演', icon: Cpu,
     path: '@/components/dashboard/SandboxReplay',
     category: 'decision', tags: ['all', 'risk'],
+    defaultEnabled: false, loaderType: 'chart',
+  },
+  {
+    id: 'calibration', label: '引擎校准', icon: BrainCircuit,
+    path: '@/components/engine/CalibrationPanel',
+    category: 'decision', tags: ['all', 'executive', 'ops'],
     defaultEnabled: false, loaderType: 'chart',
   },
 

@@ -7,7 +7,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLogistics } from '@/hooks/use-supply-chain-data';
-import type { ShipmentRecord } from '@/lib/types';
+import type { ShipmentItem } from '@prisma/client';
 
 // ==================== City Coordinates ====================
 const CITIES: Record<string, { x: number; y: number; label: string; isOrigin: boolean }> = {
@@ -53,7 +53,7 @@ const STATUS_LABELS: Record<string, string> = {
 // ==================== Tooltip Data ====================
 interface RouteTooltipData {
   route: RouteDef;
-  shipments: ShipmentRecord[];
+  shipments: ShipmentItem[];
   originCity: typeof CITIES[string];
   destCity: typeof CITIES[string];
 }
@@ -69,7 +69,7 @@ export function ShipmentRouteMap() {
   const shipments = useMemo(() => {
     if (!logisticsListQuery.data) return [];
     const data = logisticsListQuery.data as Record<string, unknown>;
-    return (data.shipments || []) as ShipmentRecord[];
+    return (data.shipments || []) as ShipmentItem[];
   }, [logisticsListQuery.data]);
 
   // Build route definitions dynamically from actual DB shipments
@@ -96,7 +96,7 @@ export function ShipmentRouteMap() {
 
   // Map shipments to routes
   const routeShipments = useMemo(() => {
-    const mapping: Record<string, ShipmentRecord[]> = {};
+    const mapping: Record<string, ShipmentItem[]> = {};
     routeDefs.forEach((r) => {
       mapping[r.id] = [];
     });

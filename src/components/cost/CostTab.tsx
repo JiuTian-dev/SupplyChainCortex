@@ -19,7 +19,7 @@ import {
 import {
   useCost,
 } from '@/hooks/use-supply-chain-data';
-import { useFilterStore } from '@/stores/filter-store';
+import { ProductFilter } from '@/components/shared/ProductFilter';
 import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { CHART_COLORS } from '@/lib/constants';
 import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
@@ -136,8 +136,8 @@ function FreightBanner({ data }: { data: Record<string, unknown> }) {
 
 // ==================== Main CostTab Component ====================
 export function CostTab() {
-  // React Query hooks — useMemo to avoid infinite re-render from new object each render
-  const selectedSkus = useFilterStore(s => s.selectedSkus);
+  // Local filter state — per-tab
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
@@ -205,6 +205,12 @@ export function CostTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <ProductFilter selected={selectedSkus} onChange={setSelectedSkus} />
+        {selectedSkus.length > 0 && (
+          <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
+        )}
+      </div>
       {/* 成本趋势横幅 — 大宗商品 · 运费 */}
       {costTrend && (
         <div className="flex flex-wrap gap-2 text-[11px]">

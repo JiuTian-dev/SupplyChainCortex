@@ -17,9 +17,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { CHART_COLORS, STATUS_LABELS } from '@/lib/constants';
-import type { InventoryRecord, CostRecord, SalesSummary } from '@/lib/types';
+import type { SalesSummary } from '@/lib/types';
+import type { Inventory, CostRecord } from '@prisma/client';
 import { fetchProducts } from '@/lib/api-client';
 import {
   RadarChart,
@@ -41,7 +42,7 @@ interface CompareProduct {
 }
 
 export interface ProductCompareDialogProps {
-  inventoryData?: { inventory?: InventoryRecord[] } | null;
+  inventoryData?: { inventory?: Inventory[] } | null;
   costData?: { costs?: CostRecord[] } | null;
   salesData?: { productSummaries?: SalesSummary[] } | null;
 }
@@ -51,10 +52,10 @@ export function ProductCompareDialog({
   costData,
   salesData,
 }: ProductCompareDialogProps) {
-  const compareOpen = useUIStore((s) => s.compareOpen);
-  const setCompareOpen = useUIStore((s) => s.setCompareOpen);
-  const compareProducts = useUIStore((s) => s.compareProducts);
-  const setCompareProducts = useUIStore((s) => s.setCompareProducts);
+  const compareOpen = useDashboardUIStore((s) => s.compareOpen);
+  const setCompareOpen = useDashboardUIStore((s) => s.setCompareOpen);
+  const compareProducts = useDashboardUIStore((s) => s.compareProducts);
+  const setCompareProducts = useDashboardUIStore((s) => s.setCompareProducts);
 
   // Fetch products from live API instead of mock data
   const { data: productsData, isLoading: productsLoading } = useQuery({

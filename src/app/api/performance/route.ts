@@ -131,38 +131,11 @@ function formatUptime(seconds: number): string {
   return `${s}s`;
 }
 
-// ─── Seed some demo data if no real data exists ──────────────────────────────
-
-function seedDemoDataIfEmpty(): void {
-  if (apiCallRecords.length > 0) return;
-
-  const demoEndpoints = [
-    '/api/dashboard', '/api/inventory', '/api/cost', '/api/logistics',
-    '/api/sales', '/api/suppliers', '/api/risk', '/api/warehouse',
-    '/api/stats', '/api/products', '/api/events', '/api/notes',
-    '/api/supply-chain-score', '/api/cache', '/api/alert-rules',
-  ];
-
-  const now = Date.now();
-  for (let i = 0; i < 80; i++) {
-    const endpoint = demoEndpoints[i % demoEndpoints.length];
-    // Simulate varying response times
-    const baseDuration = endpoint === '/api/dashboard' ? 120 : endpoint === '/api/stats' ? 200 : 50;
-    const duration = baseDuration + Math.floor(Math.random() * baseDuration * 0.8);
-    const status = Math.random() > 0.05 ? 200 : 500;
-    apiCallRecords.push({
-      endpoint,
-      duration,
-      status,
-      timestamp: now - (80 - i) * 3000, // Every 3 seconds going back
-    });
-  }
-}
+// ─── Seed demo data REMOVED — if demo data is needed, use a proper seed file ──────
 
 // ─── GET handler ─────────────────────────────────────────────────────────────
 
 export const GET = withErrorHandler(async (_req: NextRequest) => {
-  seedDemoDataIfEmpty();
 
   // Last 20 API response times (most recent first)
   const recentCalls = apiCallRecords.slice(-20).reverse().map((r) => ({

@@ -7,10 +7,48 @@
  * Priority:
  *   1. Mysteel 文章解析（每周五 15:30 后更新）
  *   2. 多个财经新闻源轮询
- *   3. 失败返回 null，上游降级到 DB → 静态基线
+ *   3. 本地 JSON 缓存（文件，os.tmpdir()，失败时使用）
+ *   4. 失败返回 null，上游降级到 DB → 静态基线
  *
  * Free, no API key required.
  */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+// ─── Cache ───────────────────────────────────────────────────────────────────────
+
+const SCFI_CACHE_FILE = path.join(os.tmpdir(), 'jiadian-scfi-cache.json');
+
+interface SCFICacheEntry {
+  data: SCFIRawData;
+  lastSuccessfulFetch: string; // ISO 8601
+}
+
+function loadScfiCache(): SCFICacheEntry | null {
+  try {
+    if (fs.existsSync(SCFI_CACHE_FILE)) {
+      const raw = fs.readFileSync(SCFI_CACHE_FILE, 'utf-8');
+      return JSON.parse(raw) as SCFICacheEntry;
+    }
+  } catch {
+    // Ignore cache read errors
+  }
+  return null;
+}
+
+function saveScfiCache(data: SCFIRawData): void {
+  try {
+    const entry: SCFICacheEntry = {
+      data,
+      lastSuccessfulFetch: new Date().toISOString(),
+    };
+    fs.writeFileSync(SCFI_CACHE_FILE, JSON.stringify(entry, null, 2), 'utf-8');
+  } catch {
+    // Ignore cache write errors
+  }
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -189,6 +227,48 @@ export async function fetchSCFI(): Promise<SCFIRawData | null> {
   }
 
   return null;
+}
+
+/**
+ * fetchSCFIWithCache — wraps fetchSCFI() with a local JSON file cache.
+ *
+ * 1. Tries live fetchSCFI() first.
+ * 2. On success, writes result to cache file in os.tmpdir().
+ * 3. On failure, reads last successful result from cache.
+ * 4. If cache is >24h old, logs a warning.
+ *
+ * Returns:
+ *   - data:    SCFIRawData | null (null only when both live and cache fail)
+ *   - cachedAt: ISO timestamp of the cached data, or null if data is fresh
+ *   - stale:   true when serving cached data that is >24h old
+ */
+export async function fetchSCFIWithCache(): Promise<{
+  data: SCFIRawData | null;
+  cachedAt: string | null;
+  stale: boolean;
+}> {
+  const fresh = await fetchSCFI();
+  if (fresh) {
+    saveScfiCache(fresh);
+    return { data: fresh, cachedAt: null, stale: false };
+  }
+
+  const cached = loadScfiCache();
+  if (cached) {
+    const ageHours = (Date.now() - new Date(cached.lastSuccessfulFetch).getTime()) / 3_600_000;
+    if (ageHours > 24) {
+      console.warn(
+        `[SCFI] Live scrape failed and cache is stale (${ageHours.toFixed(0)} hours old). Data may be inaccurate.`
+      );
+    }
+    return {
+      data: cached.data,
+      cachedAt: cached.lastSuccessfulFetch,
+      stale: ageHours > 24,
+    };
+  }
+
+  return { data: null, cachedAt: null, stale: false };
 }
 
 /**

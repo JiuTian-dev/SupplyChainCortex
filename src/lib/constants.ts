@@ -1,6 +1,7 @@
 // SupplyChain Cortex - 常量定义
 
-import type { ConnectorStatus, AlertRule } from './types';
+import type { ConnectorStatus } from './types';
+import type { AlertRule } from '@prisma/client';
 
 // ==================== 状态映射 ====================
 export const STATUS_COLORS: Record<string, string> = {
@@ -39,15 +40,19 @@ export const SHIPMENT_STATUS_COLORS: Record<string, string> = {
 export const CHART_COLORS = ["#f97316", "#22c55e", "#06b6d4", "#8b5cf6", "#ef4444", "#f59e0b", "#ec4899"];
 
 // ==================== MCP 连接器 ====================
-// Initial connector data — shows online until SSE pushes real status
+// Initial connector data — status starts at 'offline' (honest default).
+// Real health data arrives via:
+//   1. SSE `connector-health` push (every 90 s, first at 5 s)
+//   2. Client-side getConnectorHealth() call on mount (see connection-store)
+// The status field is NEVER hardcoded to 'online' — it reflects live probes.
 export const MCP_CONNECTORS: ConnectorStatus[] = [
-  { name: '数据库', type: 'database', status: 'online', lastSync: new Date().toISOString(), latency: 2, recordsSynced: 72000 },
-  { name: 'Open-Meteo 天气', type: 'weather', status: 'online', lastSync: new Date().toISOString(), latency: 45, recordsSynced: 12 },
-  { name: 'Frankfurter 汇率', type: 'fx', status: 'online', lastSync: new Date().toISOString(), latency: 38, recordsSynced: 63 },
-  { name: '库存 MCP', type: 'inventory', status: 'online', lastSync: new Date().toISOString(), latency: 5, recordsSynced: 72 },
-  { name: '成本 MCP', type: 'cost', status: 'online', lastSync: new Date().toISOString(), latency: 8, recordsSynced: 72 },
-  { name: '物流 MCP', type: 'logistics', status: 'online', lastSync: new Date().toISOString(), latency: 12, recordsSynced: 220 },
-  { name: '销售 MCP', type: 'sales', status: 'online', lastSync: new Date().toISOString(), latency: 6, recordsSynced: 26280 },
+  { name: '数据库',          type: 'database',  status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
+  { name: 'Open-Meteo 天气', type: 'weather',   status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
+  { name: 'Frankfurter 汇率', type: 'fx',        status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
+  { name: '库存 MCP',       type: 'inventory', status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
+  { name: '成本 MCP',       type: 'cost',       status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
+  { name: '物流 MCP',       type: 'logistics', status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
+  { name: '销售 MCP',       type: 'sales',     status: 'offline', lastSync: new Date().toISOString(), latency: 0, recordsSynced: 0 },
 ];
 
 export const AGING_COLORS = { '0-30天': '#22c55e', '31-60天': '#3b82f6', '61-90天': '#f59e0b', '90+天': '#ef4444' };

@@ -4,6 +4,7 @@
  */
 
 import type { MCPTool } from './tools';
+import { summarize } from './helpers';
 
 import {
   getInventoryOverview, getInventoryList, computeStockStatus, getReorderRecommendations,
@@ -20,26 +21,6 @@ import { createNote, type CreateNoteData } from '@/lib/services/notes.service';
 import { updateAlertRule } from '@/lib/queries/alert-rules.queries';
 
 import { getDashboardMetrics } from '@/lib/queries/dashboard.queries';
-
-// ─── Shared helpers ──────────────────────────────────────────────────────────────
-
-function summarize<T>(data: T, maxItems = 20): T {
-  if (Array.isArray(data)) {
-    if (data.length > maxItems) return data.slice(0, maxItems) as T;
-  }
-  if (data && typeof data === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      if (Array.isArray(value) && value.length > maxItems) {
-        result[key] = { items: value.slice(0, maxItems), total: value.length, truncated: true, note: `显示前 ${maxItems} 条，共 ${value.length} 条` };
-      } else {
-        result[key] = value;
-      }
-    }
-    return result as T;
-  }
-  return data;
-}
 
 // ─── Tool Definitions ───────────────────────────────────────────────────────────
 

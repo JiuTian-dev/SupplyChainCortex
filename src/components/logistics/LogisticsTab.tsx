@@ -15,7 +15,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import {
   useLogistics,
 } from '@/hooks/use-supply-chain-data';
-import { useFilterStore } from '@/stores/filter-store';
+import { ProductFilter } from '@/components/shared/ProductFilter';
 import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_COLORS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
 import type { ShipmentItem } from '@prisma/client';
@@ -178,8 +178,7 @@ function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentItem; on
 }
 
 // ==================== Logistics Risk Card Sub-component ====================
-function LogisticsRiskCard() {
-  const selectedSkus = useFilterStore(s => s.selectedSkus);
+function LogisticsRiskCard({ selectedSkus }: { selectedSkus: string[] }) {
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
@@ -258,7 +257,7 @@ function LogisticsRiskCard() {
 // ==================== Main LogisticsTab Component ====================
 export function LogisticsTab() {
   // React Query hooks
-  const selectedSkus = useFilterStore(s => s.selectedSkus);
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
   const filterParams = useMemo(() => {
     const p: Record<string, string | number> = {};
     if (selectedSkus.length > 0) p.skus = selectedSkus.join(',');
@@ -422,6 +421,12 @@ export function LogisticsTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <ProductFilter selected={selectedSkus} onChange={setSelectedSkus} />
+        {selectedSkus.length > 0 && (
+          <span className="text-[11px] text-muted-foreground">已选 {selectedSkus.length} 个产品</span>
+        )}
+      </div>
       {/* 物流路线图 */}
       <Card
         className="card-dashboard"
@@ -473,7 +478,7 @@ export function LogisticsTab() {
 
 
       {/* 物流风险 */}
-      <LogisticsRiskCard />
+      <LogisticsRiskCard selectedSkus={selectedSkus} />
 
       {/* 货运追踪列表 */}
       <Card

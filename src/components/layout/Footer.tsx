@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Clock, Package, Globe, Zap, Wifi, Database, RefreshCw, Keyboard } from 'lucide-react';
 import packageInfo from '../../../package.json';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useConnectionStore } from '@/stores/connection-store';
 
 export function Footer() {
-  const lastSyncTime = useUIStore((s) => s.lastSyncTime);
-  const refreshCountdown = useUIStore((s) => s.refreshCountdown);
+  const lastSyncTime = useDashboardUIStore((s) => s.lastSyncTime);
+  const refreshCountdown = useDashboardUIStore((s) => s.refreshCountdown);
   const connectorData = useConnectionStore((s) => s.connectorData);
 
   // Real-time sync time display - use mounted state to avoid hydration mismatch

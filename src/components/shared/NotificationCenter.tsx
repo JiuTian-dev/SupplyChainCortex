@@ -22,7 +22,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { VirtualList } from '@/components/shared/VirtualList';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
+import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { useNotificationStore } from '@/stores/notification-store';
 import { useNotifications } from '@/hooks/use-supply-chain-data';
 import type { BackendNotification } from '@/lib/types';
@@ -46,16 +47,16 @@ export function NotificationCenter({
   costData,
   logisticsData,
 }: NotificationCenterProps) {
-  const notificationOpen = useUIStore((s) => s.notificationOpen);
-  const setNotificationOpen = useUIStore((s) => s.setNotificationOpen);
-  const readNotifications = useUIStore((s) => s.readNotifications);
-  const addReadNotification = useUIStore((s) => s.addReadNotification);
-  const setReadNotifications = useUIStore((s) => s.setReadNotifications);
-  const setHighlightElement = useUIStore((s) => s.setHighlightElement);
-  const setActiveTab = useUIStore((s) => s.setActiveTab);
-  const setSelectedProduct = useUIStore((s) => s.setSelectedProduct);
-  const badgePop = useUIStore((s) => s.badgePop);
-  const setBadgePop = useUIStore((s) => s.setBadgePop);
+  const notificationOpen = useDashboardUIStore((s) => s.notificationOpen);
+  const setNotificationOpen = useDashboardUIStore((s) => s.setNotificationOpen);
+  const readNotifications = useDashboardUIStore((s) => s.readNotifications);
+  const addReadNotification = useDashboardUIStore((s) => s.addReadNotification);
+  const setReadNotifications = useDashboardUIStore((s) => s.setReadNotifications);
+  const setActiveTab = useDashboardUIStore((s) => s.setActiveTab);
+  const badgePop = useDashboardUIStore((s) => s.badgePop);
+  const setBadgePop = useDashboardUIStore((s) => s.setBadgePop);
+  const setHighlightElement = useInventoryUIStore((s) => s.setHighlightElement);
+  const setSelectedProduct = useInventoryUIStore((s) => s.setSelectedProduct);
 
   const backendNotifications = useNotificationStore(
     (s) => s.backendNotifications

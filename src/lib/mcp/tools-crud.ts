@@ -4,6 +4,7 @@
  */
 
 import type { MCPTool } from './tools';
+import { summarize } from './helpers';
 
 import {
   getInventoryOverview, getInventoryList, getInventoryForecast,
@@ -34,28 +35,8 @@ import {
 } from '@/lib/queries/dashboard.queries';
 
 import {
-  getRiskDashboard, getRiskMatrix, getRiskMitigations, runRiskSimulation,
+  getRiskDashboard, getRiskMatrix, getRiskMitigations, getRiskAlerts,
 } from '@/lib/services/risk.service';
-
-// ─── Shared helpers ──────────────────────────────────────────────────────────────
-
-function summarize<T>(data: T, maxItems = 20): T {
-  if (Array.isArray(data)) {
-    if (data.length > maxItems) return data.slice(0, maxItems) as T;
-  }
-  if (data && typeof data === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      if (Array.isArray(value) && value.length > maxItems) {
-        result[key] = { items: value.slice(0, maxItems), total: value.length, truncated: true, note: `显示前 ${maxItems} 条，共 ${value.length} 条` };
-      } else {
-        result[key] = value;
-      }
-    }
-    return result as T;
-  }
-  return data;
-}
 
 // ─── Tool Definitions ───────────────────────────────────────────────────────────
 
@@ -402,25 +383,20 @@ export const crudTools: MCPTool[] = [
   // ─── 7. query_risk ────────────────────────────────────────────────────────
   {
     name: 'query_risk',
-    description: '获取供应链风险评估，包括整体风险评分、风险矩阵、缓解措施和情景模拟。支持供应中断、需求激增、汇率冲击、关税上调、天气延误等情景模拟。天气延误情景使用Open-Meteo实时港口天气数据。',
+    description: '查询供应链风险状态和数据，包括整体风险评分、风险矩阵、缓解措施和风险预警。如需进行情景模拟（供应中断、需求激增、汇率冲击、关税上调等），请使用 query_cascade_risk 工具。',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          description: '查询类型: dashboard(风险仪表盘), matrix(风险矩阵), mitigations(缓解措施), simulate(情景模拟)',
-          enum: ['dashboard', 'matrix', 'mitigations', 'simulate'],
-        },
-        scenario: {
-          type: 'string',
-          description: '模拟情景: supply_disruption(供应中断), demand_spike(需求激增), exchange_rate_shock(汇率冲击), tariff_increase(关税上调), weather_disruption(天气延误-使用Open-Meteo实时数据)',
-          enum: ['supply_disruption', 'demand_spike', 'exchange_rate_shock', 'tariff_increase', 'weather_disruption'],
+          description: '查询类型: dashboard(风险仪表盘), matrix(风险矩阵), mitigations(缓解措施), alerts(风险预警)',
+          enum: ['dashboard', 'matrix', 'mitigations', 'alerts'],
         },
       },
       required: ['action'],
     },
     handler: async (params) => {
-      const { action, scenario } = params;
+      const { action } = params;
       switch (action) {
         case 'dashboard':
           return await getRiskDashboard();
@@ -428,9 +404,8 @@ export const crudTools: MCPTool[] = [
           return summarize(await getRiskMatrix());
         case 'mitigations':
           return await getRiskMitigations();
-        case 'simulate':
-          if (!scenario) throw new Error('情景模拟需要提供 scenario 参数');
-          return await runRiskSimulation(scenario as string);
+        case 'alerts':
+          return await getRiskAlerts();
         default:
           throw new Error(`未知的风险查询类型: ${action}`);
       }

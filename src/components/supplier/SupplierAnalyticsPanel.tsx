@@ -14,12 +14,12 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { CHART_COLORS } from '@/lib/constants';
-import type { SupplierRecord } from '@/lib/types';
+import type { Supplier } from '@prisma/client';
 
 // ==================== Types ====================
 
 interface SupplierAnalyticsPanelProps {
-  suppliers: SupplierRecord[];
+  suppliers: Supplier[];
   supplierPerformance: Record<string, unknown> | null;
 }
 

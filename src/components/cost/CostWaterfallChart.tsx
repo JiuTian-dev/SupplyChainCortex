@@ -16,7 +16,7 @@ import {
 } from 'recharts';
 import { TrendingUp, DollarSign, BarChart3, Table as TableIcon, ArrowRight } from 'lucide-react';
 import { useCost } from '@/hooks/use-supply-chain-data';
-import type { CostRecord } from '@/lib/types';
+import type { CostRecord } from '@prisma/client';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
 
 // ==================== Color config for waterfall components ====================

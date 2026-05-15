@@ -83,6 +83,101 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       });
     }
 
+    // ---- Check certificate expiry alerts ----
+    case "check_expiry": {
+      const days = parseInt(searchParams.get("days") || "0");
+      const todayStr = new Date().toISOString().split("T")[0];
+      const now = new Date();
+
+      // Fetch active/expiring certificates that haven't expired yet
+      const candidates = await db.complianceCert.findMany({
+        where: {
+          status: { in: ["active", "expiring"] },
+          expiryDate: { gte: todayStr },
+        },
+        orderBy: { expiryDate: "asc" },
+      });
+
+      // Filter by reminderDays if not explicitly overridden by ?days=
+      const relevantCerts = candidates.filter((cert) => {
+        if (days > 0) {
+          const diff = Math.ceil(
+            (new Date(cert.expiryDate).getTime() - now.getTime()) /
+              (1000 * 60 * 60 * 24),
+          );
+          return diff <= days;
+        }
+        const diff = Math.ceil(
+          (new Date(cert.expiryDate).getTime() - now.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        return diff <= cert.reminderDays && diff >= 0;
+      });
+
+      // Create SupplyChainEvent alerts with dedup (24h window)
+      let alertsCreated = 0;
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      for (const cert of relevantCerts) {
+        const diffDays = Math.ceil(
+          (new Date(cert.expiryDate).getTime() - now.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        const isCritical = diffDays <= 30;
+
+        try {
+          const existing = await db.supplyChainEvent.findFirst({
+            where: {
+              type: "alert",
+              title: { contains: cert.certName },
+              createdAt: { gte: oneDayAgo },
+            },
+          });
+          if (existing) continue;
+
+          await db.supplyChainEvent.create({
+            data: {
+              type: "alert",
+              title: `证书即将过期: ${cert.certName}`,
+              description: `${
+                cert.certName
+              } (${cert.certNumber || ""}) 将在 ${diffDays} 天后过期，到期日: ${cert.expiryDate}`,
+              icon: isCritical ? "🚨" : "⚠️",
+              color: isCritical ? "#ef4444" : "#f59e0b",
+              severity: isCritical ? "critical" : "warning",
+              sku: cert.sku || undefined,
+            },
+          });
+          alertsCreated++;
+        } catch {
+          continue;
+        }
+      }
+
+      const criticalCount = relevantCerts.filter((c) => {
+        const diff = Math.ceil(
+          (new Date(c.expiryDate).getTime() - now.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        return diff <= 30;
+      }).length;
+
+      return apiSuccess({
+        checked: relevantCerts.length,
+        alertsCreated,
+        critical: criticalCount,
+        certs: relevantCerts.map((c) => ({
+          id: c.id,
+          certName: c.certName,
+          expiryDate: c.expiryDate,
+          daysLeft: Math.ceil(
+            (new Date(c.expiryDate).getTime() - now.getTime()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        })),
+      });
+    }
+
     // ---- Compliance overview / dashboard ----
     case "overview": {
       const todayStr = new Date().toISOString().split("T")[0];
@@ -269,6 +364,30 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
         throw ValidationError(`无效的法规来源: ${source}`);
       }
 
+      // Auto-match affected SKUs: query products whose category/subCategory
+      // matches the regulation category
+      const manuallySelected = affectedSkus || [];
+      const suggestedSkus: Array<{ sku: string; productName: string }> = [];
+      try {
+        const matchingProducts = await db.product.findMany({
+          where: {
+            OR: [
+              { category: { contains: category, mode: "insensitive" } },
+              { subCategory: { contains: category, mode: "insensitive" } },
+            ],
+          },
+          select: { sku: true, name: true },
+          take: 50,
+        });
+        for (const p of matchingProducts) {
+          if (!manuallySelected.includes(p.sku)) {
+            suggestedSkus.push({ sku: p.sku, productName: p.name });
+          }
+        }
+      } catch {
+        // non-critical: auto-match is a best-effort enhancement
+      }
+
       const record = await db.regulationChange.create({
         data: {
           title,
@@ -278,7 +397,7 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
           impactLevel: impactLevel || "medium",
           effectiveDate: effectiveDate || null,
           deadline: deadline || null,
-          affectedSkus: JSON.stringify(affectedSkus || []),
+          affectedSkus: JSON.stringify(manuallySelected),
           affectedCerts: JSON.stringify(affectedCerts || []),
           actionRequired: actionRequired || null,
           status: status || "new",
@@ -286,7 +405,10 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
         },
       });
 
-      return apiSuccess(record, 201);
+      return apiSuccess({
+        ...record,
+        suggestedSkus,
+      }, 201);
     }
 
     default:

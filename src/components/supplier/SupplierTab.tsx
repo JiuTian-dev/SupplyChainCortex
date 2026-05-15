@@ -26,10 +26,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   useSuppliers, useReorder, useAnalytics, useWarehouse,
 } from '@/hooks/use-supply-chain-data';
-import { useUIStore } from '@/stores/ui-store';
+import { useSupplierUIStore } from '@/stores/useSupplierUIStore';
 import { SUPPLIER_CATEGORIES, SUPPLIER_REGIONS, CHART_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { SupplierRecord } from '@/lib/types';
+import type { Supplier } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import { SupplierRatingDialog } from './SupplierRatingDialog';
@@ -63,7 +63,7 @@ export function SupplierTab() {
     supplierStatusFilter, setSupplierStatusFilter,
     editSupplierOpen, setEditSupplierOpen,
     editingSupplier, setEditingSupplier,
-  } = useUIStore();
+  } = useSupplierUIStore();
 
   // React Query hooks for data fetching
   const { data: supplierData, isLoading: supplierLoading } = useSuppliers() as { data: Record<string, any> | undefined; isLoading: boolean };
@@ -76,12 +76,12 @@ export function SupplierTab() {
   const [supplierVirtualMode, setSupplierVirtualMode] = useState(true);
   const [supplierDetailTab, setSupplierDetailTab] = useState('details');
   const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
-  const [ratingSupplier, setRatingSupplier] = useState<SupplierRecord | null>(null);
+  const [ratingSupplier, setRatingSupplier] = useState<Supplier | null>(null);
 
   // Derived data from React Query responses
-  const suppliers = useMemo<SupplierRecord[]>(() => {
+  const suppliers = useMemo<Supplier[]>(() => {
     if (!supplierData) return [];
-    return ((supplierData as any)?.data ?? supplierData as Record<string, unknown>)?.suppliers as SupplierRecord[] || [];
+    return ((supplierData as any)?.data ?? supplierData as Record<string, unknown>)?.suppliers as Supplier[] || [];
   }, [supplierData]);
 
   const supplierPerformance = useMemo(() => {
@@ -557,7 +557,7 @@ export function SupplierTab() {
               {/* Virtual scroll body */}
               <VirtualTableList
                 items={filteredSuppliers}
-                renderRow={(s: SupplierRecord) => (
+                renderRow={(s: Supplier) => (
                   <div
                     className="flex items-center border-b hover:bg-muted/30 hover:border-l-orange-400 transition-all cursor-pointer px-4 py-2 border-l-[3px] border-l-transparent"
                     onClick={() => {

@@ -29,22 +29,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useConnectionStore } from '@/stores/connection-store';
 import { useNotificationStore } from '@/stores/notification-store';
 import { STATUS_LABELS, SHIPMENT_STATUS_LABELS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
 import { fetchInventory, fetchCost, fetchLogistics, fetchSales } from '@/lib/api-client';
-import type { InventoryRecord, CostRecord, ShipmentRecord, SalesSummary } from '@/lib/types';
+import type { SalesSummary } from '@/lib/types';
+import type { Inventory, CostRecord, ShipmentItem } from '@prisma/client';
 import { toast } from 'sonner';
 import { HealthDot } from './HealthDot';
 
 export interface HeaderProps {
   onRefresh: () => void;
   /** Pass-through data for export functionality (used as cache, API fetch as fallback) */
-  inventoryData?: { inventory?: InventoryRecord[] } | null;
+  inventoryData?: { inventory?: Inventory[] } | null;
   costData?: { costs?: CostRecord[] } | null;
-  logisticsData?: { shipments?: ShipmentRecord[] } | null;
+  logisticsData?: { shipments?: ShipmentItem[] } | null;
   salesData?: { productSummaries?: SalesSummary[] } | null;
   /** Risk data for the indicator badge */
   riskData?: { overallRisk: number } | null;
@@ -77,20 +78,20 @@ export function Header({
   const [mounted, setMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  const refreshCountdown = useUIStore((s) => s.refreshCountdown);
+  const refreshCountdown = useDashboardUIStore((s) => s.refreshCountdown);
   const [prevCountdown, setPrevCountdown] = useState(60);
-  const isRefreshing = useUIStore((s) => s.isRefreshing);
-  const lastSyncTime = useUIStore((s) => s.lastSyncTime);
-  const setGlobalSearchOpen = useUIStore((s) => s.setGlobalSearchOpen);
-  const setAlertRulesOpen = useUIStore((s) => s.setAlertRulesOpen);
-  const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const isRefreshing = useDashboardUIStore((s) => s.isRefreshing);
+  const lastSyncTime = useDashboardUIStore((s) => s.lastSyncTime);
+  const setGlobalSearchOpen = useDashboardUIStore((s) => s.setGlobalSearchOpen);
+  const setAlertRulesOpen = useDashboardUIStore((s) => s.setAlertRulesOpen);
+  const setActiveTab = useDashboardUIStore((s) => s.setActiveTab);
 
   const wsConnected = useConnectionStore((s) => s.wsConnected);
   const requestReconnect = useConnectionStore((s) => s.requestReconnect);
   const connectorData = useConnectionStore((s) => s.connectorData);
 
   const unreadCount = useNotificationStore((s) => s.unreadCount());
-  const badgePop = useUIStore((s) => s.badgePop);
+  const badgePop = useDashboardUIStore((s) => s.badgePop);
   const [exporting, setExporting] = useState(false);
 
   // Bell shake key: changes when unreadCount increases, re-triggers CSS animation
@@ -107,7 +108,7 @@ export function Header({
         salesData?.productSummaries ? Promise.resolve(salesData) : fetchSales('overview').catch(() => null),
       ]);
       const allData: Record<string, unknown>[] = [];
-      const inv = (invRes as { inventory?: InventoryRecord[] } | null)?.inventory;
+      const inv = (invRes as { inventory?: Inventory[] } | null)?.inventory;
       if (inv) {
         inv.forEach((i) => {
           allData.push({
@@ -126,7 +127,7 @@ export function Header({
           });
         });
       }
-      const shipments = (logRes as { shipments?: ShipmentRecord[] } | null)?.shipments;
+      const shipments = (logRes as { shipments?: ShipmentItem[] } | null)?.shipments;
       if (shipments) {
         shipments.forEach((s) => {
           allData.push({
@@ -167,7 +168,7 @@ export function Header({
       const res = inventoryData?.inventory
         ? inventoryData
         : await fetchInventory('list').catch(() => null);
-      const inv = (res as { inventory?: InventoryRecord[] } | null)?.inventory;
+      const inv = (res as { inventory?: Inventory[] } | null)?.inventory;
       if (!inv || inv.length === 0) {
         toast.error('暂无库存数据');
         return;
@@ -237,7 +238,7 @@ export function Header({
       const res = logisticsData?.shipments
         ? logisticsData
         : await fetchLogistics('list').catch(() => null);
-      const shipments = (res as { shipments?: ShipmentRecord[] } | null)?.shipments;
+      const shipments = (res as { shipments?: ShipmentItem[] } | null)?.shipments;
       if (!shipments || shipments.length === 0) {
         toast.error('暂无物流数据');
         return;
@@ -325,8 +326,8 @@ export function Header({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const setNotificationOpen = useUIStore((s) => s.setNotificationOpen);
-  const notificationOpen = useUIStore((s) => s.notificationOpen);
+  const setNotificationOpen = useDashboardUIStore((s) => s.setNotificationOpen);
+  const notificationOpen = useDashboardUIStore((s) => s.notificationOpen);
 
   // Keyboard shortcuts
   useEffect(() => {

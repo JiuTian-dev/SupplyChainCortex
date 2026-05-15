@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Shield, AlertTriangle, X, Package, TrendingDown } from 'lucide-react';
+import { Shield, AlertTriangle, Package, TrendingDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { HeatmapWrapper } from '@/components/shared/HeatmapGrid';
 import { useRiskMatrix } from '@/hooks/use-supply-chain-data';
 
 // ==================== Types ====================
@@ -126,7 +126,7 @@ export function RiskMatrixHeatmap() {
   const IMPACT_LABELS = ['', '极低', '低', '中', '高', '极高'];
 
   return (
-    <TooltipProvider delayDuration={200}>
+    <HeatmapWrapper delayDuration={200}>
       {/* Overall Risk Score */}
       <div className="flex items-center justify-center gap-4 mb-4 bg-red-50 dark:bg-red-950/20 rounded-xl px-6 py-3">
         <div className="flex items-center gap-2">
@@ -172,7 +172,6 @@ export function RiskMatrixHeatmap() {
             低 {matrixData.riskDistribution.low}
           </span>
         </div>
-        {/* Animated distribution bar */}
         <div className="h-2 rounded-full bg-muted/40 overflow-hidden flex">
           <div
             className="h-full bg-red-500"
@@ -470,6 +469,6 @@ export function RiskMatrixHeatmap() {
           }
         }
       `}</style>
-    </TooltipProvider>
+    </HeatmapWrapper>
   );
 }

@@ -18,7 +18,7 @@ import { agentMemory } from '@/lib/engine/memory';
 // Types
 // ═══════════════════════════════════════════════════════════════════════════════
 
-interface SandboxState {
+export interface SandboxState {
   round: number;
   products: SandboxProduct[];
   inventory: Record<string, SandboxInventory>;
@@ -33,34 +33,34 @@ interface SandboxState {
   stockoutEvents: number;
 }
 
-interface SandboxProduct {
+export interface SandboxProduct {
   sku: string; name: string; category: string;
   sellingPrice: number; costBase: number; grossMargin: number;
 }
 
-interface SandboxInventory {
+export interface SandboxInventory {
   sku: string; quantity: number; safetyStock: number;
   dailySales: number; inTransit: number; stockStatus: string;
 }
 
-interface SandboxShipment {
+export interface SandboxShipment {
   id: string; sku: string; origin: string; destination: string;
   delayDays: number; status: string; eta: number; // days from now
 }
 
-interface SandboxSupplier {
+export interface SandboxSupplier {
   code: string; name: string; rating: number;
   leadTime: number; // days
   reliability: number; // 0-1
 }
 
-interface AgentAction {
+export interface AgentAction {
   type: string;
   description: string;
   impact: Record<string, number>;
 }
 
-interface SandboxRoundResult {
+export interface SandboxRoundResult {
   round: number;
   demand: number;
   weather: number;
@@ -72,7 +72,7 @@ interface SandboxRoundResult {
   agentActions: string[];
 }
 
-interface SandboxReport {
+export interface SandboxReport {
   config: { rounds: number; scenario: string };
   agents: string[];
   rounds: SandboxRoundResult[];
@@ -94,7 +94,7 @@ interface SandboxReport {
 // Agent 1: Warehouse Manager
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function warehouseAgent(state: SandboxState): AgentAction {
+export function warehouseAgent(state: SandboxState): AgentAction {
   const actions: string[] = [];
   let totalReplenished = 0;
 
@@ -133,7 +133,7 @@ function warehouseAgent(state: SandboxState): AgentAction {
 // Agent 2: Supplier
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function supplierAgent(state: SandboxState, rng: DeterministicRandom): AgentAction {
+export function supplierAgent(state: SandboxState, rng: DeterministicRandom): AgentAction {
   const delays: string[] = [];
   let totalDelay = 0;
 
@@ -156,7 +156,7 @@ function supplierAgent(state: SandboxState, rng: DeterministicRandom): AgentActi
 // Agent 3: Freight Forwarder
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function forwarderAgent(state: SandboxState, rng: DeterministicRandom): AgentAction {
+export function forwarderAgent(state: SandboxState, rng: DeterministicRandom): AgentAction {
   let totalDelays = 0;
   const delayed: string[] = [];
 
@@ -189,7 +189,7 @@ function forwarderAgent(state: SandboxState, rng: DeterministicRandom): AgentAct
 // Agent 4: Market
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function marketAgent(state: SandboxState, rng: DeterministicRandom): AgentAction {
+export function marketAgent(state: SandboxState, rng: DeterministicRandom): AgentAction {
   const seasonal = Math.sin((state.round / 50) * Math.PI) * 15;
   const fxEffect = (7.25 - state.exchangeRate) / 7.25 * 20;
   const tariffEffect = state.tariffRate > 10 ? -10 : 0;
@@ -228,7 +228,7 @@ const SCENARIOS: Record<string, (state: SandboxState, round: number, rng: Determ
 // Initialization from DB
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function initState(): Promise<SandboxState> {
+export async function initState(): Promise<SandboxState> {
   const [products, inventories, shipments, suppliers] = await Promise.all([
     db.product.findMany({ take: 50 }),
     db.inventory.findMany({ take: 50 }),

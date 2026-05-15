@@ -204,20 +204,25 @@ export function DecisionCenter() {
         });
       }
 
-      // ── Fallback: original cascade risk parsing ──
+      // ── Fallback: build decisions from cascade risk propagation ──
       if (items.length === 0 && risk?.propagation) {
+        const topAffected = risk.summary?.topAffectedProducts || [];
         const topRisks = risk.propagation.filter((p: any) => p.riskScore > 30).slice(0, 5);
         topRisks.forEach((r: any, i: number) => {
-          const cf = risk.counterfactuals?.[i];
+          const matchedProduct = topAffected.find((tp: any) => tp.sku === r.nodeId || r.label?.includes(tp.productName));
+          const revenueImpact = matchedProduct?.estimatedRevenueImpact || 0;
+          const estimatedSaving = Math.round(revenueImpact * (r.riskScore / 100) * 0.7);
           items.push({
             id: `dec-${r.nodeId || i}`,
             priority: r.riskScore >= 70 ? 'immediate' : r.riskScore >= 50 ? 'this_week' : 'this_month',
             title: r.label || `风险节点 #${i + 1}`,
             description: `传播深度 ${r.path?.length ?? '?'} 层`,
-            reasoning: `风险评分 ${r.riskScore}%，${r.explanation || '需关注风险传播'}`,
+            reasoning: `风险评分 ${r.riskScore}%${matchedProduct ? ` · ${matchedProduct.productName}` : ''}${r.explanation ? ` · ${r.explanation}` : ''}`,
             confidence: passport?.confidence ?? 0.7,
-            estimatedImpact: cf?.expectedImpact ?? '暂无预估',
-            estimatedSaving: (cf?.riskReduction ?? 0.3) * 50000,
+            estimatedImpact: matchedProduct
+              ? `影响 SKU ${matchedProduct.sku} · 预计收入损失 $${revenueImpact.toLocaleString()}`
+              : '暂无预估',
+            estimatedSaving,
             category: r.type ?? 'PRODUCT',
             passport,
           });
@@ -235,69 +240,8 @@ export function DecisionCenter() {
     }
   }, [domain]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const [cascadeRes, decisionRes] = await Promise.all([
-          fetch('/api/cascade-risk?scenario=auto&includeForwardProjection=true&includeCounterfactuals=true'),
-          fetch(`/api/decision-graph?domains=${domain}&query=供应链决策`),
-        ]);
-        const risk = await cascadeRes.json();
-        const dynamic = await decisionRes.json();
-        const passport = risk.passport;
-        const items: DecisionItem[] = [];
-        if (dynamic?.success && dynamic.decisions?.length > 0) {
-          dynamic.decisions.forEach((d: any) => {
-            items.push({
-              id: d.nodeId || `dyn-${items.length}`,
-              priority: d.outcome?.urgency || 'this_week',
-              title: d.question || '决策建议',
-              description: d.outcome?.action || '',
-              reasoning: `${d.matchedCondition} · ${d.outcome?.reasoning || ''} (置信度: ${Math.round((d.outcome?.confidence || 0.7) * 100)}%)`,
-              confidence: d.outcome?.confidence || 0.7,
-              estimatedImpact: d.outcome?.impact
-                ? `${d.outcome.impact.timeline} · 节省 ¥${d.outcome.impact.estimatedSaving.toLocaleString()}`
-                : '暂无预估',
-              estimatedSaving: d.outcome?.impact?.estimatedSaving || 0,
-              category: d.riskContext?.sourceNode || '动态匹配',
-              passport,
-            });
-          });
-        }
-        if (items.length === 0 && risk?.propagation) {
-          const topRisks = risk.propagation.filter((p: any) => p.riskScore > 30).slice(0, 5);
-          topRisks.forEach((r: any, i: number) => {
-            const cf = risk.counterfactuals?.[i];
-            items.push({
-              id: `dec-${r.nodeId || i}`,
-              priority: r.riskScore >= 70 ? 'immediate' : r.riskScore >= 50 ? 'this_week' : 'this_month',
-              title: r.label || `风险节点 #${i + 1}`,
-              description: `传播深度 ${r.path?.length ?? '?'} 层`,
-              reasoning: `风险评分 ${r.riskScore}%，${r.explanation || '需关注风险传播'}`,
-              confidence: passport?.confidence ?? 0.7,
-              estimatedImpact: cf?.expectedImpact ?? '暂无预估',
-              estimatedSaving: (cf?.riskReduction ?? 0.3) * 50000,
-              category: r.type ?? 'PRODUCT',
-              passport,
-            });
-          });
-        }
-        if (!cancelled) {
-          const seen = new Set<string>();
-          setDecisions(items.filter(item => {
-            if (seen.has(item.id)) return false;
-            seen.add(item.id);
-            return true;
-          }));
-        }
-      } catch {
-        // Degraded — show empty state
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [domain]);
+  // Initial load on mount and domain change
+  useEffect(() => { fetchDecisions(); }, [fetchDecisions]);
 
   const handleFeedback = useCallback(async (id: string, action: 'accepted' | 'rejected', notes?: string) => {
     setSubmitting(true);

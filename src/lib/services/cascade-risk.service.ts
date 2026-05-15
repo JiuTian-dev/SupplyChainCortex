@@ -19,6 +19,8 @@ import { getAllPortsWeather } from '@/lib/services/weather.service';
 import { getLatestRates } from '@/lib/queries/exchange-rate.queries';
 import { computeTariff } from '@/lib/services/tariff.service';
 import { withFallback, withPromiseTimeout, logDecision, createDecisionLog, createPassport, provenanceEntry, degradedProvenance, unavailableProvenance, computeConfidence } from '@/lib/engine';
+import { buildCausalEdges, generateCausalSummary } from '@/lib/engine/causal-reasoning';
+import type { CausalEdge } from '@/lib/engine/causal-reasoning';
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -113,6 +115,10 @@ export interface CascadeReport {
   affectedNodes?: number;
   maxDepth?: number;
   scenario?: string;
+  /** Direction A: causal chain explanations for each propagation edge */
+  causalEdges?: CausalEdge[];
+  /** Direction A: natural language causal summary */
+  causalSummary?: string;
 }
 
 export interface PropagationRule {
@@ -1047,39 +1053,9 @@ export async function getCascadeRisk(options?: {
     }
   }
 
-  // Competitor pricing pressure — Amazon price squeeze
-  // NOTE: Only runs in explicit scenario, NOT auto — Amazon scraping takes 20-30s
-  if (scenario === 'competitor_pressure') {
-    try {
-      const { fetchCompetitorPrices } = await import('@/lib/sources/amazon-competitor');
-      const competitors = await withPromiseTimeout(
-        Promise.resolve(fetchCompetitorPrices()),
-        5000
-      );
-      const valid = competitors.filter(c => c.competitorCount > 0);
-      if (valid.length > 0) {
-        const avgCompetitorPrice = valid.reduce((s, c) => s + c.avgPrice, 0) / valid.length;
-        const allCosts = await db.costRecord.findMany({ take: 50 });
-        const avgLandedCost = allCosts.length > 0
-          ? allCosts.reduce((s, c) => s + c.totalLanded, 0) / allCosts.length
-          : 0;
-        if (avgLandedCost > 0 && avgCompetitorPrice > 0) {
-          const squeezeRatio = avgLandedCost / avgCompetitorPrice;
-          if (squeezeRatio > 0.7) {
-            const productNode = [...nodes.values()].find(n => n.type === 'PRODUCT');
-            if (productNode) {
-              anomalySources.push({
-                nodeId: productNode.id,
-                riskScore: squeezeRatio > 0.85 ? 75 : 50,
-                cause: `竞品价格挤压: 落地成本 $${avgLandedCost.toFixed(0)} vs 竞品均价 $${avgCompetitorPrice.toFixed(0)} (比率 ${(squeezeRatio * 100).toFixed(0)}%)`,
-                category: 'exchange',
-              });
-            }
-          }
-        }
-      }
-    } catch { /* competitor data unavailable */ }
-  }
+  // Competitor pricing pressure — Amazon price squeeze (REMOVED)
+  // Amazon scraper was non-functional (detected itself as bot). Re-implement via
+  // official Amazon Product Advertising API if needed.
 
   // Quality & returns risk — defect rates and return trends
   if (scenario === 'auto') {
@@ -1236,6 +1212,9 @@ export async function getCascadeRisk(options?: {
   // Propagate (Phase 5: with explanations)
   const propagation = propagate(nodes, edges, fusedSources);
 
+  // Direction A: Causal Reasoning — enrich edges with causal chain explanations
+  const causalEdges = await buildCausalEdges(propagation, edges, nodes);
+
   // Phase 3: Forward projection
   let forwardProjection: DayProjection[] | undefined;
   if (includeForwardProjection) {
@@ -1268,6 +1247,16 @@ export async function getCascadeRisk(options?: {
     description: `${p.label}: 传播深度 ${p.path.length}，${p.explanation}`,
   }));
 
+  // Direction A: final causal summary with real topAffectedProducts
+  const causalSummary = generateCausalSummary({
+    propagation,
+    causalEdges,
+    summary: {
+      affectedNodes: affectedNodes.length,
+      topAffectedProducts,
+    },
+  });
+
   const report: CascadeReport = {
     triggeredBy: {
       source: scenario,
@@ -1280,6 +1269,8 @@ export async function getCascadeRisk(options?: {
     }),
     propagation,
     forwardProjection,
+    causalEdges,
+    causalSummary,
     summary: {
       totalNodes: nodes.size, affectedNodes: affectedNodes.length, maxDepth, avgPropagatedRisk: avgRisk, criticalPaths, topAffectedProducts,
       totalMonthlyLoss: propagation.reduce((sum, p) => sum + (p.monetaryImpact || 0), 0),

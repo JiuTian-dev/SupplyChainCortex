@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CHART_COLORS } from '@/lib/constants';
-import type { SupplierRecord } from '@/lib/types';
+import type { Supplier } from '@prisma/client';
 
 // ==================== Types ====================
 
@@ -50,7 +50,7 @@ interface SupplierPerfEntry {
 }
 
 interface SupplierComparisonPanelProps {
-  suppliers: SupplierRecord[];
+  suppliers: Supplier[];
   supplierPerformance: Record<string, unknown> | null;
 }
 
@@ -148,7 +148,7 @@ export function SupplierComparisonPanel({ suppliers, supplierPerformance }: Supp
 
   // Selected supplier records with performance data
   const selectedSuppliers = useMemo(
-    () => selectedIds.map((id) => suppliers.find((s) => s.id === id)).filter(Boolean) as SupplierRecord[],
+    () => selectedIds.map((id) => suppliers.find((s) => s.id === id)).filter(Boolean) as Supplier[],
     [selectedIds, suppliers],
   );
 

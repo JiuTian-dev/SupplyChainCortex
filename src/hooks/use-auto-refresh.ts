@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useConnectionStore } from '@/stores/connection-store';
 
 // ==================== Auto-Refresh Hook ====================
@@ -11,10 +11,10 @@ export function useAutoRefresh() {
   const queryClient = useQueryClient();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isRefreshing = useUIStore((s) => s.isRefreshing);
-  const setIsRefreshing = useUIStore((s) => s.setIsRefreshing);
-  const setRefreshCountdown = useUIStore((s) => s.setRefreshCountdown);
-  const setLastSyncTime = useUIStore((s) => s.setLastSyncTime);
+  const isRefreshing = useDashboardUIStore((s) => s.isRefreshing);
+  const setIsRefreshing = useDashboardUIStore((s) => s.setIsRefreshing);
+  const setRefreshCountdown = useDashboardUIStore((s) => s.setRefreshCountdown);
+  const setLastSyncTime = useDashboardUIStore((s) => s.setLastSyncTime);
   const wsConnected = useConnectionStore((s) => s.wsConnected);
 
   // When SSE is connected, disable polling entirely (SSE handles real-time updates)
@@ -61,7 +61,7 @@ export function useAutoRefresh() {
   }, [interval, refreshAll, setRefreshCountdown]);
 
   return {
-    countdown: useUIStore((s) => s.refreshCountdown),
+    countdown: useDashboardUIStore((s) => s.refreshCountdown),
     isRefreshing,
     refreshAll,
   };

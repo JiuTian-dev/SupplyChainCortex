@@ -1,7 +1,7 @@
 // ==================== API Client ====================
 // Centralized API client that wraps all fetch calls used in the supply chain dashboard.
 
-import type { AlertRule } from '@/lib/types';
+import type { AlertRule } from '@prisma/client';
 
 /** Helper to build query strings from params */
 function buildQuery(params?: Record<string, string | number | boolean | undefined>): string {
@@ -82,7 +82,7 @@ export function fetchNotifications() {
 }
 
 export function fetchRisk(action: string, params?: Record<string, string | number>) {
-  return apiFetch(`/api/risk${buildQuery({ action, ...params })}`);
+  return apiFetch(`/api/cascade-risk${buildQuery({ action, ...params })}`);
 }
 
 export function fetchProcurement(action: string, params?: Record<string, string | number>) {
@@ -97,8 +97,9 @@ export function fetchAnalytics(action: string, params?: Record<string, string | 
   return apiFetch(`/api/analytics${buildQuery({ action, ...params })}`);
 }
 
-export function fetchReports(action: string) {
-  return apiFetch(`/api/reports?action=${encodeURIComponent(action)}`);
+export function fetchReports(action: string, params?: Record<string, string | number>) {
+  // Delegates to the unified /api/analytics endpoint
+  return fetchAnalytics(action, params);
 }
 
 export function fetchSupplyChainScore(detailed = false) {
@@ -134,7 +135,7 @@ export function fetchInventoryCapitalAnalysis() {
 }
 
 export function fetchRiskMatrix() {
-  return apiFetch('/api/risk?action=matrix');
+  return apiFetch('/api/cascade-risk?action=matrix');
 }
 
 export function fetchSalesForecast() {

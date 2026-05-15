@@ -23,7 +23,7 @@ import {
   useSales,
   useStats,
 } from '@/hooks/use-supply-chain-data';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { CHART_COLORS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
 import type { SalesSummary } from '@/lib/types';
@@ -242,7 +242,7 @@ export function SalesTab() {
   const [compareDialogOpen, setCompareDialogOpen] = useState(false);
   const [salesVirtualMode, setSalesVirtualMode] = useState(true);
   const salesTableRef = useRef<HTMLDivElement>(null);
-  const dateRange = useUIStore((s) => s.dateRange);
+  const dateRange = useDashboardUIStore((s) => s.dateRange);
 
   // Fetch heatmap data from stats
   const stats30dQuery = useStats('30d');

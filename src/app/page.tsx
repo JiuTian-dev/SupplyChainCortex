@@ -147,7 +147,6 @@ function HomePageContent() {
         />
 
         <ConfigToolbarLazy />
-        <FilterBarLazy />
 
         <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
           {/* ── Decision Flow ── */}
@@ -198,12 +197,6 @@ function HomePageContent() {
 // ── Lazy ConfigToolbar (imports panel registry → moderate weight) ────────────
 const ConfigToolbarLazy = dynamic(
   () => import('@/components/dashboard/ConfigToolbar').then(m => ({ default: m.ConfigToolbar })),
-  { ssr: false, loading: () => <div className="h-8 bg-muted/30 border-b" /> },
-);
-
-// ── Lazy FilterBar (requires product data → moderate weight) ───────────────
-const FilterBarLazy = dynamic(
-  () => import('@/components/shared/FilterBar').then(m => ({ default: m.FilterBar })),
   { ssr: false, loading: () => <div className="h-8 bg-muted/30 border-b" /> },
 );
 
