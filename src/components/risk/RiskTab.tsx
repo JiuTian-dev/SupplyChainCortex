@@ -14,7 +14,7 @@ import { RiskMatrixHeatmap } from '@/components/risk/RiskMatrixHeatmap';
 import { WeatherRiskWidget } from '@/components/risk/WeatherRiskWidget';
 import { DecisionPanel } from '@/components/risk/DecisionPanel';
 import { useRisk } from '@/hooks/use-supply-chain-data';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 
 // ==================== Type definitions ====================
 
@@ -57,8 +57,8 @@ interface SimulationData {
 export function RiskTab() {
   // React Query hooks
   const riskDashboardQuery = useRisk('dashboard');
-  const selectedScenario = useUIStore((s) => s.selectedScenario);
-  const setSelectedScenario = useUIStore((s) => s.setSelectedScenario);
+  const selectedScenario = useDashboardUIStore((s) => s.selectedScenario);
+  const setSelectedScenario = useDashboardUIStore((s) => s.setSelectedScenario);
   const riskSimulationQuery = useRisk('simulation', selectedScenario ? { scenario: selectedScenario } : undefined);
 
   // Derived data
@@ -131,11 +131,6 @@ export function RiskTab() {
         <WeatherRiskWidget />
         <DecisionPanel />
       </div>
-
-      {/* ══════════════════════════════════════════════════════════════════
-          Layer 2: Risk Matrix — "Where is the risk concentrated?"
-          ══════════════════════════════════════════════════════════════════ */}
-      <RiskMatrixHeatmap />
 
       {/* ══════════════════════════════════════════════════════════════════
           Layer 3: Deep Dive — Simulation + Risk Matrix
@@ -300,6 +295,7 @@ export function RiskTab() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <RiskMatrixHeatmap />
         </CardContent>
       </Card>
     </div>
