@@ -22,10 +22,13 @@ import { UserMenu } from '@/components/auth/UserMenu';
 import { GlobalSearch } from '@/components/shared/GlobalSearch';
 import { ScrollToTop } from '@/components/shared/ScrollToTop';
 import { QuickActions } from '@/components/shared/QuickActions';
+import { MCPConnectorCard } from '@/components/dashboard/MCPConnectorCard';
 
 // ── Stores & hooks ──────────────────────────────────────────────────────────
 import { useAuthStore } from '@/stores/auth-store';
-import { useUIStore } from '@/stores/ui-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
+import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
+import { useConnectionStore } from '@/stores/connection-store';
 import { useSSE } from '@/hooks/use-sse';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { useWebVitals } from '@/hooks/use-web-vitals';
@@ -61,15 +64,17 @@ function HomePageContent() {
   useSSE();
   const { refreshAll } = useAutoRefresh();
   useWebVitals();
+  const refreshHealth = useConnectionStore((s) => s.refreshHealth);
+  useEffect(() => { refreshHealth(); }, [refreshHealth]);
 
   // ── Tab state ────────────────────────────────────────────────────────────
   const [decisionTab, setDecisionTab] = useState('monitor');
-  const activeTab = useUIStore(s => s.activeTab);
-  const setActiveTab = useUIStore(s => s.setActiveTab);
-  const setShowScrollTop = useUIStore(s => s.setShowScrollTop);
-  const setScrollProgress = useUIStore(s => s.setScrollProgress);
-  const setSelectedInventorySku = useUIStore(s => s.setSelectedInventorySku);
-  const setInventoryDetail = useUIStore(s => s.setInventoryDetail);
+  const activeTab = useDashboardUIStore(s => s.activeTab);
+  const setActiveTab = useDashboardUIStore(s => s.setActiveTab);
+  const setShowScrollTop = useDashboardUIStore(s => s.setShowScrollTop);
+  const setScrollProgress = useDashboardUIStore(s => s.setScrollProgress);
+  const setSelectedInventorySku = useInventoryUIStore(s => s.setSelectedInventorySku);
+  const setInventoryDetail = useInventoryUIStore(s => s.setInventoryDetail);
 
   // ── Panel visibility from config ─────────────────────────────────────────
   const panels = useDashboardConfigStore(s => s.config.panels);
@@ -142,6 +147,7 @@ function HomePageContent() {
         />
 
         <ConfigToolbarLazy />
+        <FilterBarLazy />
 
         <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
           {/* ── Decision Flow ── */}
@@ -150,6 +156,15 @@ function HomePageContent() {
             activeTab={decisionTab}
             onTabChange={setDecisionTab}
           />
+
+          {/* ── MCP Connector Health — live status cards ── */}
+          <div className="bg-card border rounded-lg p-4">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <span className="w-1.5 h-4 rounded bg-orange-500 inline-block" />
+              MCP 连接器状态
+            </h3>
+            <MCPConnectorCard />
+          </div>
 
           <Separator />
 
@@ -183,6 +198,12 @@ function HomePageContent() {
 // ── Lazy ConfigToolbar (imports panel registry → moderate weight) ────────────
 const ConfigToolbarLazy = dynamic(
   () => import('@/components/dashboard/ConfigToolbar').then(m => ({ default: m.ConfigToolbar })),
+  { ssr: false, loading: () => <div className="h-8 bg-muted/30 border-b" /> },
+);
+
+// ── Lazy FilterBar (requires product data → moderate weight) ───────────────
+const FilterBarLazy = dynamic(
+  () => import('@/components/shared/FilterBar').then(m => ({ default: m.FilterBar })),
   { ssr: false, loading: () => <div className="h-8 bg-muted/30 border-b" /> },
 );
 
