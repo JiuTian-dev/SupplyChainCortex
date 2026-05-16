@@ -419,13 +419,18 @@ async function main() {
   // ── 12. Users ──────────────────────────────────────────────────────────────
   const bcrypt = await import('bcryptjs');
   const hash = await bcrypt.hash('admin123', 10);
+  const hash2 = await bcrypt.hash('manager123', 10);
+  const hash3 = await bcrypt.hash('viewer123', 10);
   await prisma.user.create({
-    data: { email:'admin@supplychain.local', name:'管理员', password:hash, role:'admin' },
+    data: { email:'admin@supply-chain.com', name:'管理员', password:hash, role:'admin' },
   });
   await prisma.user.create({
-    data: { email:'viewer@supplychain.local', name:'查看者', password:hash, role:'viewer' },
+    data: { email:'manager@supply-chain.com', name:'经理', password:hash2, role:'manager' },
   });
-  console.log('✅ 2 用户 (admin/viewer)');
+  await prisma.user.create({
+    data: { email:'viewer@supply-chain.com', name:'查看者', password:hash3, role:'viewer' },
+  });
+  console.log('✅ 3 用户 (admin/manager/viewer)');
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`🎉 压测种子完成! 耗时 ${elapsed}s`);
