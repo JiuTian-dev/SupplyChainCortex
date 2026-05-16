@@ -46,17 +46,20 @@ const ZONE_COLORS: Record<string, string> = {
 
 // Status badge config
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgClass: string }> = {
-  healthy: { label: '正常', color: '#22c55e', bgClass: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  warning: { label: '拥挤', color: '#f59e0b', bgClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  critical: { label: '满仓', color: '#ef4444', bgClass: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  healthy: { label: '正常', color: '#22c55e', bgClass: 'bg-white border text-green-700 dark:bg-white/90 dark:text-green-600' },
+  warning: { label: '拥挤', color: '#f59e0b', bgClass: 'bg-white border text-yellow-700 dark:bg-white/90 dark:text-yellow-600' },
+  critical: { label: '满仓', color: '#ef4444', bgClass: 'bg-white border text-red-700 dark:bg-white/90 dark:text-red-600' },
 };
 
-// Progress bar color based on utilization
-function getUtilizationColor(utilization: number): string {
+// Utilization bar color — red/orange/green
+function getUtilizationBarColor(utilization: number): string {
   if (utilization > 90) return '#ef4444';
   if (utilization > 70) return '#f59e0b';
   return '#22c55e';
 }
+
+// Utilization text color — unified gold
+const UTILIZATION_TEXT_COLOR = '#b8860b';
 
 // ==================== Transfer Dialog ====================
 export function TransferDialog({
@@ -346,7 +349,7 @@ export function WarehouseZonesPanel() {
             {allZoneCards.map((zone: any) => {
               const statusCfg = STATUS_CONFIG[zone.status] || STATUS_CONFIG.healthy;
               const zoneColor = ZONE_COLORS[zone.type] || '#94a3b8';
-              const barColor = getUtilizationColor(zone.utilization);
+              const barColor = getUtilizationBarColor(zone.utilization);
 
               return (
                 <div
@@ -373,8 +376,11 @@ export function WarehouseZonesPanel() {
                   {/* Capacity info */}
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span>{zone.used.toLocaleString()} / {zone.capacity.toLocaleString()} 件</span>
-                    <span className="font-semibold" style={{ color: barColor }}>
-                      {zone.utilization.toFixed(0)}%
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-white border" style={{ borderColor: barColor }} />
+                      <span className="font-semibold" style={{ color: UTILIZATION_TEXT_COLOR }}>
+                        {zone.utilization.toFixed(0)}%
+                      </span>
                     </span>
                   </div>
 

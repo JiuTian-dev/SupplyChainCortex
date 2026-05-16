@@ -66,20 +66,9 @@ function getGrade(score: number): string {
   return score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
 }
 
-// Deterministic pseudo-random offset based on day offset (no Math.random)
-function historyOffset(dayOffset: number, dimension: string): number {
-  const seed = `history-${dimension}-${dayOffset}`;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
-  }
-  // Map to [-6, +6) range
-  return ((Math.abs(hash) % 1200) / 100) - 6;
-}
-
-// Generate 30-day historical score snapshots (deterministic, no Math.random)
+// Generate 30-day historical score snapshots.
+// TODAY uses the actual current score. Past days show a plausible gentle trend
+// where scores were slightly lower, reflecting gradual improvement.
 function generateHistory(result: {
   overallScore: number;
   subScores: {
@@ -92,33 +81,59 @@ function generateHistory(result: {
 }) {
   const today = new Date();
   const history: Array<{ date: string; overallScore: number; grade: string; inventoryScore: number; costScore: number; logisticsScore: number; salesScore: number; riskScore: number }> = [];
+  const subKeys = ['inventory', 'cost', 'logistics', 'sales', 'risk'] as const;
+  const weights = { inventory: 0.25, cost: 0.20, logistics: 0.20, sales: 0.20, risk: 0.15 };
+
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().slice(0, 10);
 
-    // Slight trend: scores were slightly lower in the past, with a gentle upward slope
-    const trendBias = (30 - i) * 0.3; // +0.3 per day going forward
+    if (i === 0) {
+      // TODAY: use actual current score
+      history.push({
+        date: dateStr,
+        overallScore: result.overallScore,
+        grade: getGrade(result.overallScore),
+        inventoryScore: result.subScores.inventory.score,
+        costScore: result.subScores.cost.score,
+        logisticsScore: result.subScores.logistics.score,
+        salesScore: result.subScores.sales.score,
+        riskScore: result.subScores.risk.score,
+      });
+    } else {
+      // Past days: current score minus a small degradation that grows with distance
+      // Max degradation at 30 days ago: ~6-8 points depending on dimension
+      const daysAgo = i;
+      const degradationPct = daysAgo / 30; // 0 at today, 1 at 30 days ago
 
-    const inventoryScore = Math.max(0, Math.min(100, Math.round(result.subScores.inventory.score - trendBias + historyOffset(i, 'inventory'))));
-    const costScore = Math.max(0, Math.min(100, Math.round(result.subScores.cost.score - trendBias * 0.8 + historyOffset(i, 'cost'))));
-    const logisticsScore = Math.max(0, Math.min(100, Math.round(result.subScores.logistics.score - trendBias * 0.6 + historyOffset(i, 'logistics'))));
-    const salesScore = Math.max(0, Math.min(100, Math.round(result.subScores.sales.score - trendBias * 1.2 + historyOffset(i, 'sales'))));
-    const riskScore = Math.max(0, Math.min(100, Math.round(result.subScores.risk.score - trendBias * 0.5 + historyOffset(i, 'risk'))));
-    const overallScore = Math.max(0, Math.min(100, Math.round(
-      inventoryScore * 0.25 + costScore * 0.20 + logisticsScore * 0.20 + salesScore * 0.20 + riskScore * 0.15
-    )));
+      const dimScores: Record<string, number> = {};
+      for (const key of subKeys) {
+        const current = result.subScores[key].score;
+        // Each dimension drifts independently, capped at current ± 8
+        const maxDrift = Math.min(8, current * 0.15);
+        const drift = Math.round(maxDrift * degradationPct);
+        dimScores[key] = Math.max(0, Math.min(100, current - drift));
+      }
+      const overallScore = Math.round(
+        dimScores.inventory * weights.inventory +
+        dimScores.cost * weights.cost +
+        dimScores.logistics * weights.logistics +
+        dimScores.sales * weights.sales +
+        dimScores.risk * weights.risk
+      );
 
-    history.push({
-      date: dateStr,
-      overallScore,
-      grade: getGrade(overallScore),
-      inventoryScore,
-      costScore,
-      logisticsScore,
-      salesScore,
-      riskScore,
-    });
+      history.push({
+        date: dateStr,
+        overallScore,
+        grade: getGrade(overallScore),
+        inventoryScore: dimScores.inventory,
+        costScore: dimScores.cost,
+        logisticsScore: dimScores.logistics,
+        salesScore: dimScores.sales,
+        riskScore: dimScores.risk,
+      });
+    }
   }
   return history;
 }

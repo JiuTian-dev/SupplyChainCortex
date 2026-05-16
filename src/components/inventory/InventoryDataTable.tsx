@@ -80,7 +80,7 @@ interface InventoryDataTableProps {
 // ==================== Main Component ====================
 export function InventoryDataTable({ onAdjustStock, onViewDetail, onAddNote }: InventoryDataTableProps) {
   const { data: inventoryData } = useInventory('list');
-  const inventory = useMemo(() => (inventoryData as any)?.inventory ?? [] as Inventory[], [inventoryData]);
+  const inventory = useMemo(() => (inventoryData as any)?.data?.inventory ?? (inventoryData as any)?.inventory ?? [] as Inventory[], [inventoryData]);
 
   // UI state
   const [virtualMode, setVirtualMode] = useState(true);

@@ -16,6 +16,7 @@
 import { crudTools } from './tools-crud';
 import { operationsTools } from './tools-operations';
 import { intelligenceTools } from './tools-intelligence';
+import { supplyChainTools } from './tools-supply-chain';
 
 // ─── Tool Definition Types ──────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ const tools: MCPTool[] = [
   ...crudTools,
   ...operationsTools,
   ...intelligenceTools,
+  ...supplyChainTools,
 ];
 
 // ─── Registry Operations ────────────────────────────────────────────────────────

@@ -576,16 +576,17 @@ export async function getReorderRecommendations(safetyDays = 14) {
       ? Math.round(matchingSuppliers.reduce((sum, s) => sum + s.leadTime, 0) / matchingSuppliers.length)
       : avgLeadTime;
 
-    const recommendedQty = Math.max(0, Math.round(
-      dailyVelocity * (leadTimeDays + safetyDays) - inv.quantity
-    ));
+    const safetyGap = Math.max(0, inv.safetyStock - inv.quantity);
+    const velocityQty = Math.round(dailyVelocity * (leadTimeDays + safetyDays) - inv.quantity);
+    const recommendedQty = Math.max(0, Math.round(Math.max(velocityQty, safetyGap)));
 
     const unitCost = inv.product?.cost?.totalLanded || inv.product?.unitCost || 0;
     const estimatedCost = Math.round(recommendedQty * unitCost * 100) / 100;
 
     let priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
-    if (daysRemaining < 7) priority = 'URGENT';
-    else if (daysRemaining < 14) priority = 'HIGH';
+    const belowSafety = inv.quantity < inv.safetyStock;
+    if (daysRemaining < 7 || (belowSafety && inv.quantity < inv.safetyStock * 0.5)) priority = 'URGENT';
+    else if (daysRemaining < 14 || belowSafety) priority = 'HIGH';
     else if (daysRemaining < 21) priority = 'MEDIUM';
     else priority = 'LOW';
 

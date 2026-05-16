@@ -124,22 +124,29 @@ async function handler(_request: NextRequest) {
     }),
   ]);
 
-  // ── Compute scores ──────────────────────────────────────────────────────
+  // ── Compute scores — use authoritative score from supply-chain engine ───
 
   const affectedNodes = cascade?.affectedNodes || 0;
   const totalNodes = cascade?.totalNodes || 39;
   const totalLoss = cascade?.totalMonthlyLoss || 0;
-  const commodityChange = Math.abs(commodity?.items?.reduce((s: number, i: any) => s + i.changePct, 0) || 0) / Math.max(commodity?.items?.length || 1, 1);
 
-  const healthScore = Math.round(Math.max(0, Math.min(100,
-    100
-    - (affectedNodes / Math.max(totalNodes, 1)) * 25
-    - commodityChange * 1.5
-    - (freight?.trend === 'rising' ? 8 : 0)
-    - criticalInv.length * 3
-    - delayed.length * 2
-    - (carbon?.price && carbon.price > 90 ? 5 : 0)
-  )));
+  // Use computeSupplyChainScore() for authoritative scores (same as /api/supply-chain-score)
+  let healthScore = 50; // fallback
+  let riskScore = 50;
+  let subScores: Record<string, number> = {};
+  try {
+    const { computeSupplyChainScore } = await import('@/lib/queries/score.queries');
+    const scoreResult = await computeSupplyChainScore();
+    healthScore = scoreResult.overallScore;
+    riskScore = scoreResult.subScores.risk.score;
+    subScores = {
+      inventory: scoreResult.subScores.inventory.score,
+      cost: scoreResult.subScores.cost.score,
+      logistics: scoreResult.subScores.logistics.score,
+      sales: scoreResult.subScores.sales.score,
+      risk: scoreResult.subScores.risk.score,
+    };
+  } catch { /* keep fallback */ }
 
   // ── Build recommendation ────────────────────────────────────────────────
 
@@ -173,7 +180,8 @@ async function handler(_request: NextRequest) {
   const briefLines = [
     `## 周度供应链情报简报`,
     ``,
-    `**综合健康分: ${healthScore}/100**`,
+    `**综合健康分: ${healthScore}/100 | 风险分: ${riskScore}/100**`,
+    `**子项**: 库存 ${subScores.inventory || '?'} | 成本 ${subScores.cost || '?'} | 物流 ${subScores.logistics || '?'} | 销售 ${subScores.sales || '?'} | 风险 ${subScores.risk || '?'}`,
     ``,
     `### 📋 本周关键发现`,
     ...recommendations.map(r => `- ${r}`),
@@ -201,6 +209,8 @@ async function handler(_request: NextRequest) {
 
   return NextResponse.json({
     healthScore,
+    riskScore,
+    subScores,
     recommendations,
     sections: { cascade, commodity, freight, fx, carbon, scfis, cpsc, criticalInv, delayed, topSuppliers, recentEvents },
     text: briefLines.join('\n'),

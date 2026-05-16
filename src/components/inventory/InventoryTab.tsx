@@ -120,8 +120,9 @@ export function InventoryTab() {
   // Derived data from React Query responses
   const inventory = useMemo(() => (inventoryData as any)?.data?.inventory ?? [], [inventoryData]);
   const inventoryAgingData = useMemo(() => {
-    if ((agingResponse as any)?.data?.agingAnalysis && (agingResponse as any).data.agingAnalysis.length > 0) {
-      const agingAnalysis = (agingResponse as any).data.agingAnalysis;
+    const rawAging = (agingResponse as any)?.agingAnalysis || (agingResponse as any)?.data?.agingAnalysis;
+    if (rawAging && Array.isArray(rawAging) && rawAging.length > 0) {
+      const agingAnalysis = rawAging;
       const productAging: Record<string, { name: string; '0-30天': number; '31-60天': number; '61-90天': number; '90+天': number }> = {};
       agingAnalysis.forEach((item: { productName: string; quantity: number; ageBracket: string }) => {
         if (!productAging[item.productName]) {
@@ -430,12 +431,12 @@ export function InventoryTab() {
               {zoneSummary && (
                 <>
                   {zoneSummary.criticalZones > 0 && (
-                    <Badge variant="destructive" className="text-xs">
+                    <Badge variant="outline" className="text-xs bg-white dark:bg-white/90" style={{ color: '#ef4444', fontWeight: 600 }}>
                       {zoneSummary.criticalZones} 满仓
                     </Badge>
                   )}
                   {zoneSummary.warningZones > 0 && (
-                    <Badge variant="secondary" className="text-xs text-yellow-700 dark:text-yellow-400">
+                    <Badge variant="outline" className="text-xs bg-white dark:bg-white/90" style={{ color: '#b8860b', fontWeight: 600 }}>
                       {zoneSummary.warningZones} 拥挤
                     </Badge>
                   )}
@@ -463,6 +464,7 @@ export function InventoryTab() {
               const totalCap = whCapacity.reduce((s: number, wh: any) => s + wh.totalCapacity, 0);
               const totalUsed = whCapacity.reduce((s: number, wh: any) => s + wh.totalUsed, 0);
               const zoneColors: Record<string, string> = { fast: '#f97316', normal: '#22c55e', bulk: '#06b6d4' };
+              const GOLD = '#b8860b';
               const allRecommendations = whCapacity.flatMap((wh: any) => wh.recommendations || []);
               return (
                 <>
@@ -471,7 +473,7 @@ export function InventoryTab() {
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-medium">总利用率</span>
                       <span className="text-sm text-muted-foreground">
-                        {totalUsed.toLocaleString()} / {totalCap.toLocaleString()} ({((totalUsed / totalCap) * 100).toFixed(1)}%)
+                        {totalUsed.toLocaleString()} / {totalCap.toLocaleString()} (<span style={{ color: GOLD, fontWeight: 600 }}>{((totalUsed / totalCap) * 100).toFixed(1)}%</span>)
                       </span>
                     </div>
                     <Progress value={(totalUsed / totalCap) * 100} className="h-2 transition-all duration-500" />
@@ -484,7 +486,7 @@ export function InventoryTab() {
                         <div key={wh.warehouse}>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-medium">{wh.warehouse}</span>
-                            <span className="text-xs text-muted-foreground">{wh.totalUsed.toLocaleString()} / {wh.totalCapacity.toLocaleString()} ({whPercent.toFixed(1)}%)</span>
+                            <span className="text-xs text-muted-foreground">{wh.totalUsed.toLocaleString()} / {wh.totalCapacity.toLocaleString()} (<span style={{ color: GOLD, fontWeight: 600 }}>{whPercent.toFixed(1)}%</span>)</span>
                           </div>
                           <Progress value={whPercent} className="h-1.5 transition-all duration-500" />
                         </div>
@@ -495,16 +497,18 @@ export function InventoryTab() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {allZones.map((zone: any, idx: number) => {
                       const zonePercent = zone.utilization;
-                      const badgeColor = zonePercent > 90 ? 'destructive' : zonePercent > 70 ? 'secondary' : 'default';
-                      const badgeTextColor = zonePercent > 90 ? 'text-red-600 dark:text-red-400' : zonePercent > 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400';
+                      const barColor = zonePercent > 90 ? '#ef4444' : zonePercent > 70 ? '#f59e0b' : '#22c55e';
                       const zoneColor = zoneColors[zone.type] || CHART_COLORS[idx % CHART_COLORS.length];
                       return (
                         <div key={`${zone.warehouse}-${zone.name}`} className="rounded-lg border p-3 hover:shadow-md hover:scale-[1.02] transition-all duration-200" style={{ borderLeftWidth: '3px', borderLeftColor: zoneColor }}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-semibold">{zone.name}</span>
-                            <Badge variant={badgeColor as 'default' | 'secondary' | 'destructive'} className={`text-[10px] pulse-soft ${badgeTextColor}`}>
-                              {zonePercent.toFixed(0)}%
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-block w-2 h-2 rounded-full bg-white border" style={{ borderColor: barColor }} />
+                              <Badge variant="outline" className="text-[10px] bg-white dark:bg-white/90" style={{ color: GOLD, fontWeight: 700 }}>
+                                {zonePercent.toFixed(0)}%
+                              </Badge>
+                            </div>
                           </div>
                           <Badge variant="outline" className="text-[10px] mb-2">{zone.type === 'fast' ? '高频拣选' : zone.type === 'normal' ? '常规存储' : '大件仓储'}</Badge>
                           <div className="mt-2">
@@ -529,7 +533,7 @@ export function InventoryTab() {
                       <div className="mt-2 space-y-1.5">
                         {allRecommendations.map((rec: string, rIdx: number) => (
                           <p key={rIdx} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                            <span className="text-yellow-500 shrink-0">●</span>
+                            <span className="shrink-0" style={{ color: GOLD }}>●</span>
                             {rec}
                           </p>
                         ))}
@@ -553,10 +557,7 @@ export function InventoryTab() {
                             <span>当前: <b>{trendSummary.currentOverallUtilization}%</b></span>
                             <span>峰值: {trendSummary.peakUtilization}%</span>
                             <span>趋势:
-                              <span className={
-                                trendSummary.trendDirection === 'increasing' ? 'text-red-500 ml-1' :
-                                trendSummary.trendDirection === 'decreasing' ? 'text-green-500 ml-1' : 'ml-1'
-                              }>
+                              <span className="ml-1" style={{ color: GOLD, fontWeight: 600 }}>
                                 {trendSummary.trendDirection === 'increasing' ? '↑ 上升' :
                                  trendSummary.trendDirection === 'decreasing' ? '↓ 下降' : '→ 稳定'}
                               </span>

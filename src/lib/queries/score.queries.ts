@@ -191,16 +191,26 @@ export function computeRiskScore(params: {
   const avgSupplierRating = suppliers.length > 0 ? suppliers.reduce((s, sp) => s + sp.rating, 0) / suppliers.length : 3;
   const avgLeadTime = suppliers.length > 0 ? suppliers.reduce((s, sp) => s + sp.leadTime, 0) / suppliers.length : 14;
 
-  const inventoryRiskPenalty = totalInventory > 0 ? Math.round((criticalCount * 25 + warningCount * 12 + overstockCount * 8) / totalInventory * 10) : 0;
-  const costRiskPenalty = costRecords.length > 0 ? Math.round((50 - avgMargin) * 1.2 + lowMarginCount * 5) : 0;
-  const logisticsRiskPenalty = totalShipments > 0 ? Math.round((delayedShipments * 15 + highRiskShipments * 20) / totalShipments * 10) : 0;
-  const supplierRiskPenalty = Math.round((5 - avgSupplierRating) * 10 + Math.max(0, avgLeadTime - 14) * 2);
+  // Each risk dimension contributes to a weighted penalty, normalized to prevent overflow
+  const invRiskBase = totalInventory > 0 ? (criticalCount * 3 + warningCount * 1.5 + overstockCount * 1) / totalInventory : 0;
+  const inventoryRiskPenalty = Math.round(clamp(invRiskBase * 40, 0, 40));
 
-  const totalRiskPenalty = inventoryRiskPenalty + costRiskPenalty + logisticsRiskPenalty + supplierRiskPenalty + Math.min(10, activeAlertRules * 2);
+  const marginDeficit = Math.max(0, 50 - avgMargin);
+  const lowMarginRatio = costRecords.length > 0 ? lowMarginCount / costRecords.length : 0;
+  const costRiskPenalty = Math.round(clamp(marginDeficit * 0.4 + lowMarginRatio * 25, 0, 25));
+
+  const delayRatio = totalShipments > 0 ? (delayedShipments + highRiskShipments) / totalShipments : 0;
+  const logisticsRiskPenalty = Math.round(clamp(delayRatio * 30, 0, 20));
+
+  const supplierRiskPenalty = Math.round(clamp(Math.max(0, 5 - avgSupplierRating) * 4 + Math.max(0, avgLeadTime - 14) * 0.5, 0, 10));
+
+  const alertPenalty = Math.min(5, activeAlertRules * 1);
+
+  const totalRiskPenalty = inventoryRiskPenalty + costRiskPenalty + logisticsRiskPenalty + supplierRiskPenalty + alertPenalty;
 
   return {
     score: clamp(100 - totalRiskPenalty, 0, 100),
-    inventoryRiskPenalty, costRiskPenalty, logisticsRiskPenalty, supplierRiskPenalty,
+    inventoryRiskPenalty, costRiskPenalty, logisticsRiskPenalty, supplierRiskPenalty, alertPenalty,
   };
 }
 

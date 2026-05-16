@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Activity, Globe, AlertTriangle, DollarSign,
   TrendingDown, TrendingUp, RefreshCw,
@@ -37,53 +37,77 @@ export function MonitorStrip() {
 
   const fetchSnapshot = useCallback(async () => {
     try {
-      const [dashRes, cascadeRes, commodityRes, freightRes, fxRes, inventoryRes] = await Promise.all([
+      const [dashRes, cascadeRes, commodityRes, freightRes, fxRes, inventoryRes, scoreRes] = await Promise.all([
         fetch('/api/dashboard?action=summary'),
         fetch('/api/cascade-risk?scenario=auto'),
         fetch('/api/commodity'),
         fetch('/api/freight'),
         fetch('/api/exchange-rates?action=latest'),
         fetch('/api/inventory?action=health'),
+        fetch('/api/supply-chain-score'),
       ]);
-      const dash = await dashRes.json();
-      const risk = await cascadeRes.json();
+      const dash = await dashRes.json().catch(() => ({}));
+      const risk = await cascadeRes.json().catch(() => ({}));
       const commodity = await commodityRes.json().catch(() => ({}));
       const freight = await freightRes.json().catch(() => ({}));
       const fx = await fxRes.json().catch(() => ({}));
       const inv = await inventoryRes.json().catch(() => ({}));
+      const score = await scoreRes.json().catch(() => ({}));
 
-      // Extract real exchange rate
+      // Exchange rate
       const usdRate = fx?.rates?.USD
         ? 1 / fx.rates.USD
         : fx?.data?.rates?.USD
           ? 1 / fx.data.rates.USD
-          : 7.25;
-      const fxSpread = fx?.midpoints?.USD?.spread || 0;
+          : fx?.usdCny
+            || (score?.subScores ? 7.25 : 7.25);
+      const fxSpread = fx?.midpoints?.USD?.spread || fx?.data?.spread || 0;
 
-      // Extract port risks with actual port names
-      const portSourceNodes = risk?.sourceNodes?.filter((n: any) => n.category === 'weather') || [];
+      // Port risks — from cascade trigger source nodes
+      const portSourceNodes = (risk?.data?.sourceNodes || risk?.sourceNodes || [])
+        .filter((n: any) => n.category === 'weather' || n.category === 'port');
       const portRisks = {
-        total: portSourceNodes.length || 12,
-        high: portSourceNodes.filter((n: any) => n.riskScore >= 70).length,
-        medium: portSourceNodes.filter((n: any) => n.riskScore >= 40 && n.riskScore < 70).length,
-        normal: (12 - portSourceNodes.length),
-        hotSpots: portSourceNodes.filter((n: any) => n.riskScore >= 40).map((n: any) => n.cause?.split(':')[1]?.trim() || n.nodeId).slice(0, 2),
+        total: portSourceNodes.length || 0,
+        high: portSourceNodes.filter((n: any) => (n.riskScore || 0) >= 70).length,
+        medium: portSourceNodes.filter((n: any) => (n.riskScore || 0) >= 40 && (n.riskScore || 0) < 70).length,
+        normal: 12 - portSourceNodes.length,
+        hotSpots: portSourceNodes
+          .filter((n: any) => (n.riskScore || 0) >= 40)
+          .map((n: any) => n.cause?.split(':')[1]?.trim() || n.nodeId)
+          .slice(0, 2),
       };
 
-      // Real inventory breakdown
+      // Inventory health — match actual API structure
+      const criticalList = inv?.data?.critical || inv?.critical || [];
+      const warningList = inv?.data?.warning || inv?.warning || [];
+      const criticalSkus = Array.isArray(criticalList) ? criticalList.length : 0;
+      const warningSkus = Array.isArray(warningList) ? warningList.length : 0;
+      const invHealthyRate = inv?.data?.healthyRate || inv?.healthyRate || 100;
       const inventoryHealth = {
-        criticalSkus: inv?.critical?.length || inv?.data?.critical?.length || dash?.healthBreakdown?.inventory || 0,
-        warningSkus: inv?.warning?.length || inv?.data?.warning?.length || 0,
-        healthyRate: inv?.healthyRate || inv?.data?.healthyRate || dash?.healthScore || 100,
+        criticalSkus,
+        warningSkus,
+        healthyRate: invHealthyRate,
       };
 
-      // Monetary loss: use cascade engine's computed totalMonthlyLoss
-      const estimatedLoss = risk?.summary?.totalMonthlyLoss
-        || (risk?.propagation || []).reduce((s: number, p: any) => s + (p.monetaryImpact || 0), 0)
+      // Commodity — match actual API shape: { commodities: Array<{name,price,unit,changePct}> }
+      const commodities = commodity?.commodities || commodity?.data?.commodities || [];
+      const commodityChanges = commodities.map((c: any) => c.changePct || 0);
+      const avgChangePct = commodityChanges.length > 0
+        ? Math.round(commodityChanges.reduce((a: number, b: number) => a + b, 0) / commodityChanges.length * 10) / 10
+        : 0;
+      const topMoverItem = commodities.length > 0
+        ? commodities.reduce((a: any, b: any) => Math.abs(a.changePct || 0) > Math.abs(b.changePct || 0) ? a : b)
+        : null;
+      const commodityTrend = avgChangePct > 2 ? 'rising' : avgChangePct < -2 ? 'falling' : 'stable';
+
+      // Monetary loss — cascade engine
+      const riskData = risk?.data || risk;
+      const estimatedLoss = riskData?.summary?.totalMonthlyLoss
+        || riskData?.totalMonthlyLoss
+        || (riskData?.propagation || []).reduce((s: number, p: any) => s + (p.monetaryImpact || 0), 0)
         || 0;
 
-      // Real saving from top counterfactual
-      const topCF = risk?.counterfactuals?.[0];
+      const topCF = riskData?.counterfactuals?.[0];
       const estimatedSaving = topCF?.riskReduction
         ? Math.round(estimatedLoss * (topCF.riskReduction / 100))
         : 0;
@@ -93,22 +117,22 @@ export function MonitorStrip() {
         portRisks: { ...portRisks, normal: Math.max(0, portRisks.normal) },
         inventoryHealth,
         commodity: {
-          trend: commodity?.overallTrend || 'stable',
-          avgChangePct: commodity?.avgChangePct || 0,
-          topMover: commodity?.affectedMaterials?.[0] || '—',
+          trend: commodityTrend,
+          avgChangePct,
+          topMover: topMoverItem ? `${topMoverItem.name}: ${topMoverItem.changePct > 0 ? '+' : ''}${topMoverItem.changePct}%` : '—',
         },
         freight: {
-          trend: freight?.trend || 'stable',
-          avgRate: freight?.avgRate40GP || 0,
-          routeCount: freight?.rates?.length || 0,
+          trend: freight?.trend || freight?.data?.trend || 'stable',
+          avgRate: freight?.avgRate40GP || freight?.data?.avgRate40GP || 0,
+          routeCount: freight?.rates?.length || freight?.data?.rates?.length || 0,
         },
         estimatedLoss,
         estimatedSaving,
         topCounterfactual: topCF?.name || '',
         updatedAt: new Date().toISOString(),
       });
-    } catch {
-      // Degraded — show last known state
+    } catch (e) {
+      console.warn('MonitorStrip: fetch failed, keeping last snapshot', e);
     }
   }, []);
 
@@ -118,20 +142,24 @@ export function MonitorStrip() {
     return () => clearInterval(i);
   }, [fetchSnapshot]);
 
-  // Supply Chain Health Score — must be before any early return (Rules of Hooks)
-  const healthScore = useMemo(() => {
-    if (!snapshot) return 100;
-    return Math.round(
-      Math.max(0, Math.min(100,
-        100
-        - Math.min(snapshot.portRisks.high * 6 + snapshot.portRisks.medium * 3, 25)
-        - Math.max(0, 100 - snapshot.inventoryHealth.healthyRate) * 0.2
-        - (snapshot.commodity.trend === 'rising' ? 12 : snapshot.commodity.trend === 'falling' ? 5 : 0)
-        - (snapshot.freight.trend === 'rising' ? 8 : 0)
-        - (snapshot.estimatedLoss > snapshot.estimatedSaving && snapshot.estimatedLoss > 0 ? 15 : 0)
-      ))
-    );
-  }, [snapshot]);
+  // Health score — from authoritative /api/supply-chain-score, with local fallback
+  const [healthScore, setHealthScore] = useState(50);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadScore() {
+      try {
+        const res = await fetch('/api/supply-chain-score');
+        const data = await res.json();
+        if (!cancelled) {
+          setHealthScore(data?.overallScore ?? data?.data?.overallScore ?? 50);
+        }
+      } catch { /* keep current score */ }
+    }
+    loadScore();
+    const i = setInterval(loadScore, 30000);
+    return () => { cancelled = true; clearInterval(i); };
+  }, []);
 
   if (!snapshot) return null;
 

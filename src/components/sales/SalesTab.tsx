@@ -239,7 +239,6 @@ export function SalesTab() {
   const dailySalesQuery = useSales('daily');
 
   // Zustand store
-  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
   const [salesVirtualMode, setSalesVirtualMode] = useState(true);
   const salesTableRef = useRef<HTMLDivElement>(null);
   const dateRange = useDashboardUIStore((s) => s.dateRange);
@@ -603,7 +602,11 @@ export function SalesTab() {
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => setCompareDialogOpen(true)}
+                onClick={() => {
+                  const store = useDashboardUIStore.getState();
+                  store.setCompareProducts([]);
+                  store.setCompareOpen(true);
+                }}
               >
                 <GitCompare className="h-3 w-3" />
                 产品对比
@@ -725,25 +728,6 @@ export function SalesTab() {
         </CardContent>
       </Card>
 
-      {/* 产品对比提示对话框 */}
-      <Dialog open={compareDialogOpen} onOpenChange={setCompareDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <GitCompare className="h-5 w-5 text-orange-500" />
-              产品对比
-            </DialogTitle>
-            <DialogDescription>
-              请使用全局产品对比功能
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={() => setCompareDialogOpen(false)}>
-              知道了
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

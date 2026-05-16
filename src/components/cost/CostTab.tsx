@@ -178,22 +178,22 @@ export function CostTab() {
   // Derive cost variance data from trend API, fallback to constant
   const costVarianceData = useMemo(() => {
     const trendData = costTrendQuery.data as Record<string, unknown> | undefined;
-    if (trendData && ((trendData as Record<string, unknown>)?.data as Record<string, unknown>)?.trends) {
-      const trends = ((trendData as Record<string, unknown>).data as Record<string, unknown>).trends as Array<{
-        sku: string;
-        productName: string;
-        monthlyData: Array<{ totalLanded: number }>;
-      }>;
-      const varianceData = trends.map((t) => {
+    // API returns { months, trends: [...] } directly; react-query stores it in .data
+    const trends = (trendData as any)?.trends as Array<{
+      sku: string;
+      productName: string;
+      monthlyData: Array<{ totalLanded: number }>;
+    }> | undefined;
+    if (trends && Array.isArray(trends)) {
+      return trends.map((t) => {
         const md = t.monthlyData;
-        if (md.length < 2) return { name: t.productName, change: 0, absChange: 0, sku: t.sku };
+        if (!md || md.length < 2) return { name: t.productName, change: 0, absChange: 0, sku: t.sku };
         const prev = md[md.length - 2].totalLanded;
         const curr = md[md.length - 1].totalLanded;
         const change = prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : 0;
         const absChange = Math.round((curr - prev) * 100) / 100;
         return { name: t.productName, change, absChange, sku: t.sku };
       });
-      if (varianceData.length > 0) return varianceData;
     }
     return [];
   }, [costTrendQuery.data]);

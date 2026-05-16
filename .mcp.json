@@ -3,6 +3,10 @@
     "playwright": {
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest", "--browser", "chromium", "--headless", "--viewport-size", "1280,900"]
+    },
+    "supply-math": {
+      "command": "python",
+      "args": ["mcp-server/server.py"]
     }
   }
 }

@@ -3,29 +3,28 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  MessageSquare, X, Send, Bot, User, Sparkles, ChevronDown,
+  MessageSquare, Send, Bot, User, Sparkles, ChevronDown,
   Package, DollarSign, TrendingUp, Ship, Building2, Shield, BarChart3,
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
-  Wifi, GripVertical, RefreshCw, Play, CircleDot, Loader2, Check,
-  Square, MoreHorizontal, Paperclip,
-  FileDown, FolderOpen, HardDrive, Image, FileText, RotateCcw,
+  Wifi, RefreshCw, CircleDot, Loader2, Check, Square,
+  MoreHorizontal, Paperclip, FileDown, FolderOpen, HardDrive, FileText, RotateCcw,
+  PanelRightClose,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { AI_PROVIDERS, getProviderModels, getDefaultModel, type AIModel } from '@/lib/services/ai-providers.service';
+import { AI_PROVIDERS, getProviderModels, getDefaultModel } from '@/lib/services/ai-providers.service';
 import {
   ChatMessage, OllamaModel,
-  STORAGE_KEY, SETTINGS_KEY,
+  SETTINGS_KEY,
   TOOL_ICONS, TOOL_LABELS, QUICK_ACTIONS,
   loadMessages, saveMessages, clearStoredMessages,
-  useDraggable, useResizable,
-  formatTimestamp, parseSSEChunk,
+  parseSSEChunk,
   renderMarkdown, CopyButton, TypingIndicator,
   fetchOllamaModels, fmtBytes,
 } from './ChatPanel.helpers';
@@ -33,7 +32,14 @@ import { ClaimLabel, parseClaimsFromText, type ClaimData, type ClaimVerdict, typ
 import { ActionCard, type ConfirmationCardData } from './ActionCard';
 import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 
-// ─── ChatPanel Component ──────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DRAWER_WIDTH = 460; // px — default drawer width
+const DRAWER_MIN = 400;
+const DRAWER_MAX = 900;
+const WIDTH_STORAGE_KEY = 'chat-panel-width';
+
+// ─── ChatPanel Component — Right-Side Drawer ─────────────────────────────────
 
 export function ChatPanel() {
   const [isOpen, setIsOpen] = useState(false);
@@ -64,13 +70,49 @@ export function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [convList, setConvList] = useState<Array<{ id: string; title: string; messageCount: number }>>([]);
+  const [showConvList, setShowConvList] = useState(false);
 
-  // Drag hooks for entry button and panel
-  const entryDrag = useDraggable('chat-entry-pos', 0, 0);
-  const panelDrag = useDraggable('chat-panel-pos', 0, 0);
+  // Drawer width — persisted & draggable
+  const [drawerWidth, setDrawerWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem(WIDTH_STORAGE_KEY);
+      if (saved) { const w = parseInt(saved, 10); if (w >= DRAWER_MIN && w <= DRAWER_MAX) return w; }
+    } catch { /* ignore */ }
+    return DRAWER_WIDTH;
+  });
+  const resizingRef = useRef(false);
+  const resizeStartRef = useRef({ x: 0, w: 0 });
 
-  // Resize hook for panel
-  const panelResize = useResizable('chat-panel-size', 380, 500);
+  const onResizeStart = useCallback((e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    resizingRef.current = true;
+    resizeStartRef.current = { x: e.clientX, w: drawerWidth };
+    e.preventDefault();
+  }, [drawerWidth]);
+
+  const onResizeMove = useCallback((e: React.PointerEvent) => {
+    if (!resizingRef.current) return;
+    const dx = resizeStartRef.current.x - e.clientX;
+    const newW = Math.min(DRAWER_MAX, Math.max(DRAWER_MIN, resizeStartRef.current.w + dx));
+    setDrawerWidth(newW);
+  }, []);
+
+  const onResizeEnd = useCallback(() => {
+    if (!resizingRef.current) return;
+    resizingRef.current = false;
+    try { localStorage.setItem(WIDTH_STORAGE_KEY, String(drawerWidth)); } catch { /* ignore */ }
+  }, [drawerWidth]);
+
+  // Prevent background scroll when drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   // Ollama scanner
   const scanOllama = useCallback(async () => {
@@ -93,21 +135,19 @@ export function ChatPanel() {
     setScanningOllama(false);
   }, []);
 
-  // Auto-scan Ollama when local provider selected
   useEffect(() => {
     if (selectedProvider === 'local' && ollamaModels.length === 0 && ollamaStatus === 'idle') {
       scanOllama();
     }
   }, [selectedProvider, ollamaModels.length, ollamaStatus, scanOllama]);
 
-  // Load messages from localStorage on mount
+  // Load messages from localStorage
   useEffect(() => {
     const stored = loadMessages();
     if (stored.length > 0) setMessages(stored);
     setHydrated(true);
   }, []);
 
-  // Save messages to localStorage (after hydration)
   useEffect(() => {
     if (!hydrated) return;
     saveMessages(messages);
@@ -122,10 +162,9 @@ export function ChatPanel() {
 
   // Focus input when panel opens
   useEffect(() => {
-    if (isOpen && inputRef.current) setTimeout(() => inputRef.current?.focus(), 100);
+    if (isOpen && inputRef.current) setTimeout(() => inputRef.current?.focus(), 200);
   }, [isOpen]);
 
-  // Cleanup abort controller on unmount
   useEffect(() => { return () => { if (abortRef.current) abortRef.current.abort(); }; }, []);
 
   // Load provider settings from localStorage
@@ -141,7 +180,6 @@ export function ChatPanel() {
     } catch { /* ignore */ }
   }, []);
 
-  // Save settings
   const saveSettings = useCallback((provider: string, model: string, key: string) => {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ provider, model, apiKey: key })); } catch { /* ignore */ }
   }, []);
@@ -159,9 +197,6 @@ export function ChatPanel() {
   }, []);
 
   // Server-side conversation save/load
-  const [convList, setConvList] = useState<Array<{ id: string; title: string; messageCount: number }>>([]);
-  const [showConvList, setShowConvList] = useState(false);
-
   const saveToServer = useCallback(async () => {
     if (messages.length === 0) { toast.error('无对话可保存'); return; }
     try {
@@ -196,12 +231,11 @@ export function ChatPanel() {
     } catch { toast.error('获取列表失败'); }
   }, []);
 
-  // File upload — supports text/csv/json, images (preview), PDF (extract text)
+  // File upload
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-
     if (isImage) {
       const dataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -216,7 +250,7 @@ export function ChatPanel() {
     } else if (isPdf) {
       setMessages(prev => [...prev, {
         id: `file-${Date.now()}`, role: 'user',
-        content: `📄 ${file.name} (${(file.size / 1024).toFixed(0)}KB)\n_PDF文件已上传。如需提取内容，后续版本将支持PDF解析。_`,
+        content: `📄 ${file.name} (${(file.size / 1024).toFixed(0)}KB)\n_PDF文件已上传。_`,
         timestamp: new Date().toISOString(),
       }]);
     } else {
@@ -231,7 +265,7 @@ export function ChatPanel() {
     e.target.value = '';
   }, []);
 
-  // Export as Markdown
+  // Export
   const exportMarkdown = useCallback(() => {
     const md = messages.map(m => `### ${m.role === 'user' ? '🧑' : '🤖'} (${m.timestamp.slice(11, 19)})\n\n${m.content}\n`).join('\n---\n\n');
     const blob = new Blob([md], { type: 'text/markdown' });
@@ -240,7 +274,6 @@ export function ChatPanel() {
     toast.success('Markdown 已导出');
   }, [messages]);
 
-  // Export as PDF (via browser print)
   const exportPdf = useCallback(() => {
     const html = messages.map(m =>
       `<div style="margin-bottom:20px;font-family:sans-serif">
@@ -256,27 +289,22 @@ export function ChatPanel() {
   // Send message with SSE streaming
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
-
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`, role: 'user', content: text.trim(),
       timestamp: new Date().toISOString(),
     };
-
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages); setInput(''); setIsLoading(true);
     setStreaming(true); setThinking(false); setStreamingToolCalls([]);
-
     const historyMessages = messages.slice(-10).map(msg => ({ role: msg.role, content: msg.content }));
     const abortController = new AbortController();
     abortRef.current = abortController;
-
     const assistantMsgId = `msg-${Date.now()}-ai`;
     const assistantMessage: ChatMessage = {
       id: assistantMsgId, role: 'assistant', content: '',
       toolsUsed: [], data: {}, model: selectedModel,
       timestamp: new Date().toISOString(),
     };
-
     setMessages(prev => [...prev, assistantMessage]);
 
     try {
@@ -285,9 +313,7 @@ export function ChatPanel() {
         body: JSON.stringify({ message: text.trim(), stream: true, history: historyMessages, provider: selectedProvider, model: selectedModel, apiKey: apiKey || undefined, currency: dashConfig.currency, timeHorizon: dashConfig.timeHorizon, ...(webSearchEnabled !== undefined ? { webSearch: webSearchEnabled } : {}) }),
         signal: abortController.signal,
       });
-
       if (!response.ok || !response.body) throw new Error('Streaming not available');
-
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       const sseBuffer = { value: '' };
@@ -300,7 +326,6 @@ export function ChatPanel() {
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
         const events = parseSSEChunk(chunk, sseBuffer);
-
         for (const sseEvent of events) {
           switch (sseEvent.event) {
             case 'thinking': setThinking(true); break;
@@ -349,7 +374,6 @@ export function ChatPanel() {
               setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: `⚠️ ${errMsg}` } : msg));
               break;
             }
-            // heartbeats, comments, unknown events — silently ignored
           }
         }
       }
@@ -380,43 +404,23 @@ export function ChatPanel() {
   const handleQuickAction = (message: string) => { sendMessage(message); };
   const toggleDataExpand = (msgId: string) => { setExpandedData(prev => prev === msgId ? null : msgId); };
 
-  // Generate context-aware follow-up questions from assistant response
+  // Generate context-aware follow-up questions
   const generateFollowUps = (content: string): string[] => {
     const suggestions: string[] = [];
     const lower = content.toLowerCase();
-
-    // Extract specific SKUs mentioned for targeted follow-ups
-    const skuMatches = content.match(/(?:SKU|sku)[-:]*\s*([A-Z]{2,4}-\d{3,5})/g) || [];
-    const mentionedSku = skuMatches.length > 0 && skuMatches[0] ? skuMatches[0].replace(/SKU[-: ]*/i, 'SKU-') : null;
-
-    // Extract product names mentioned
     const productMatch = content.match(/(便携榨汁[杯机]|智能加湿[器壶]|无线吸尘[器机]|智能电热[水壶]|便携咖啡[机壶]|空气净化[器机]|负离子吹风[机筒])/g) || [];
     const mentionedProduct = productMatch.length > 0 && productMatch[0] ? productMatch[0] : null;
-
-    // Context-aware suggestions based on what was discussed
-    if (lower.includes('补货') || lower.includes('缺货') || lower.includes('库存不足') || lower.includes('库存预警')) {
-      if (mentionedProduct) {
-        suggestions.push(`立即为${mentionedProduct}创建补货订单`);
-      } else if (mentionedSku) {
-        suggestions.push(`立即为${mentionedSku}创建补货订单`);
-      }
+    if (lower.includes('补货') || lower.includes('缺货') || lower.includes('库存不足')) {
+      if (mentionedProduct) suggestions.push(`立即为${mentionedProduct}创建补货订单`);
       suggestions.push('空运补货5000台的到岸成本是多少？');
     }
     if (lower.includes('关税') || lower.includes('tariff') || lower.includes('贸易战')) {
-      if (mentionedProduct) {
-        suggestions.push(`${mentionedProduct}在25%关税下的利润还剩多少？`);
-      } else {
-        suggestions.push('模拟关税从25%降到10%对全部SKU的利润影响');
-      }
+      suggestions.push('模拟关税从25%降到10%对全部SKU的利润影响');
     }
     if (lower.includes('供应商') || lower.includes('supplier') || lower.includes('1688')) {
-      if (mentionedProduct) {
-        suggestions.push(`在1688上搜${mentionedProduct}的具体工厂联系方式`);
-      } else {
-        suggestions.push('帮我在1688找备选供应商');
-      }
+      suggestions.push('帮我在1688找备选供应商');
     }
-    if (lower.includes('合规') || lower.includes('认证') || lower.includes('fcc') || lower.includes('ce') || lower.includes('ul')) {
+    if (lower.includes('合规') || lower.includes('认证') || lower.includes('fcc') || lower.includes('ce')) {
       suggestions.push('检查这个产品出口美国需要的全部认证和费用');
     }
     if (lower.includes('物流') || lower.includes('货运') || lower.includes('港口') || lower.includes('延误')) {
@@ -425,45 +429,25 @@ export function ChatPanel() {
     if (lower.includes('召回') || lower.includes('recall') || lower.includes('安全')) {
       suggestions.push('查一下这个品类的CPSC召回历史');
     }
-    if (lower.includes('爆品') || lower.includes('选品') || lower.includes('什么产品')) {
-      suggestions.push('帮我分析这个品在亚马逊上的竞品定价和利润空间');
-    }
-
-    // Fallback: if no specific context matched, offer relevant next steps
     if (suggestions.length === 0) {
-      if (lower.includes('毛利') || lower.includes('成本') || lower.includes('利润')) {
-        suggestions.push('跑一下财务模拟看看降本空间');
-      }
-      if (lower.includes('健康') || lower.includes('dashboard') || lower.includes('概览')) {
-        suggestions.push('深入排查健康评分最低的环节');
-      }
+      if (lower.includes('毛利') || lower.includes('成本') || lower.includes('利润')) suggestions.push('跑一下财务模拟看看降本空间');
       suggestions.push('做一次全面的供应链一致性审计');
     }
-
     return suggestions.slice(0, 3);
   };
 
-  // Claim feedback handler
   const handleClaimVerdict = useCallback(async (msgId: string, claims: ClaimData[], claimId: string, verdict: ClaimVerdict) => {
     setFeedbackMap(prev => ({ ...prev, [claimId]: verdict }));
-
-    // Collect all claims with their current verdicts for this message
     const updatedClaims = claims.map(c => ({
-      claimId: c.id,
-      claimText: c.text,
-      citedSource: c.source,
+      claimId: c.id, claimText: c.text, citedSource: c.source,
       statedConfidence: c.confidence,
       verdict: c.id === claimId ? verdict : (feedbackMap[c.id] || 'unverified' as ClaimVerdict),
     }));
-
-    // Fire-and-forget POST to feedback API
     try {
       await fetch('/api/engine-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          auditId: `chat-${msgId}`,
-          engine: 'chat-agent',
+          auditId: `chat-${msgId}`, engine: 'chat-agent',
           action: verdict === 'accurate' ? 'accepted' : 'modified',
           claims: updatedClaims,
         }),
@@ -471,42 +455,60 @@ export function ChatPanel() {
     } catch { /* non-blocking */ }
   }, [feedbackMap]);
 
-  // ─── Render: Floating Entry Button ──────────────────────────────────────────
+  // ─── Keyboard shortcut: Escape to close drawer ──────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && isOpen) setIsOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen]);
 
-  if (!isOpen) {
-    return (
-      <Button
-        onClick={() => setIsOpen(true)}
-        onPointerDown={entryDrag.onDown} onPointerMove={entryDrag.onMove} onPointerUp={entryDrag.onUp}
-        className="fixed z-50 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg bg-gradient-to-br from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white transition-all duration-300 hover:scale-110 hover:shadow-xl group cursor-grab active:cursor-grabbing touch-none select-none"
-        style={{ right: `calc(1rem - ${entryDrag.pos.x}px)`, bottom: `calc(1rem - ${entryDrag.pos.y}px)` }}
-        size="icon" aria-label="打开供应链助手"
-      >
-        <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 group-hover:scale-110 transition-transform pointer-events-none" />
-        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-green-400 animate-pulse border-2 border-white" />
-      </Button>
-    );
-  }
-
-  // ─── Render: Chat Panel ────────────────────────────────────────────────────
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed z-50" style={{ right: `calc(0.5rem - ${panelDrag.pos.x}px)`, bottom: `calc(0.5rem - ${panelDrag.pos.y}px)`, width: `${panelResize.size.w}px`, maxWidth: 'calc(100vw - 48px)' }}>
-      <Card className="relative shadow-2xl border-0 sm:border overflow-hidden bg-background dark:bg-card rounded-none sm:rounded-lg">
-        {/* Resize handles */}
-        <div className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize z-10 hover:bg-primary/10 transition-colors" onPointerDown={panelResize.onResizeDown('left')} onPointerMove={panelResize.onResizeMove} onPointerUp={panelResize.onResizeUp} />
-        <div className="absolute top-0 left-0 right-0 h-2 cursor-n-resize z-10 hover:bg-primary/10 transition-colors" onPointerDown={panelResize.onResizeDown('top')} onPointerMove={panelResize.onResizeMove} onPointerUp={panelResize.onResizeUp} />
-        <div className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-20 hover:bg-primary/20 rounded-br transition-colors" onPointerDown={panelResize.onResizeDown('top-left')} onPointerMove={panelResize.onResizeMove} onPointerUp={panelResize.onResizeUp} />
-        <div className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize z-10 hover:bg-primary/10 transition-colors" onPointerDown={panelResize.onResizeDown('bottom')} onPointerMove={panelResize.onResizeMove} onPointerUp={panelResize.onResizeUp} />
+    <>
+      {/* FAB Button — hidden when drawer is open */}
+      <Button
+        onClick={() => setIsOpen(true)}
+        className={`fixed z-50 h-14 w-14 rounded-full shadow-lg bg-gradient-to-br from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white transition-all duration-300 hover:scale-110 hover:shadow-xl group ${isOpen ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100'}`}
+        style={{ right: '1.25rem', bottom: '1.25rem' }}
+        size="icon"
+        aria-label="打开供应链 AI 助手"
+      >
+        <MessageSquare className="h-6 w-6 group-hover:scale-110 transition-transform" />
+        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-green-400 animate-pulse border-2 border-white" />
+      </Button>
 
-        {/* Header */}
-        <CardHeader className="p-4 bg-gradient-to-r from-orange-500 to-rose-500 text-white cursor-grab active:cursor-grabbing touch-none select-none" onPointerDown={panelDrag.onDown} onPointerMove={panelDrag.onMove} onPointerUp={panelDrag.onUp}>
+      {/* Backdrop overlay */}
+      <div
+        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setIsOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* Right drawer — slides in/out from right, resizable */}
+      <div
+        className={`fixed top-0 right-0 z-50 h-full flex flex-col bg-background dark:bg-card shadow-2xl border-l border-border transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ width: `min(${drawerWidth}px, 100vw)` }}
+      >
+        {/* Resize handle — left edge */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-w-resize z-20 hover:bg-orange-500/30 hover:w-1.5 transition-colors select-none"
+          style={{ marginLeft: '-2px' }}
+          onPointerDown={onResizeStart}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeEnd}
+          onPointerCancel={onResizeEnd}
+          onLostPointerCapture={onResizeEnd}
+        />
+        {/* ─── Header ─── */}
+        <div className="shrink-0 p-4 bg-gradient-to-r from-orange-500 to-rose-500 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <GripVertical className="h-4 w-4 opacity-50 shrink-0" />
-              <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center"><Sparkles className="h-4 w-4" /></div>
+              <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Sparkles className="h-4 w-4" />
+              </div>
               <div>
-                <CardTitle className="text-sm font-semibold">供应链 AI 助手</CardTitle>
+                <p className="text-sm font-semibold">供应链 AI 助手</p>
                 <p className="text-[10px] text-white/80">SupplyChain Cortex · AI 决策助手</p>
               </div>
             </div>
@@ -544,12 +546,19 @@ export function ChatPanel() {
               </DropdownMenu>
 
               {/* Web search toggle */}
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${webSearchEnabled === true ? 'bg-green-500/30 text-green-400' : webSearchEnabled === false ? 'bg-red-500/20 text-red-300' : ''}`} onClick={() => { const next = webSearchEnabled === undefined ? true : webSearchEnabled === true ? false : undefined; setWebSearchEnabled(next); if (next === true) toast.success('联网搜索: 强制开启'); else if (next === false) toast.success('联网搜索: 强制关闭'); else toast.success('联网搜索: 自动检测'); }} aria-label="联网搜索"><Globe className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">{webSearchEnabled === true ? '搜索: 开' : webSearchEnabled === false ? '搜索: 关' : '搜索: 自动'}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${webSearchEnabled === true ? 'bg-green-500/30 text-green-400' : webSearchEnabled === false ? 'bg-red-500/20 text-red-300' : ''}`}
+                  onClick={() => { const next = webSearchEnabled === undefined ? true : webSearchEnabled === true ? false : undefined; setWebSearchEnabled(next); }}
+                  aria-label="联网搜索"><Globe className="h-3.5 w-3.5" /></Button>
+              </TooltipTrigger><TooltipContent side="bottom" className="text-xs">{webSearchEnabled === true ? '搜索: 开' : webSearchEnabled === false ? '搜索: 关' : '搜索: 自动'}</TooltipContent></Tooltip>
 
               {/* Settings */}
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`} onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className={`h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 ${showSettings ? 'bg-white/20' : ''}`}
+                  onClick={() => setShowSettings(!showSettings)} aria-label="设置"><Settings className="h-3.5 w-3.5" /></Button>
+              </TooltipTrigger><TooltipContent side="bottom" className="text-xs">API 设置</TooltipContent></Tooltip>
 
-              {/* Actions dropdown — consolidated upload / export / save / load / clear */}
+              {/* More actions */}
               <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt,.json,.pdf,.png,.jpg,.jpeg,.gif,.webp" onChange={handleFileUpload} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -570,15 +579,17 @@ export function ChatPanel() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Close */}
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={() => setIsOpen(false)} aria-label="关闭聊天面板"><X className="h-4 w-4" /></Button>
+              {/* Collapse drawer */}
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/20" onClick={() => setIsOpen(false)} aria-label="收起面板">
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        </CardHeader>
+        </div>
 
-        {/* Settings Panel */}
+        {/* ─── Settings Panel ─── */}
         {showSettings && (
-          <div className="px-4 py-3 border-b bg-muted/30 space-y-3">
+          <div className="shrink-0 px-4 py-3 border-b bg-muted/30 space-y-3">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Key className="h-3.5 w-3.5" /> API 设置</div>
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">AI 提供商</label>
@@ -605,24 +616,14 @@ export function ChatPanel() {
                   <Button variant="outline" size="sm" className={`h-6 text-[10px] gap-1 ${ollamaStatus === 'error' ? 'border-amber-500' : ollamaStatus === 'found' ? 'border-green-500' : ''}`} disabled={scanningOllama} onClick={scanOllama}>
                     {scanningOllama ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}扫描模型</Button>
                 </div>
-                {ollamaStatus === 'error' && ollamaModels.length === 0 && (
-                  <div className="p-2 rounded bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                    <p className="text-[10px] text-amber-700 dark:text-amber-400 flex items-center gap-1"><CircleDot className="h-2.5 w-2.5" />Ollama 未连接</p>
-                  </div>
-                )}
                 {ollamaModels.length > 0 && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">已发现 {ollamaModels.length} 个本地模型</label>
-                    <div className="max-h-32 overflow-y-auto space-y-0.5">
-                      {ollamaModels.map((m) => (
-                        <button key={m.name} onClick={() => { setSelectedModel(m.name); saveSettings(selectedProvider, m.name, apiKey); }}
-                          className={`w-full flex items-center gap-2 p-1.5 rounded text-xs transition-colors ${selectedModel === m.name ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted border border-transparent'}`}>
-                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                          <span className="flex-1 text-left truncate font-medium">{m.name}</span>
-                          <span className="text-[10px] text-muted-foreground shrink-0">{fmtBytes(m.size)}</span>
-                        </button>
-                      ))}
-                    </div>
+                  <div className="max-h-32 overflow-y-auto space-y-0.5">
+                    {ollamaModels.map((m) => (
+                      <button key={m.name} onClick={() => { setSelectedModel(m.name); saveSettings(selectedProvider, m.name, apiKey); }}
+                        className={`w-full flex items-center gap-2 p-1.5 rounded text-xs transition-colors ${selectedModel === m.name ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted border border-transparent'}`}>
+                        <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" /><span className="flex-1 text-left truncate font-medium">{m.name}</span><span className="text-[10px] text-muted-foreground shrink-0">{fmtBytes(m.size)}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -630,210 +631,176 @@ export function ChatPanel() {
           </div>
         )}
 
-        {/* Messages Area */}
-        <CardContent className="p-0">
-          <div className="p-3 overflow-y-auto custom-scrollbar" style={{ height: `${panelResize.size.h - 140}px` }} ref={scrollRef} suppressHydrationWarning>
-            {messages.length === 0 && (
-              <div className="text-center py-6">
-                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-950/30 dark:to-rose-950/30 flex items-center justify-center mx-auto mb-3"><Bot className="h-6 w-6 text-orange-500 dark:text-orange-400" /></div>
-                <p className="text-sm font-medium text-foreground mb-1">你好！我是供应链助手</p>
-                <p className="text-xs text-muted-foreground mb-4">我可以帮你查询库存、成本、销售、物流等数据</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {QUICK_ACTIONS.map((action) => (
-                    <Button key={action.label} variant="outline" size="sm" className="text-xs h-8 justify-start" onClick={() => handleQuickAction(action.message)}>{action.label}</Button>
-                  ))}
-                </div>
+        {/* ─── Messages Area (flex-1 to fill available space) ─── */}
+        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar" ref={scrollRef}>
+          {messages.length === 0 && (
+            <div className="text-center py-8">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-950/30 dark:to-rose-950/30 flex items-center justify-center mx-auto mb-3">
+                <Bot className="h-6 w-6 text-orange-500 dark:text-orange-400" />
               </div>
-            )}
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`group flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-950/30 dark:to-rose-950/30 flex items-center justify-center shrink-0 mt-1"><Bot className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" /></div>
-                  )}
-                  <div className={`max-w-[85%] ${msg.role === 'user' ? 'order-first' : ''}`}>
-                    <div className="flex items-end gap-1">
-                      <div className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-gradient-to-r from-orange-500 to-rose-500 text-white rounded-br-md' : 'bg-muted dark:bg-muted/80 text-foreground rounded-bl-md'}`}>
-                        {msg.content ? renderMarkdown(msg.content) : null}
-                        {streaming && msg.id.endsWith('-ai') && msg.role === 'assistant' && (<span className="inline-block w-1.5 h-4 bg-orange-500 dark:bg-orange-400 animate-pulse ml-0.5 align-middle rounded-sm" />)}
-                      </div>
-                      {msg.content && !(streaming && msg.id.endsWith('-ai')) && <CopyButton text={msg.content} />}
+              <p className="text-sm font-medium text-foreground mb-1">你好！我是供应链助手</p>
+              <p className="text-xs text-muted-foreground mb-4">我可以帮你查询库存、成本、销售、物流等数据</p>
+              <div className="grid grid-cols-2 gap-2">
+                {QUICK_ACTIONS.slice(0, 6).map((action) => (
+                  <Button key={action.label} variant="outline" size="sm" className="text-xs h-8 justify-start" onClick={() => handleQuickAction(action.message)}>{action.label}</Button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-3">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`group flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.role === 'assistant' && (
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-950/30 dark:to-rose-950/30 flex items-center justify-center shrink-0 mt-1"><Bot className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" /></div>
+                )}
+                <div className={`max-w-[85%] ${msg.role === 'user' ? 'order-first' : ''}`}>
+                  <div className="flex items-end gap-1">
+                    <div className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-gradient-to-r from-orange-500 to-rose-500 text-white rounded-br-md' : 'bg-muted dark:bg-muted/80 text-foreground rounded-bl-md'}`}>
+                      {msg.content ? renderMarkdown(msg.content) : null}
+                      {streaming && msg.id.endsWith('-ai') && msg.role === 'assistant' && (<span className="inline-block w-1.5 h-4 bg-orange-500 dark:bg-orange-400 animate-pulse ml-0.5 align-middle rounded-sm" />)}
                     </div>
-                    {/* Evidence feedback claims */}
-                    {msg.role === 'assistant' && msg.content && !(streaming && msg.id.endsWith('-ai')) && (() => {
-                      const claims = parseClaimsFromText(msg.content);
-                      if (claims.length === 0) return null;
-                      const msgId = msg.id;
-                      return (
-                        <div className="mt-2 space-y-1">
-                          <p className="text-[10px] text-muted-foreground mb-1">📌 分析声明 (点击标注准确性):</p>
-                          <div className="flex flex-wrap gap-1">
-                            {claims.map(claim => (
-                              <ClaimLabel
-                                key={`${msgId}-${claim.id}`}
-                                claim={{ ...claim, verdict: feedbackMap[claim.id] }}
-                                onVerdict={(claimId, verdict) => handleClaimVerdict(msgId, claims, claimId, verdict)}
-                              />
-                            ))}
-                          </div>
+                    {msg.content && !(streaming && msg.id.endsWith('-ai')) && <CopyButton text={msg.content} />}
+                  </div>
+                  {/* Claims */}
+                  {msg.role === 'assistant' && msg.content && !(streaming && msg.id.endsWith('-ai')) && (() => {
+                    const claims = parseClaimsFromText(msg.content);
+                    if (claims.length === 0) return null;
+                    return (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[10px] text-muted-foreground mb-1">📌 分析声明 (点击标注准确性):</p>
+                        <div className="flex flex-wrap gap-1">
+                          {claims.map(claim => (
+                            <ClaimLabel key={`${msg.id}-${claim.id}`} claim={{ ...claim, verdict: feedbackMap[claim.id] }} onVerdict={(claimId, verdict) => handleClaimVerdict(msg.id, claims, claimId, verdict)} />
+                          ))}
                         </div>
-                      );
-                    })()}
-                    {/* Confirmation cards for pending write operations */}
-                    {msg.role === 'assistant' && confirmationCards[msg.id] && confirmationCards[msg.id].length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-[10px] text-muted-foreground">🛡️ 待确认操作:</p>
-                        {confirmationCards[msg.id].map((card, i) => (
-                          <ActionCard key={`${msg.id}-action-${i}`} card={card} msgId={msg.id} />
+                      </div>
+                    );
+                  })()}
+                  {/* Confirmation cards */}
+                  {msg.role === 'assistant' && confirmationCards[msg.id] && confirmationCards[msg.id].length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-[10px] text-muted-foreground">🛡️ 待确认操作:</p>
+                      {confirmationCards[msg.id].map((card, i) => (<ActionCard key={`${msg.id}-action-${i}`} card={card} msgId={msg.id} />))}
+                    </div>
+                  )}
+                  {/* Passport */}
+                  {msg.role === 'assistant' && passports[msg.id] && (() => {
+                    const passport = passports[msg.id];
+                    const isExpanded = expandedPassports[msg.id];
+                    return (
+                      <div className="mt-1">
+                        <button onClick={() => setExpandedPassports(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))} className="text-[10px] text-muted-foreground hover:text-orange-500 transition-colors flex items-center gap-1">
+                          <Shield className="h-3 w-3" />Passport · 置信度 {((passport.confidence as number) * 100).toFixed(0)}% · audit: {(passport.auditId as string)?.slice(-8)}
+                        </button>
+                        {isExpanded && (
+                          <Card className="mt-1 border-dashed"><CardContent className="p-2 text-[10px] space-y-1">
+                            <div className="flex items-center gap-2"><span className="text-muted-foreground">Audit ID:</span><span className="font-mono">{passport.auditId as string}</span></div>
+                            <div className="flex items-center gap-2"><span className="text-muted-foreground">Time:</span><span>{passport.generatedAt as string}</span></div>
+                            <div><span className="text-muted-foreground">Provenance:</span>
+                              <div className="flex flex-wrap gap-1 mt-0.5">{((passport.dataProvenance as Array<{ source: string; status: string }>) || []).map((p, i) => (
+                                <Badge key={i} variant="secondary" className={`text-[9px] h-4 ${p.status === 'ok' ? 'bg-emerald-50 text-emerald-600' : p.status === 'degraded' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>{p.source} · {p.status}</Badge>
+                              ))}</div>
+                            </div>
+                          </CardContent></Card>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {/* Tool calls */}
+                  {msg.role === 'assistant' && (() => {
+                    const isCurrentlyStreaming = streaming && msg.id.endsWith('-ai');
+                    const toolsToShow = isCurrentlyStreaming ? streamingToolCalls : (msg.toolsUsed || []);
+                    if (toolsToShow.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {Array.from(new Set(toolsToShow)).map((tool, i) => (
+                          <Badge key={`${tool}-${i}`} variant="secondary" className="text-[10px] h-5 gap-1 bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-300 border-orange-200 dark:border-orange-800">
+                            {isCurrentlyStreaming ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : TOOL_ICONS[tool]}{TOOL_LABELS[tool] || tool}
+                          </Badge>
+                        ))}
+                        {!isCurrentlyStreaming && msg.data && (
+                          <button onClick={() => toggleDataExpand(msg.id)} className="text-[10px] text-muted-foreground hover:text-orange-500 transition-colors ml-1"><ChevronDown className={`h-3 w-3 inline transition-transform ${expandedData === msg.id ? 'rotate-180' : ''}`} /> 数据</button>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {expandedData === msg.id && msg.data && (
+                    <Card className="mt-2 text-xs border-dashed"><CardContent className="p-2 max-h-40 overflow-y-auto"><pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-all">{JSON.stringify(msg.data, null, 2).substring(0, 2000)}</pre></CardContent></Card>
+                  )}
+                  {/* Regenerate */}
+                  {msg.role === 'assistant' && msg.content && !streaming && msg.id === messages[messages.length - 1]?.id && (
+                    <button onClick={() => { const lastUserMsg = [...messages].reverse().find(m => m.role === 'user'); if (lastUserMsg) { setMessages(prev => prev.slice(0, -1)); sendMessage(lastUserMsg.content); } }} className="text-[10px] text-muted-foreground hover:text-orange-500 mt-1 flex items-center gap-1"><RotateCcw className="h-3 w-3" /> 重新生成</button>
+                  )}
+                  {/* Follow-ups */}
+                  {msg.role === 'assistant' && msg.content && !streaming && msg.id === messages[messages.length - 1]?.id && messages.length > 0 && (() => {
+                    const suggestions = generateFollowUps(msg.content);
+                    if (suggestions.length === 0) return null;
+                    return (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {suggestions.map((q, i) => (
+                          <button key={i} onClick={() => sendMessage(q)} className="text-[10px] px-2 py-1 rounded-full border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors">{q}</button>
                         ))}
                       </div>
-                    )}
-                    {/* Decision passport panel */}
-                    {msg.role === 'assistant' && passports[msg.id] && (() => {
-                      const passport = passports[msg.id];
-                      const isExpanded = expandedPassports[msg.id];
-                      return (
-                        <div className="mt-1">
-                          <button
-                            onClick={() => setExpandedPassports(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                            className="text-[10px] text-muted-foreground hover:text-orange-500 transition-colors flex items-center gap-1"
-                          >
-                            <Shield className="h-3 w-3" />
-                            Passport · 置信度 {((passport.confidence as number) * 100).toFixed(0)}%
-                            · audit: {(passport.auditId as string)?.slice(-8)}
-                          </button>
-                          {isExpanded && (
-                            <Card className="mt-1 border-dashed">
-                              <CardContent className="p-2 text-[10px] space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Audit ID:</span>
-                                  <span className="font-mono">{passport.auditId as string}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Time:</span>
-                                  <span>{passport.generatedAt as string}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Provenance:</span>
-                                  <div className="flex flex-wrap gap-1 mt-0.5">
-                                    {((passport.dataProvenance as Array<{ source: string; status: string }>) || []).map((p, i) => (
-                                      <Badge key={i} variant="secondary" className={`text-[9px] h-4 ${p.status === 'ok' ? 'bg-emerald-50 text-emerald-600' : p.status === 'degraded' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>
-                                        {p.source} · {p.status}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                                {((passport.warnings as string[]) || []).length > 0 && (
-                                  <div className="text-amber-600">
-                                    ⚠ {(passport.warnings as string[]).join(', ')}
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {msg.role === 'assistant' && (() => {
-                      const isCurrentlyStreaming = streaming && msg.id.endsWith('-ai');
-                      const toolsToShow = isCurrentlyStreaming ? streamingToolCalls : (msg.toolsUsed || []);
-                      if (toolsToShow.length === 0) return null;
-                      return (
-                        <div className="flex items-center gap-1 mt-1 flex-wrap">
-                          {Array.from(new Set(toolsToShow)).map((tool, i) => (
-                            <Badge key={`${tool}-${i}`} variant="secondary" className="text-[10px] h-5 gap-1 bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-300 border-orange-200 dark:border-orange-800">
-                              {isCurrentlyStreaming ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : TOOL_ICONS[tool]}
-                              {TOOL_LABELS[tool] || tool}
-                            </Badge>
-                          ))}
-                          {!isCurrentlyStreaming && msg.data && (
-                            <button onClick={() => toggleDataExpand(msg.id)} className="text-[10px] text-muted-foreground hover:text-orange-500 transition-colors ml-1"><ChevronDown className={`h-3 w-3 inline transition-transform ${expandedData === msg.id ? 'rotate-180' : ''}`} /> 数据</button>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {expandedData === msg.id && msg.data && (
-                      <Card className="mt-2 text-xs border-dashed"><CardContent className="p-2 max-h-40 overflow-y-auto"><pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-all">{JSON.stringify(msg.data, null, 2).substring(0, 2000)}</pre></CardContent></Card>
-                    )}
-                    {/* Regenerate button — only on last assistant message */}
-                    {msg.role === 'assistant' && msg.content && !streaming &&
-                      msg.id === messages[messages.length - 1]?.id && (
-                      <button
-                        onClick={() => {
-                          const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-                          if (lastUserMsg) {
-                            setMessages(prev => prev.slice(0, -1)); // remove last assistant msg
-                            sendMessage(lastUserMsg.content);
-                          }
-                        }}
-                        className="text-[10px] text-muted-foreground hover:text-orange-500 mt-1 flex items-center gap-1"
-                      ><RotateCcw className="h-3 w-3" /> 重新生成</button>
-                    )}
-                    {/* Suggested follow-ups — on last assistant message */}
-                    {msg.role === 'assistant' && msg.content && !streaming &&
-                      msg.id === messages[messages.length - 1]?.id && messages.length > 0 && (() => {
-                        const suggestions = generateFollowUps(msg.content);
-                        if (suggestions.length === 0) return null;
-                        return (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {suggestions.map((q, i) => (
-                              <button key={i} onClick={() => sendMessage(q)}
-                                className="text-[10px] px-2 py-1 rounded-full border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
-                              >{q}</button>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                  </div>
-                  {msg.role === 'user' && (
-                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-950/30 dark:to-cyan-950/30 flex items-center justify-center shrink-0 mt-1"><User className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" /></div>
-                  )}
+                    );
+                  })()}
                 </div>
-              ))}
-              {isLoading && messages[messages.length - 1]?.role === 'user' && <TypingIndicator thinking={thinking} />}
-            </div>
-          </div>
-          {/* Conversation list popup */}
-          {showConvList && (
-            <div className="absolute top-12 right-2 z-50 bg-card border rounded-lg shadow-lg p-2 w-56 max-h-48 overflow-y-auto">
-              <div className="text-[10px] text-muted-foreground mb-1 px-1">已保存的对话</div>
-              {convList.length === 0 ? (
-                <div className="text-xs text-muted-foreground px-1 py-2">暂无</div>
-              ) : convList.map(c => (
-                <button key={c.id} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted/50 flex justify-between" onClick={() => loadFromServer(c.id)}>
-                  <span className="truncate">{c.title}</span>
-                  <span className="text-muted-foreground shrink-0">{c.messageCount}条</span>
-                </button>
-              ))}
-              <button className="w-full text-center text-[10px] text-muted-foreground mt-1 hover:text-foreground" onClick={() => setShowConvList(false)}>关闭</button>
-            </div>
-          )}
-
-          {messages.length > 0 && !isLoading && (
-            <div className="px-3 pb-2 flex gap-1 overflow-x-auto"><div className="flex gap-1">{QUICK_ACTIONS.map((a) => <Button key={a.label} variant="ghost" size="sm" className="text-[10px] h-6 px-2 shrink-0" onClick={() => handleQuickAction(a.message)}>{a.label}</Button>)}</div></div>
-          )}
-          <form onSubmit={handleSubmit} className="p-3 pt-2 border-t bg-background dark:bg-card border-border">
-            {(tokenUsage.input > 0) && (
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1 px-1">
-                <span>📊 输入 ~{tokenUsage.input.toLocaleString()}tk · 输出 ~{tokenUsage.output.toLocaleString()}tk</span>
-                <span>≈ ¥{((tokenUsage.input * 0.002 + tokenUsage.output * 0.008) / 1000).toFixed(3)}</span>
+                {msg.role === 'user' && (
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-950/30 dark:to-cyan-950/30 flex items-center justify-center shrink-0 mt-1"><User className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" /></div>
+                )}
               </div>
-            )}
-            <div className="flex gap-2">
-              <Tooltip><TooltipTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-orange-500 shrink-0" onClick={() => fileInputRef.current?.click()} aria-label="上传文件"><Paperclip className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="top" className="text-xs">上传 CSV/TXT/JSON</TooltipContent></Tooltip>
-              <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="输入问题，如：当前库存情况... (Enter发送, Shift+Enter换行)"
-                className="flex-1 h-9 text-sm rounded-full border-orange-200 focus-visible:ring-orange-300 dark:border-orange-800" disabled={isLoading} maxLength={2000} />
-              {isLoading ? (
-                <Button type="button" size="icon" className="h-9 w-9 rounded-full bg-red-500 hover:bg-red-600 text-white shrink-0 animate-pulse" onClick={() => { abortRef.current?.abort(); setIsLoading(false); setStreaming(false); }}><Square className="h-4 w-4" /></Button>
-              ) : (
-                <Button type="submit" size="icon" disabled={!input.trim()} className="h-9 w-9 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shrink-0"><Send className="h-4 w-4" /></Button>
-              )}
+            ))}
+            {isLoading && messages[messages.length - 1]?.role === 'user' && <TypingIndicator thinking={thinking} />}
+          </div>
+        </div>
+
+        {/* ─── Conversation list popup ─── */}
+        {showConvList && (
+          <div className="absolute bottom-20 left-4 z-50 bg-card border rounded-lg shadow-lg p-2 w-56 max-h-48 overflow-y-auto">
+            <div className="text-[10px] text-muted-foreground mb-1 px-1">已保存的对话</div>
+            {convList.length === 0 ? (
+              <div className="text-xs text-muted-foreground px-1 py-2">暂无</div>
+            ) : convList.map(c => (
+              <button key={c.id} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted/50 flex justify-between" onClick={() => loadFromServer(c.id)}>
+                <span className="truncate">{c.title}</span><span className="text-muted-foreground shrink-0">{c.messageCount}条</span>
+              </button>
+            ))}
+            <button className="w-full text-center text-[10px] text-muted-foreground mt-1 hover:text-foreground" onClick={() => setShowConvList(false)}>关闭</button>
+          </div>
+        )}
+
+        {/* ─── Quick actions bar (when messages exist) ─── */}
+        {messages.length > 0 && !isLoading && (
+          <div className="shrink-0 px-3 pb-1 flex gap-1 overflow-x-auto border-t border-border/50 pt-2">
+            {QUICK_ACTIONS.slice(0, 6).map((a) => (
+              <Button key={a.label} variant="ghost" size="sm" className="text-[10px] h-6 px-2 shrink-0" onClick={() => handleQuickAction(a.message)}>{a.label}</Button>
+            ))}
+          </div>
+        )}
+
+        {/* ─── Input Area (fixed at bottom) ─── */}
+        <div className="shrink-0 p-3 border-t bg-background dark:bg-card border-border">
+          {(tokenUsage.input > 0) && (
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1 px-1">
+              <span>📊 输入 ~{tokenUsage.input.toLocaleString()}tk · 输出 ~{tokenUsage.output.toLocaleString()}tk</span>
+              <span>≈ ¥{((tokenUsage.input * 0.002 + tokenUsage.output * 0.008) / 1000).toFixed(3)}</span>
             </div>
+          )}
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <Tooltip><TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-orange-500 shrink-0" onClick={() => fileInputRef.current?.click()} aria-label="上传文件"><Paperclip className="h-4 w-4" /></Button>
+            </TooltipTrigger><TooltipContent side="top" className="text-xs">上传 CSV/TXT/JSON</TooltipContent></Tooltip>
+            <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+              placeholder="输入问题... (Enter发送)"
+              className="flex-1 h-9 text-sm rounded-full border-orange-200 focus-visible:ring-orange-300 dark:border-orange-800" disabled={isLoading} maxLength={2000} />
+            {isLoading ? (
+              <Button type="button" size="icon" className="h-9 w-9 rounded-full bg-red-500 hover:bg-red-600 text-white shrink-0" onClick={() => { abortRef.current?.abort(); setIsLoading(false); setStreaming(false); }}><Square className="h-4 w-4" /></Button>
+            ) : (
+              <Button type="submit" size="icon" disabled={!input.trim()} className="h-9 w-9 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shrink-0"><Send className="h-4 w-4" /></Button>
+            )}
           </form>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }
