@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, apiSuccess, apiError } from '@/lib/api-utils';
 import { withChatRateLimit } from '@/lib/api-protection';
-import { optionalRequireAuth } from '@/lib/auth-helpers';
+import { getAuth } from '@/lib/auth-helpers';
 import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
@@ -488,8 +488,8 @@ async function handlePost(request: NextRequest) {
     return apiError('请输入消息内容');
   }
 
-  // Auth check
-  await optionalRequireAuth();
+  // Optional auth — gets user session if logged in, null otherwise
+  await getAuth();
 
   // Build messages array
   const messages: ChatMessage[] = [
