@@ -631,18 +631,24 @@ export interface QualitySearchResult {
 
 function classifyQueryForSearch(query: string): {
   categories: string;
-  time_range: string;
+  time_range?: string;
   engines: string;
 } {
   const q = query.toLowerCase();
   const hasChinese = /[一-鿿]/.test(query);
+  const cnEngines = 'google,bing,duckduckgo';
+  const enEngines = 'google,bing,duckduckgo,wikipedia';
 
+  // Only news/policy queries benefit from time_range filtering.
+  // Price forecasts, technical queries, and general search return better
+  // results without time_range because SearXNG's date filtering can
+  // incorrectly exclude relevant results.
   if (/关税|贸易|政策|法规|制裁|限制|宣布|实施/.test(query) ||
       /tariff|trade|policy|sanction|regulation|announce/.test(q)) {
     return {
       categories: 'general,news',
       time_range: 'month',
-      engines: hasChinese ? 'google,bing,duckduckgo' : 'google,bing,duckduckgo,wikipedia',
+      engines: hasChinese ? cnEngines : enEngines,
     };
   }
 
@@ -650,8 +656,7 @@ function classifyQueryForSearch(query: string): {
       /price|rate|index|trend|analysis|forecast/.test(q)) {
     return {
       categories: 'general',
-      time_range: 'year',
-      engines: hasChinese ? 'google,bing,duckduckgo' : 'google,bing,duckduckgo,wikipedia',
+      engines: hasChinese ? cnEngines : enEngines,
     };
   }
 
@@ -659,15 +664,13 @@ function classifyQueryForSearch(query: string): {
       /technical|system|architecture|code|api|database|algorithm/.test(q)) {
     return {
       categories: 'general,it',
-      time_range: 'year',
       engines: 'google,github,duckduckgo,qwant',
     };
   }
 
   return {
     categories: 'general',
-    time_range: 'year',
-    engines: hasChinese ? 'google,bing,duckduckgo' : 'google,bing,duckduckgo,wikipedia',
+    engines: hasChinese ? cnEngines : enEngines,
   };
 }
 
