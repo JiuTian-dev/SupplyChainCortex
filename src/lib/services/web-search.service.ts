@@ -295,6 +295,119 @@ async function searchDuckDuckGoHTML(query: string): Promise<SearchResult[]> {
   }
 }
 
+// ─── Wikipedia API — free, unlimited, excellent for knowledge questions ────────────
+
+async function searchWikipedia(query: string): Promise<SearchResult[]> {
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=10&origin=*`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(6000),
+      headers: { 'User-Agent': 'SupplyChainCortex/2.9' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      query?: { search?: Array<{ title: string; snippet: string; timestamp: string }> };
+    };
+    if (!data.query?.search?.length) return [];
+    return data.query.search.slice(0, 10).map(r => ({
+      title: r.title,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}`,
+      snippet: stripHtml(r.snippet || ''),
+      publishedAt: r.timestamp ? r.timestamp.replace(/T.*/, '') : undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Public SearXNG Pool — multi-instance parallel racing for redundancy ────────────
+
+let _publicInstanceCache: string[] = [];
+let _publicInstanceCacheTs = 0;
+const PUBLIC_INSTANCE_CACHE_TTL = 3600_000; // 1 hour
+
+async function getPublicSearXNGInstances(): Promise<string[]> {
+  if (Date.now() - _publicInstanceCacheTs < PUBLIC_INSTANCE_CACHE_TTL && _publicInstanceCache.length > 0) {
+    return _publicInstanceCache;
+  }
+  try {
+    const res = await fetch('https://searx.space/data/instances.json', {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return _publicInstanceCache;
+    const data = await res.json() as {
+      instances?: Record<string, {
+        network_type?: string;
+        timing?: { search?: { all?: { median?: number } } };
+        uptime?: number;
+        generator?: string;
+      }>;
+    };
+    if (!data.instances) return _publicInstanceCache;
+    const healthy: Array<{ url: string; latency: number }> = [];
+    for (const [url, info] of Object.entries(data.instances)) {
+      if (info.network_type !== 'normal') continue;
+      const uptime = info.uptime ?? 0;
+      if (uptime < 95) continue;
+      const latency = info.timing?.search?.all?.median ?? 999;
+      healthy.push({ url: `https://${url}`, latency });
+    }
+    healthy.sort((a, b) => a.latency - b.latency);
+    _publicInstanceCache = healthy.slice(0, 20).map(h => h.url);
+    _publicInstanceCacheTs = Date.now();
+    return _publicInstanceCache;
+  } catch {
+    return _publicInstanceCache;
+  }
+}
+
+async function searchPublicSearXNGPool(query: string, poolSize = 3): Promise<SearchResult[]> {
+  try {
+    const instances = await getPublicSearXNGInstances();
+    if (instances.length === 0) return [];
+
+    // Randomly pick poolSize instances and race them in parallel
+    const shuffled = [...instances].sort(() => Math.random() - 0.5).slice(0, poolSize);
+
+    const results = await Promise.allSettled(
+      shuffled.map(async (baseUrl) => {
+        const url = `${baseUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&safesearch=2&language=zh-CN`;
+        const res = await fetch(url, {
+          signal: AbortSignal.timeout(6000),
+          headers: { 'Accept': 'application/json', 'User-Agent': 'SupplyChainCortex/2.9' },
+        });
+        if (!res.ok) return [] as SearchResult[];
+        const data = await res.json() as {
+          results?: Array<{ title: string; url: string; content: string; publishedDate?: string }>;
+        };
+        if (!data.results?.length) return [] as SearchResult[];
+        return data.results.slice(0, 10).map(r => ({
+          title: stripHtml(r.title || ''),
+          url: r.url,
+          snippet: (r.content || '').slice(0, 500),
+          publishedAt: r.publishedDate,
+        }));
+      })
+    );
+
+    const merged: SearchResult[] = [];
+    const seen = new Set<string>();
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        for (const item of r.value) {
+          if (!seen.has(item.url)) {
+            merged.push(item);
+            seen.add(item.url);
+          }
+        }
+      }
+    }
+    return merged;
+  } catch {
+    return [];
+  }
+}
+
 // ─── Jina Reader — shared content extraction ───────────────────────────────────────
 
 async function fetchPageContent(url: string): Promise<string | undefined> {
@@ -723,27 +836,42 @@ export async function webSearchWithQuality(
   let allResults: SearchResult[] = [];
   let sources: string[] = [];
 
-  // ── Step 4: Recall-first parallel fetching ─────────────────────────────────
+  // ── Step 4: Multi-source parallel racing (all free, all unlimited) ──────────
 
-  // 4a: Primary search (SearXNG main engines)
-  try {
-    const primary = await fetchFromSource(primaryQuery, config, searchOptions);
-    allResults = primary.results;
-    sources.push(primary.source);
-  } catch (err) {
-    const msg = (err as Error).message || 'Unknown error';
-    console.warn('[web-search-quality] Primary search failed:', msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***'));
-  }
+  // Fire all 4 sources simultaneously — fastest wins, all results merged
+  const parallelSources: Array<Promise<{ results: SearchResult[]; source: string }>> = [];
 
-  // 4b: Parallel DDG fallback (always runs — adds lexical diversity for free)
-  if (config.provider === 'searxng') {
-    try {
-      const ddgResults = await searchDuckDuckGoHTML(primaryQuery);
-      if (ddgResults.length > 0) {
-        mergeResults(allResults, ddgResults);
-        sources.push('DDG');
-      }
-    } catch { /* DDG is supplementary — silence failures */ }
+  // 4a: Self-hosted SearXNG (full control, all engines)
+  parallelSources.push(
+    fetchFromSource(primaryQuery, config, searchOptions)
+      .catch(err => {
+        const msg = (err as Error).message || 'Unknown error';
+        console.warn('[web-search-quality] SearXNG failed:', msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***'));
+        return { results: [] as SearchResult[], source: 'SearXNG' };
+      })
+  );
+
+  // 4b: DDG HTML (lexical diversity, free unlimited)
+  parallelSources.push(
+    searchDuckDuckGoHTML(primaryQuery).then(r => ({ results: r, source: 'DDG' }))
+  );
+
+  // 4c: Wikipedia API (knowledge excellence, free unlimited)
+  parallelSources.push(
+    searchWikipedia(primaryQuery).then(r => ({ results: r, source: 'Wikipedia' }))
+  );
+
+  // 4d: Public SearXNG pool (redundancy, different engine configs, 3 instances raced)
+  parallelSources.push(
+    searchPublicSearXNGPool(primaryQuery, 3).then(r => ({ results: r, source: 'PublicPool' }))
+  );
+
+  const settled = await Promise.allSettled(parallelSources);
+  for (const s of settled) {
+    if (s.status === 'fulfilled' && s.value.results.length > 0) {
+      mergeResults(allResults, s.value.results);
+      sources.push(s.value.source);
+    }
   }
 
   // 4c: Multi-query variant expansion (up to 2 additional queries in parallel)

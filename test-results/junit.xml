@@ -1,77 +1,77 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="33" failures="0" errors="0" time="0.0142934">
-    <testsuite name="src/lib/services/__tests__/web-search-cross-validator.test.ts" timestamp="2026-05-17T08:44:47.652Z" hostname="qaswe12340" tests="7" failures="0" errors="0" skipped="0" time="0.0032652">
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; extracts factual claims about tariffs" time="0.00103">
+<testsuites name="vitest tests" tests="33" failures="0" errors="0" time="0.0138923">
+    <testsuite name="src/lib/services/__tests__/web-search-cross-validator.test.ts" timestamp="2026-05-17T09:16:05.752Z" hostname="qaswe12340" tests="7" failures="0" errors="0" skipped="0" time="0.0031547">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; extracts factual claims about tariffs" time="0.0010059">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; handles Chinese text" time="0.0001426">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; handles Chinese text" time="0.0001392">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; returns empty for non-factual text" time="0.0001917">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; returns empty for non-factual text" time="0.0001997">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="computeSourceAgreement &gt; returns high agreement for similar claims from different sources" time="0.0002908">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="computeSourceAgreement &gt; returns high agreement for similar claims from different sources" time="0.0002836">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="computeSourceAgreement &gt; returns low agreement for contradictory sources" time="0.0001278">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="computeSourceAgreement &gt; returns low agreement for contradictory sources" time="0.000114">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="crossValidate &gt; flags results with low source agreement" time="0.0004051">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="crossValidate &gt; flags results with low source agreement" time="0.0003991">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="crossValidate &gt; handles empty results" time="0.0001097">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-guard.test.ts" timestamp="2026-05-17T08:44:47.655Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0040992">
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="filterBlacklistedDomains &gt; filters out known adult/suspicious domains" time="0.0014188">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="filterBlacklistedDomains &gt; filters URLs containing suspicious patterns" time="0.0002001">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="checkLanguageMatch &gt; detects Chinese content correctly" time="0.0001744">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="checkLanguageMatch &gt; flags language mismatches" time="0.0000662">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; detects empty results" time="0.0001778">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; detects when all results are from low-quality sources" time="0.0001475">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; passes good results through" time="0.0000801">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="scoreResultQuality &gt; scores high-authority domains higher" time="0.0002502">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="scoreResultQuality &gt; penalizes results with keyword-stuffed titles" time="0.0002051">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="guardResults &gt; returns degraded flag when all results are filtered" time="0.0002156">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="guardResults &gt; returns passed results sorted by quality" time="0.0001615">
+        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="crossValidate &gt; handles empty results" time="0.000109">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-reranker.test.ts" timestamp="2026-05-17T08:44:47.657Z" hostname="qaswe12340" tests="7" failures="0" errors="0" skipped="0" time="0.0032268">
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; returns higher score for more relevant content" time="0.0010668">
+    <testsuite name="src/lib/services/__tests__/web-search-guard.test.ts" timestamp="2026-05-17T09:16:05.755Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0039246">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="filterBlacklistedDomains &gt; filters out known adult/suspicious domains" time="0.0013987">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; handles Chinese text" time="0.0002259">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="filterBlacklistedDomains &gt; filters URLs containing suspicious patterns" time="0.0001815">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; returns low score for empty snippet" time="0.0001328">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="checkLanguageMatch &gt; detects Chinese content correctly" time="0.0001669">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeAuthorityBoost &gt; boosts .gov domains" time="0.000149">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="checkLanguageMatch &gt; flags language mismatches" time="0.0000713">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeAuthorityBoost &gt; does not boost low-authority domains" time="0.0000973">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; detects empty results" time="0.0001805">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="rerankResults &gt; places more relevant results at the top" time="0.0002888">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; detects when all results are from low-quality sources" time="0.0001328">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="rerankResults &gt; handles empty results" time="0.0003529">
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; passes good results through" time="0.0000719">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="scoreResultQuality &gt; scores high-authority domains higher" time="0.0002535">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="scoreResultQuality &gt; penalizes results with keyword-stuffed titles" time="0.0001442">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="guardResults &gt; returns degraded flag when all results are filtered" time="0.0001915">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="guardResults &gt; returns passed results sorted by quality" time="0.0001546">
         </testcase>
     </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-rewriter.test.ts" timestamp="2026-05-17T08:44:47.659Z" hostname="qaswe12340" tests="8" failures="0" errors="0" skipped="0" time="0.0037022">
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; extracts Chinese supply chain entities" time="0.001582">
+    <testsuite name="src/lib/services/__tests__/web-search-reranker.test.ts" timestamp="2026-05-17T09:16:05.759Z" hostname="qaswe12340" tests="7" failures="0" errors="0" skipped="0" time="0.0031483">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; returns higher score for more relevant content" time="0.0010394">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; extracts mixed Chinese-English terms" time="0.0001843">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; handles Chinese text" time="0.0002304">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; returns empty for short query" time="0.0001314">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; returns low score for empty snippet" time="0.0001349">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; injects entities from previous conversation turns" time="0.0002283">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeAuthorityBoost &gt; boosts .gov domains" time="0.0001376">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; returns original query if history has no entities" time="0.0000885">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeAuthorityBoost &gt; does not boost low-authority domains" time="0.0000931">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; caps entities to maxContextTerms" time="0.0001595">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="rerankResults &gt; places more relevant results at the top" time="0.0002873">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="rewriteQuery &gt; generates multiple search variants" time="0.0003078">
+        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="rerankResults &gt; handles empty results" time="0.0003409">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="rewriteQuery &gt; includes the original query as one variant" time="0.0001149">
+    </testsuite>
+    <testsuite name="src/lib/services/__tests__/web-search-rewriter.test.ts" timestamp="2026-05-17T09:16:05.761Z" hostname="qaswe12340" tests="8" failures="0" errors="0" skipped="0" time="0.0036647">
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; extracts Chinese supply chain entities" time="0.0015584">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; extracts mixed Chinese-English terms" time="0.0001788">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; returns empty for short query" time="0.0001283">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; injects entities from previous conversation turns" time="0.0002339">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; returns original query if history has no entities" time="0.0000929">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; caps entities to maxContextTerms" time="0.0001484">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="rewriteQuery &gt; generates multiple search variants" time="0.0003016">
+        </testcase>
+        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="rewriteQuery &gt; includes the original query as one variant" time="0.00012">
         </testcase>
     </testsuite>
 </testsuites>
