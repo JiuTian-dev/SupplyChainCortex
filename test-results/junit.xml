@@ -1,177 +1,103 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="82" failures="0" errors="0" time="0.0253084">
-    <testsuite name="src/lib/services/__tests__/information-router.test.ts" timestamp="2026-05-17T12:36:55.445Z" hostname="qaswe12340" tests="49" failures="0" errors="0" skipped="0" time="0.0089308">
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;铜价最近走势如何&quot; to Tier 1" time="0.00152">
+<testsuites name="vitest tests" tests="49" failures="0" errors="0" time="0.0071527">
+    <testsuite name="src/lib/services/__tests__/information-router.test.ts" timestamp="2026-05-17T13:11:50.814Z" hostname="qaswe12340" tests="49" failures="0" errors="0" skipped="0" time="0.0071527">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;铜价最近走势如何&quot; to Tier 1" time="0.0011517">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;铝价今天多少钱&quot; to Tier 1" time="0.0003187">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;铝价今天多少钱&quot; to Tier 1" time="0.0002317">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;SCFI运价最新数据&quot; to Tier 1" time="0.0001473">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;SCFI运价最新数据&quot; to Tier 1" time="0.0001357">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;人民币对美元汇率&quot; to Tier 1" time="0.0001831">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;人民币对美元汇率&quot; to Tier 1" time="0.0001416">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;咖啡机库存告急的SKU有哪些&quot; to Tier 1" time="0.0002092">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;咖啡机库存告急的SKU有哪些&quot; to Tier 1" time="0.0001116">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;电机马达供应商风险多大&quot; to Tier 1" time="0.0001777">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;电机马达供应商风险多大&quot; to Tier 1" time="0.0000971">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;美国301关税最新税率&quot; to Tier 1" time="0.0001148">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;美国301关税最新税率&quot; to Tier 1" time="0.0000777">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;洛杉矶港口拥堵情况&quot; to Tier 1" time="0.0001108">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;洛杉矶港口拥堵情况&quot; to Tier 1" time="0.0000888">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;最近有CPSC召回吗&quot; to Tier 1" time="0.0001159">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;最近有CPSC召回吗&quot; to Tier 1" time="0.0000968">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;copper price forecast&quot; to Tier 1" time="0.0002252">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;copper price forecast&quot; to Tier 1" time="0.0002083">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;exchange rate CNY USD&quot; to Tier 1" time="0.0000881">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;exchange rate CNY USD&quot; to Tier 1" time="0.0000698">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;CBAM碳关税成本估算&quot; to Tier 1" time="0.0000675">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;CBAM碳关税成本估算&quot; to Tier 1" time="0.0000591">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;如何计算安全库存&quot; to Tier 1" time="0.0000604">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;如何计算安全库存&quot; to Tier 1" time="0.000053">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;怎么优化库存周转率&quot; to Tier 1" time="0.0000763">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;怎么优化库存周转率&quot; to Tier 1" time="0.0000526">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;什么是CBAM碳关税&quot; to Tier 1" time="0.000075">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1: Supply chain real-time data &gt; routes &quot;什么是CBAM碳关税&quot; to Tier 1" time="0.0000576">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;FOB和CIF有什么区别&quot; to supply_chain_knowledge" time="0.0001544">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;FOB和CIF有什么区别&quot; to supply_chain_knowledge" time="0.0000904">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;HS编码怎么查&quot; to supply_chain_knowledge" time="0.0000745">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;HS编码怎么查&quot; to supply_chain_knowledge" time="0.0000559">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;什么是供应链数字化转型&quot; to supply_chain_knowledge" time="0.0000687">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;什么是供应链数字化转型&quot; to supply_chain_knowledge" time="0.0000528">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;Incoterm和贸易术语有什么区别&quot; to supply_chain_knowledge" time="0.0000741">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 1+2: Supply chain domain knowledge &gt; routes &quot;Incoterm和贸易术语有什么区别&quot; to supply_chain_knowledge" time="0.0000552">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;这周有什么供应链大事件&quot; to news_event" time="0.0000869">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;这周有什么供应链大事件&quot; to news_event" time="0.0000813">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;今天最新关税政策&quot; to news_event" time="0.0000625">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;今天最新关税政策&quot; to news_event" time="0.0000658">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;最近中美贸易战有什么新动态&quot; to news_event" time="0.000062">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;最近中美贸易战有什么新动态&quot; to news_event" time="0.0000608">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;刚刚发生的港口罢工影响&quot; to news_event" time="0.0000829">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;刚刚发生的港口罢工影响&quot; to news_event" time="0.0000579">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;what happened this week in trade&quot; to news_event" time="0.0000711">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;what happened this week in trade&quot; to news_event" time="0.0000552">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;latest supply chain news&quot; to news_event" time="0.0000596">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 3: News and events &gt; routes &quot;latest supply chain news&quot; to news_event" time="0.0000639">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;什么是区块链&quot; to general_knowledge" time="0.0000714">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;什么是区块链&quot; to general_knowledge" time="0.0000633">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;为什么会有通货膨胀&quot; to general_knowledge" time="0.0000619">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;为什么会有通货膨胀&quot; to general_knowledge" time="0.000057">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;how does machine learning work&quot; to general_knowledge" time="0.000057">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;how does machine learning work&quot; to general_knowledge" time="0.0000518">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;量子计算是什么原理&quot; to general_knowledge" time="0.0000579">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 2: General knowledge &gt; routes &quot;量子计算是什么原理&quot; to general_knowledge" time="0.0000545">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;推荐一本供应链管理的书&quot; to opinion_recommendation (Tier 0)" time="0.0000939">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;推荐一本供应链管理的书&quot; to opinion_recommendation (Tier 0)" time="0.0000756">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;哪个物流平台比较好&quot; to opinion_recommendation (Tier 0)" time="0.0000552">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;哪个物流平台比较好&quot; to opinion_recommendation (Tier 0)" time="0.0000431">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;你觉得应该签长约吗&quot; to opinion_recommendation (Tier 0)" time="0.0000541">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;你觉得应该签长约吗&quot; to opinion_recommendation (Tier 0)" time="0.0000467">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;帮我选一个供应商&quot; to opinion_recommendation (Tier 0)" time="0.0000556">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;帮我选一个供应商&quot; to opinion_recommendation (Tier 0)" time="0.0000487">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;best coffee maker for export&quot; to opinion_recommendation (Tier 0)" time="0.0000463">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Opinion and recommendation &gt; routes &quot;best coffee maker for export&quot; to opinion_recommendation (Tier 0)" time="0.0000417">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;你好&quot; to chat_greeting (Tier 0)" time="0.0000623">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;你好&quot; to chat_greeting (Tier 0)" time="0.0000611">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;早安&quot; to chat_greeting (Tier 0)" time="0.0000805">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;早安&quot; to chat_greeting (Tier 0)" time="0.0000671">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;谢谢你的帮助&quot; to chat_greeting (Tier 0)" time="0.000056">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;谢谢你的帮助&quot; to chat_greeting (Tier 0)" time="0.0000546">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;再见&quot; to chat_greeting (Tier 0)" time="0.0000572">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;再见&quot; to chat_greeting (Tier 0)" time="0.0000388">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;你能做什么&quot; to chat_greeting (Tier 0)" time="0.0000581">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Tier 0: Chat and greeting &gt; routes &quot;你能做什么&quot; to chat_greeting (Tier 0)" time="0.0000438">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Default routing &gt; routes unrecognized supply chain query to supply_chain_knowledge" time="0.0000928">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Default routing &gt; routes unrecognized supply chain query to supply_chain_knowledge" time="0.0000776">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Default routing &gt; routes empty query to chat_greeting" time="0.0000513">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Default routing &gt; routes empty query to chat_greeting" time="0.0000542">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables MCP tools for Tier 1 decisions" time="0.0000977">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables MCP tools for Tier 1 decisions" time="0.0000827">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables Wikipedia for Tier 2 decisions" time="0.0000805">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables Wikipedia for Tier 2 decisions" time="0.0000646">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables web search for Tier 3 decisions" time="0.0000823">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables web search for Tier 3 decisions" time="0.0000536">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables direct reply for Tier 0 decisions" time="0.0001022">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="getActiveSources &gt; enables direct reply for Tier 0 decisions" time="0.000066">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; handles very long queries" time="0.0001621">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; handles very long queries" time="0.0001454">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; handles special characters" time="0.0000878">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; handles special characters" time="0.0000673">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; handles mixed Chinese-English" time="0.0001021">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; handles mixed Chinese-English" time="0.0000755">
         </testcase>
-        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; all routing decisions have valid tiers" time="0.001258">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-cross-validator.test.ts" timestamp="2026-05-17T12:36:55.455Z" hostname="qaswe12340" tests="7" failures="0" errors="0" skipped="0" time="0.003418">
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; extracts factual claims about tariffs" time="0.0011116">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; handles Chinese text" time="0.0001545">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="extractClaim &gt; returns empty for non-factual text" time="0.0001979">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="computeSourceAgreement &gt; returns high agreement for similar claims from different sources" time="0.0002958">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="computeSourceAgreement &gt; returns low agreement for contradictory sources" time="0.0001247">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="crossValidate &gt; flags results with low source agreement" time="0.000424">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-cross-validator.test.ts" name="crossValidate &gt; handles empty results" time="0.0001076">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-guard.test.ts" timestamp="2026-05-17T12:36:55.456Z" hostname="qaswe12340" tests="11" failures="0" errors="0" skipped="0" time="0.0053391">
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="filterBlacklistedDomains &gt; filters out known adult/suspicious domains" time="0.0020907">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="filterBlacklistedDomains &gt; filters URLs containing suspicious patterns" time="0.0002218">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="checkLanguageMatch &gt; detects Chinese content correctly" time="0.0001989">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="checkLanguageMatch &gt; flags language mismatches" time="0.0000699">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; detects empty results" time="0.0002099">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; detects when all results are from low-quality sources" time="0.0001655">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="detectEmptyOrDegraded &gt; passes good results through" time="0.000082">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="scoreResultQuality &gt; scores high-authority domains higher" time="0.0003827">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="scoreResultQuality &gt; penalizes results with keyword-stuffed titles" time="0.0001748">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="guardResults &gt; returns degraded flag when all results are filtered" time="0.0002222">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-guard.test.ts" name="guardResults &gt; returns passed results sorted by quality" time="0.0002087">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-reranker.test.ts" timestamp="2026-05-17T12:36:55.458Z" hostname="qaswe12340" tests="7" failures="0" errors="0" skipped="0" time="0.0033339">
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; returns higher score for more relevant content" time="0.0011028">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; handles Chinese text" time="0.0002509">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeSemanticSimilarity &gt; returns low score for empty snippet" time="0.0001391">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeAuthorityBoost &gt; boosts .gov domains" time="0.0001441">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="computeAuthorityBoost &gt; does not boost low-authority domains" time="0.000102">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="rerankResults &gt; places more relevant results at the top" time="0.0003073">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-reranker.test.ts" name="rerankResults &gt; handles empty results" time="0.0003617">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/lib/services/__tests__/web-search-rewriter.test.ts" timestamp="2026-05-17T12:36:55.459Z" hostname="qaswe12340" tests="8" failures="0" errors="0" skipped="0" time="0.0042866">
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; extracts Chinese supply chain entities" time="0.0018318">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; extracts mixed Chinese-English terms" time="0.0002112">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="extractKeywords &gt; returns empty for short query" time="0.0001489">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; injects entities from previous conversation turns" time="0.0002436">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; returns original query if history has no entities" time="0.0000897">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="injectContext &gt; caps entities to maxContextTerms" time="0.000163">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="rewriteQuery &gt; generates multiple search variants" time="0.0003398">
-        </testcase>
-        <testcase classname="src/lib/services/__tests__/web-search-rewriter.test.ts" name="rewriteQuery &gt; includes the original query as one variant" time="0.0001157">
+        <testcase classname="src/lib/services/__tests__/information-router.test.ts" name="Edge cases &gt; all routing decisions have valid tiers" time="0.0012087">
         </testcase>
     </testsuite>
 </testsuites>

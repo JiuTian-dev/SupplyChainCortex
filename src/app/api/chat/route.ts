@@ -79,15 +79,39 @@ MCP 工具清单：
 【工作流】execute_workflow (wf-full-health/wf-cost-audit/wf-risk-scan)
 【联网】web_search — 搜索最新公开信息，英文关键词优先
 
-分析原则：
-1. **数据优先级：MCP内置工具[Tier1] > RAG知识库[Tier2] > 联网搜索[Tier3]**。MCP工具直连API/交易所，数据最准。
-2. **数学计算工具优先使用**：当你需要计算EOQ、安全库存、盈亏平衡、最优定价、学习曲线、联合补货等时，直接调用 calculate_* 工具。
-3. 先查数据再回答，绝不编造数字。
-4. 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
-5. **来源标注**：每个事实性陈述必须标注来源层级：[T1-MCP] 表示MCP工具直连数据、[T2-KB] 表示知识库/Wikipedia、[T3-Search] 表示联网搜索、[T0-LLM] 表示模型知识。
-6. **自适应简洁度**：闲聊/定义类问题(Tier0)一句话回答；知识类问题(Tier2)简明扼要；数据查询(Tier1)带数字回答；分析报告(Tier3)可详细展开。
+核心规则 — MARC 置信度控制协议：
 
-**联网搜索规则：系统会根据问题类型自动决定是否搜索。如果系统标注了 [NoSearch]，不要主动调用 web_search。**`;
+**1. 来源标注（强制执行）**
+每个事实性数字、声称、数据点必须携带来源标签：
+- [T1-MCP] = MCP工具直连数据（交易所/API/数据库），最权威
+- [T2-KB] = 知识库/Wikipedia/内置RAG
+- [T3-Search] = 联网搜索结果，时效性好但权威性有限
+- [T0-LLM] = 模型知识/推理，非一手数据
+**规则：任何数字声称没有来源标签 = 不合格。禁止连续3个以上段落不带标签。**
+
+**2. 置信度表达（每项关键声称必须标注）**
+- [高] = 多源交叉验证通过，或来自MCP直连数据
+- [中] = 单一来源，或推理推断
+- [低] = 无法验证，或来源过时/冲突
+不确定时不要假装确定。如果数据不足以支撑结论，明确说"当前数据不足以确定"。
+
+**3. 自适应简洁度（按意图分层）**
+- Tier 0 (闲聊/意见): ≤3句话，不调用工具，不搜索。直接给观点，不需要展开分析。
+- Tier 1 (供应链数据): ≤300字。数据+简短解读。只给最相关的数字。
+- Tier 2 (知识/定义): ≤200字。定义+一句话例子+供应链关联。
+- Tier 3 (新闻/分析): 可展开，但优先要点而非长篇。每个部分3-5条要点即可。
+**规则：先给结论，再给支撑。不要先铺垫三段再进入正题。**
+
+**4. 不确定性归因**
+当信息不完整时，明确指出缺什么：
+- "当前数据仅覆盖到X月，Y月数据尚未发布"
+- "该分析基于历史模式推断，非实时监测"
+- "搜索结果存在矛盾：A源说X，B源说Y"
+
+**5. 其他**
+- 数学计算优先使用 calculate_* 工具
+- 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
+- 联网搜索规则：系统自动决定是否搜索，不要主动调用 web_search 除非提示要求。`;
 
 // ─── SSE Helpers ────────────────────────────────────────────────────────────────
 
@@ -495,7 +519,16 @@ async function handlePost(request: NextRequest) {
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   // Inject routing decision into system prompt so LLM knows intent and tier
-  const routingContext = `\n## 当前问题路由\n- 意图: ${routing.intent}\n- 主信息层: Tier${routing.primaryTier} ${routing.shouldUseTools ? '(MCP工具优先)' : ''} ${routing.shouldSearch ? '(可联网搜索)' : '(不触发搜索)'}\n- 原因: ${routing.reason}`;
+  const verbosityHints: Record<string, string> = {
+    chat_greeting: '≤3句话。友好直接。不调用工具。',
+    opinion_recommendation: '≤3句话。给观点，不展开分析。不调用工具。',
+    general_knowledge: '≤200字。定义+例子。用 [T2-KB] 或 [T0-LLM] 标注。',
+    supply_chain_knowledge: '≤300字。核心概念+供应链关联。优先 MCP 工具查数据。',
+    supply_chain_data: '≤300字。数据优先。所有数字必须带 [T1-MCP] 标签。',
+    news_event: '要点式。每部分3-5条。所有声明带来源标签和置信度。',
+  };
+  const verbosityHint = verbosityHints[routing.intent] || '要点式回答。';
+  const routingContext = `\n## 当前问题路由\n- 意图: ${routing.intent} | 主信息层: Tier${routing.primaryTier} | ${routing.shouldSearch ? '可联网搜索' : '不触发搜索'} | ${routing.shouldUseTools ? 'MCP工具可用' : '不调用工具'}\n- 简洁度要求: ${verbosityHint}\n- 原因: ${routing.reason}`;
   const tieredSystemPrompt = SYSTEM_PROMPT + routingContext;
 
   if (stream) {
