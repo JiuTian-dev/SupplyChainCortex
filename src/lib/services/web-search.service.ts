@@ -12,6 +12,11 @@
  *   TAVILY_API_KEY=...
  */
 
+import { rewriteQuery, injectContext, type ConversationTurn } from './web-search-rewriter';
+import { guardResults } from './web-search-guard';
+import { rerankResults } from './web-search-reranker';
+import { crossValidate } from './web-search-cross-validator';
+
 // ─── Types ────────────────────────────────────────────────────────────────────────
 
 export interface SearchResult {
@@ -100,8 +105,32 @@ function getConfig(): ProviderConfig {
 
 // ─── SearXNG ──────────────────────────────────────────────────────────────────────
 
-async function searchSearXNG(query: string, baseUrl: string): Promise<SearchResult[]> {
-  const url = `${baseUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&language=en`;
+interface SearXNGOptions {
+  categories?: string;
+  time_range?: string;
+  language?: string;
+  safesearch?: number;
+  engines?: string;
+}
+
+function buildSearXNGUrl(baseUrl: string, query: string, options: SearXNGOptions = {}): string {
+  const params = new URLSearchParams();
+  params.set('q', query);
+  params.set('format', 'json');
+  params.set('categories', options.categories || 'general');
+  if (options.time_range) params.set('time_range', options.time_range);
+  params.set('language', options.language || 'zh-CN');
+  params.set('safesearch', String(options.safesearch ?? 2));
+  if (options.engines) params.set('engines', options.engines);
+  return `${baseUrl}/search?${params.toString()}`;
+}
+
+async function searchSearXNG(
+  query: string,
+  baseUrl: string,
+  options: SearXNGOptions = {},
+): Promise<SearchResult[]> {
+  const url = buildSearXNGUrl(baseUrl, query, options);
   const res = await fetch(url, {
     signal: AbortSignal.timeout(8000),
     headers: { 'Accept': 'application/json', 'User-Agent': 'SupplyChainCortex/2.9' },
@@ -111,7 +140,7 @@ async function searchSearXNG(query: string, baseUrl: string): Promise<SearchResu
     results?: Array<{ title: string; url: string; content: string; publishedDate?: string }>;
   };
   if (!data.results?.length) return [];
-  return data.results.slice(0, 8).map(r => ({
+  return data.results.slice(0, 10).map(r => ({
     title: r.title,
     url: r.url,
     snippet: (r.content || '').slice(0, 500),
@@ -577,4 +606,156 @@ export function getAvailableProviders(): Array<{ name: SearchProvider; available
     { name: 'tavily', available: !!process.env.TAVILY_API_KEY, reason: process.env.TAVILY_API_KEY ? 'Configured' : 'Set TAVILY_API_KEY in .env' },
     { name: 'jina', available: !!process.env.JINA_API_KEY, reason: process.env.JINA_API_KEY ? 'Configured' : 'Needs JINA_API_KEY (free tier available)' },
   ];
+}
+
+// ─── Quality Pipeline ───────────────────────────────────────────────────────────
+
+export interface QualitySearchResult {
+  results: SearchResult[];
+  source: string;
+  diagnostics: {
+    originalQuery: string;
+    rewrittenQueries: string[];
+    guardPassed: boolean;
+    guardReason?: string;
+    rerankApplied: boolean;
+    crossValidation: {
+      confidence: string;
+      caveats: string[];
+      supportingSources: number;
+      sourceCount: number;
+    };
+    pipelineMs: number;
+  };
+}
+
+function classifyQueryForSearch(query: string): {
+  categories: string;
+  time_range: string;
+  engines: string;
+} {
+  const q = query.toLowerCase();
+  const hasChinese = /[一-鿿]/.test(query);
+
+  if (/关税|贸易|政策|法规|制裁|限制|宣布|实施/.test(query) ||
+      /tariff|trade|policy|sanction|regulation|announce/.test(q)) {
+    return {
+      categories: 'general,news',
+      time_range: 'month',
+      engines: hasChinese ? 'google,bing,duckduckgo' : 'google,bing,duckduckgo,wikipedia',
+    };
+  }
+
+  if (/价格|汇率|铜|铝|钢|碳|运价|指数|趋势|分析/.test(query) ||
+      /price|rate|index|trend|analysis|forecast/.test(q)) {
+    return {
+      categories: 'general',
+      time_range: 'year',
+      engines: hasChinese ? 'google,bing,duckduckgo' : 'google,bing,duckduckgo,wikipedia',
+    };
+  }
+
+  if (/技术|系统|架构|代码|API|数据库|算法/.test(query) ||
+      /technical|system|architecture|code|api|database|algorithm/.test(q)) {
+    return {
+      categories: 'general,it',
+      time_range: 'year',
+      engines: 'google,github,duckduckgo,qwant',
+    };
+  }
+
+  return {
+    categories: 'general',
+    time_range: 'year',
+    engines: hasChinese ? 'google,bing,duckduckgo' : 'google,bing,duckduckgo,wikipedia',
+  };
+}
+
+export async function webSearchWithQuality(
+  query: string,
+  conversationHistory: ConversationTurn[] = [],
+): Promise<QualitySearchResult> {
+  const startTime = Date.now();
+  const safeQuery = sanitizeQuery(query);
+
+  // Step 1: Inject context from conversation history
+  const contextQuery = injectContext(safeQuery, conversationHistory);
+
+  // Step 2: Rewrite into multiple variant queries
+  const rewrittenQueries = rewriteQuery(contextQuery);
+  const primaryQuery = rewrittenQueries[0] || contextQuery;
+
+  // Step 3: Classify query for optimal SearXNG params
+  const searchOptions = classifyQueryForSearch(primaryQuery);
+
+  // Step 4: Execute primary search with dynamic params
+  const config = getConfig();
+  let allResults: SearchResult[] = [];
+  let source = 'none';
+
+  try {
+    if (config.provider === 'searxng') {
+      const baseUrl = config.baseUrl || 'http://localhost:8081';
+      allResults = await searchSearXNG(primaryQuery, baseUrl, searchOptions);
+      source = 'SearXNG';
+    } else {
+      const result = await searchByProvider(primaryQuery, config);
+      allResults = result.results;
+      source = result.source;
+    }
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error';
+    console.warn('[web-search-quality] Primary search failed:', msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***'));
+  }
+
+  // Step 5: If multi-query rewriting enabled, search additional variants (max 2 more)
+  if (rewrittenQueries.length > 1 && allResults.length < 5) {
+    for (const variant of rewrittenQueries.slice(1, 3)) {
+      try {
+        const extraResults = config.provider === 'searxng'
+          ? await searchSearXNG(variant, config.baseUrl || 'http://localhost:8081', searchOptions)
+          : (await searchByProvider(variant, config)).results;
+        const seenUrls = new Set(allResults.map(r => r.url));
+        for (const r of extraResults) {
+          if (!seenUrls.has(r.url)) {
+            allResults.push(r);
+            seenUrls.add(r.url);
+          }
+        }
+      } catch { /* continue */ }
+    }
+  }
+
+  // Step 6: Guard — filter and score
+  const guardTargetLang = /[一-鿿]/.test(primaryQuery) ? 'zh' : 'auto';
+  const guarded = guardResults(allResults, primaryQuery, guardTargetLang as 'zh' | 'en' | 'auto');
+
+  let finalResults = guarded.passed ? guarded.results : allResults;
+
+  // Step 7: Rerank
+  finalResults = rerankResults(finalResults, primaryQuery);
+
+  // Step 8: Cross-validate
+  const verified = crossValidate(finalResults, primaryQuery);
+
+  const pipelineMs = Date.now() - startTime;
+
+  return {
+    results: finalResults.slice(0, 8),
+    source: guarded.passed ? source : `${source} ⚠️degraded`,
+    diagnostics: {
+      originalQuery: query,
+      rewrittenQueries,
+      guardPassed: guarded.passed,
+      guardReason: guarded.reason,
+      rerankApplied: true,
+      crossValidation: {
+        confidence: verified.confidence,
+        caveats: verified.caveats,
+        supportingSources: verified.supportingSources,
+        sourceCount: verified.sourceCount,
+      },
+      pipelineMs,
+    },
+  };
 }
