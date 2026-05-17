@@ -448,6 +448,8 @@ async function handleReActNonStream(
         steps: steps.length,
         durationMs,
         mode: 'react',
+        intent: routing?.intent,
+        tier: routing?.primaryTier,
         passport,
       },
     });
