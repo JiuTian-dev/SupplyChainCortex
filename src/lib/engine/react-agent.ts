@@ -46,6 +46,7 @@ export interface ReActOptions {
   enableWebSearch?: boolean;
   enableRAG?: boolean;
   serverSide?: boolean;
+  tieredSystemPrompt?: string;
 }
 
 // ─── Tool Registry for Prompt ────────────────────────────────────────────────────
@@ -353,7 +354,9 @@ export async function* runReActAgent(
     } catch { /* web search is best-effort */ }
   }
 
-  const systemPrompt = buildReActSystemPrompt(dynamicContext);
+  const systemPrompt = options.tieredSystemPrompt
+    ? options.tieredSystemPrompt + '\n\n' + dynamicContext
+    : buildReActSystemPrompt(dynamicContext);
 
   // Build message list
   const messages: ChatMessage[] = [

@@ -178,7 +178,8 @@ export function classifyIntent(query: string): RoutingDecision {
   return {
     intent: best.intent, primaryTier: best.primaryTier,
     fallbackTier: best.fallbackTier,
-    shouldSearch: best.primaryTier === 3 || best.fallbackTier === 3,
+    // Search only fires for Tier 3 (discovery). Tier 2 uses Wikipedia first.
+    shouldSearch: best.primaryTier === 3,
     shouldUseTools: best.primaryTier === 1,
     reason: best.reason,
   };

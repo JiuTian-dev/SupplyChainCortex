@@ -14,6 +14,7 @@ import { getAuth } from '@/lib/auth-helpers';
 import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
+import { classifyIntent, getActiveSources, type Intent, type RoutingDecision } from '@/lib/services/information-router';
 import { runReActAgent } from '@/lib/engine/react-agent';
 import { buildDynamicSystemContext, rememberConversationTurn } from '@/lib/engine/context-builder';
 import { episodeStore } from '@/lib/engine/episode-store';
@@ -79,14 +80,14 @@ MCP 工具清单：
 【联网】web_search — 搜索最新公开信息，英文关键词优先
 
 分析原则：
-1. **数据优先级：MCP内置工具 > RAG知识库 > 联网搜索**。MCP工具直连API/交易所，数据最准。
-2. **数学计算工具优先使用**：当你需要计算EOQ、安全库存、盈亏平衡、最优定价、学习曲线、联合补货等时，直接调用 calculate_* 工具，它们返回精确的数学模型结果，比自己手算准确。
-3. 先查数据再回答，绝不编造数字。涉及健康评分风险评分等关键指标时，务必直接查询 supply-chain-score 或 brief API。
+1. **数据优先级：MCP内置工具[Tier1] > RAG知识库[Tier2] > 联网搜索[Tier3]**。MCP工具直连API/交易所，数据最准。
+2. **数学计算工具优先使用**：当你需要计算EOQ、安全库存、盈亏平衡、最优定价、学习曲线、联合补货等时，直接调用 calculate_* 工具。
+3. 先查数据再回答，绝不编造数字。
 4. 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
-5. **联网搜索必须使用英文关键词**。正确: web_search("US China tariff 2026")。错误: web_search("中美关税")
-6. 如果搜索结果内容与MCP工具数据冲突，以MCP工具为准。
-7. 用中文回复，金额用美元/人民币，数字保留合理精度
-8. **询问"你能做什么/有什么工具"时，列出所有类别包括数学计算工具**`;
+5. **来源标注**：每个事实性陈述必须标注来源层级：[T1-MCP] 表示MCP工具直连数据、[T2-KB] 表示知识库/Wikipedia、[T3-Search] 表示联网搜索、[T0-LLM] 表示模型知识。
+6. **自适应简洁度**：闲聊/定义类问题(Tier0)一句话回答；知识类问题(Tier2)简明扼要；数据查询(Tier1)带数字回答；分析报告(Tier3)可详细展开。
+
+**联网搜索规则：系统会根据问题类型自动决定是否搜索。如果系统标注了 [NoSearch]，不要主动调用 web_search。**`;
 
 // ─── SSE Helpers ────────────────────────────────────────────────────────────────
 
@@ -260,27 +261,10 @@ const DEFAULT_TOOL_ACTIONS: Record<string, string> = {
   web_search: '',
 };
 
-// ─── Auto-Search Detection ────────────────────────────────────────────────────────
+// ─── Intent-Aware Search Gating (replaces crude keyword-based shouldAutoSearch) ───
 
-const TIME_SENSITIVE_KEYWORDS = [
-  '最新', '最近', '今天', '昨天', '本周', '本月', '今年',
-  '新闻', '动态', '变化', '更新', '突发', '刚发布', '刚公布',
-  '当前', '现在', 'latest', 'recent', 'today', 'this week',
-  'news', 'update', 'breaking', 'just announced', 'current',
-  '多少', '是多少', '什么价格', '什么价', '多少钱',
-  'SCFI', 'SCFIS', '运价', '运费', '碳价', '铜价', '铝价', '钢价',
-  '汇率', '关税', '政策', '召回', '港口',
-];
-
-function shouldAutoSearch(query: string): boolean {
-  const q = query.toLowerCase();
-  // Check time-sensitive keywords
-  for (const kw of TIME_SENSITIVE_KEYWORDS) {
-    if (q.includes(kw.toLowerCase())) return true;
-  }
-  // Check for questions asking about current data
-  if (/what('s| is) the (current |latest |price of )/i.test(q)) return true;
-  return false;
+function getRoutingDecision(query: string): RoutingDecision {
+  return classifyIntent(query);
 }
 
 // ─── ReAct Agent Stream Handler ──────────────────────────────────────────────────
@@ -294,6 +278,8 @@ async function handleReActStream(
   webSearchEnabled?: boolean,
   currency = 'CNY',
   timeHorizon = '30d',
+  tieredSystemPrompt?: string,
+  routing?: RoutingDecision,
 ): Promise<Response> {
   const encoder = new TextEncoder();
 
@@ -323,6 +309,7 @@ async function handleReActStream(
           maxRounds: 8,
           temperature: 0.7,
           maxTokens: 4000,
+          tieredSystemPrompt,
         });
 
         for await (const event of eventStream) {
@@ -388,6 +375,8 @@ async function handleReActNonStream(
   webSearchEnabled?: boolean,
   currency = 'CNY',
   timeHorizon = '30d',
+  tieredSystemPrompt?: string,
+  routing?: RoutingDecision,
 ): Promise<NextResponse> {
   let fullResponse = '';
   const toolsUsed: string[] = [];
@@ -411,6 +400,7 @@ async function handleReActNonStream(
       enableWebSearch: webSearchEnabled,
       enableRAG: true,
       maxRounds: 8,
+      tieredSystemPrompt,
     });
 
     for await (const event of eventStream) {
@@ -433,7 +423,7 @@ async function handleReActNonStream(
     // If ReAct produced no content (likely API error), fall back to hybrid
     if (!fullResponse.trim() && hadError) {
       console.warn('[ReAct] No content produced, falling back to hybrid mode. Error:', errorMsg);
-      return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
+      return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled, tieredSystemPrompt, routing);
     }
 
     // Remember this conversation turn for multi-turn context
@@ -463,7 +453,7 @@ async function handleReActNonStream(
     });
   } catch (err) {
     console.error('[ReAct] Exception, falling back to hybrid:', err);
-    return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled);
+    return handleHybrid(message, history, provider, model, apiKey, webSearchEnabled, tieredSystemPrompt, routing);
   }
 }
 
@@ -479,8 +469,10 @@ async function handlePost(request: NextRequest) {
   const model = (body.model as string) || getDefaultModel(provider);
   const apiKey = body.apiKey as string | undefined;
   const history = (body.history as ChatMessage[]) || [];
-  // Auto-enable web search for time-sensitive / real-time queries, unless explicitly disabled
-  const webSearchEnabled = body.webSearch === false ? false : (body.webSearch === true || shouldAutoSearch(message));
+  // Auto-enable web search based on routing decision: Tier 3 enables search, Tier 0/2 skip it
+  const routing = getRoutingDecision(message);
+  const webSearchEnabled = body.webSearch === false ? false
+    : (body.webSearch === true || routing.shouldSearch);
   const currency = (body.currency as string) || 'CNY';
   const timeHorizon = (body.timeHorizon as string) || '30d';
 
@@ -500,12 +492,16 @@ async function handlePost(request: NextRequest) {
 
   const hasApiKey = !!(apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
+  // Inject routing decision into system prompt so LLM knows intent and tier
+  const routingContext = `\n## 当前问题路由\n- 意图: ${routing.intent}\n- 主信息层: Tier${routing.primaryTier} ${routing.shouldUseTools ? '(MCP工具优先)' : ''} ${routing.shouldSearch ? '(可联网搜索)' : '(不触发搜索)'}\n- 原因: ${routing.reason}`;
+  const tieredSystemPrompt = SYSTEM_PROMPT + routingContext;
+
   if (stream) {
-    if (hasApiKey) return handleReActStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon);
-    return handleLocalModeStream(message);
+    if (hasApiKey) return handleReActStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon, tieredSystemPrompt, routing);
+    return handleLocalModeStream(message, routing);
   }
-  if (hasApiKey) return handleReActNonStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon);
-  return handleLocalMode(message);
+  if (hasApiKey) return handleReActNonStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon, tieredSystemPrompt, routing);
+  return handleLocalMode(message, routing);
 }
 
 // ─── Hybrid Mode: keyword matching → tool execution → LLM summarization ──────────
@@ -537,8 +533,20 @@ async function executeMatchedTools(message: string): Promise<{
 }
 
 async function handleHybrid(
-  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string, webSearchEnabled?: boolean,
+  message: string, history: ChatMessage[], provider: string, model: string, apiKey?: string, webSearchEnabled?: boolean, tieredSystemPrompt?: string, routing?: RoutingDecision,
 ): Promise<NextResponse> {
+  // Respect router: Tier 0/2 skip tools and search
+  if (routing && (routing.primaryTier === 0 || routing.primaryTier === 2)) {
+    return NextResponse.json({
+      success: true,
+      data: {
+        reply: `[T${routing.primaryTier}] ${routing.reason}。该问题适合从模型知识或Wikipedia获取答案，不需要搜索或工具调用。`,
+        mode: routing.primaryTier === 0 ? 'tier0-skip' : 'tier2-skip',
+        intent: routing.intent,
+      },
+    });
+  }
+
   const { toolResults, toolsUsed } = await executeMatchedTools(message);
   const dataContext = toolResults.map(r => r.result).join('\n\n');
   const ragResults = retrieveKnowledge(message, 2);
@@ -555,7 +563,7 @@ async function handleHybrid(
 
   try {
     const summaryMsg: ChatMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: tieredSystemPrompt || SYSTEM_PROMPT },
       ...history.slice(-6),  // last 3 user-assistant exchanges
       { role: 'user', content: `用户问题: ${message}\n\n实时数据:\n${dataContext}\n${ragContext}${webContext}\n请综合分析。` },
     ];
@@ -575,7 +583,17 @@ async function handleHybrid(
       },
     });
   } catch {
-    // LLM failed — return tool results directly
+    // LLM failed — return tool results, respecting router
+    if (routing && (routing.primaryTier === 0 || routing.primaryTier === 2)) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          reply: `[T${routing.primaryTier}] ${routing.reason}。该问题适合从模型知识获取答案。LLM 服务暂不可用。`,
+          mode: 'local-fallback-routed',
+          intent: routing.intent,
+        },
+      });
+    }
     return NextResponse.json({
       success: true,
       data: {
@@ -829,7 +847,31 @@ function matchToolsToQuery(query: string): ToolAction[] {
   return actions.slice(0, 4);
 }
 
-async function handleLocalMode(message: string): Promise<NextResponse> {
+async function handleLocalMode(message: string, routing?: RoutingDecision): Promise<NextResponse> {
+  // For Tier 0 queries (chat/opinion), skip tools entirely — LLM would handle these
+  if (routing && routing.primaryTier === 0) {
+    return NextResponse.json({
+      success: true,
+      data: {
+        reply: `[T0-LLM] ${routing.reason}。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 驱动的自然语言回答。当前问题类型: ${routing.intent}`,
+        mode: 'local-tier0',
+        intent: routing.intent,
+      },
+    });
+  }
+
+  // For Tier 2 queries (general knowledge), skip tools, suggest Wikipedia
+  if (routing && routing.primaryTier === 2) {
+    return NextResponse.json({
+      success: true,
+      data: {
+        reply: `[T2-KB] ${routing.reason}。该问题适合从 Wikipedia 或知识库获取答案。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 驱动的知识回答。当前问题类型: ${routing.intent}`,
+        mode: 'local-tier2',
+        intent: routing.intent,
+      },
+    });
+  }
+
   const actions = matchToolsToQuery(message);
   const results: Array<{ tool: string; result: string }> = [];
 
@@ -859,7 +901,7 @@ async function handleLocalMode(message: string): Promise<NextResponse> {
   });
 }
 
-function handleLocalModeStream(message: string): Response {
+function handleLocalModeStream(message: string, routing?: RoutingDecision): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -868,6 +910,16 @@ function handleLocalModeStream(message: string): Response {
       };
 
       try {
+        // Tier 0/2: skip tools, return routing info
+        if (routing && (routing.primaryTier === 0 || routing.primaryTier === 2)) {
+          const tierLabel = routing.primaryTier === 0 ? 'T0-LLM' : 'T2-KB';
+          const msg = `[${tierLabel}] ${routing.reason}。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 回答。`;
+          enqueue('token', { content: msg });
+          enqueue('done', { toolsUsed: [], mode: routing.primaryTier === 0 ? 'local-tier0' : 'local-tier2', intent: routing.intent, complete: true });
+          controller.close();
+          return;
+        }
+
         enqueue('thinking', { status: 'analyzing' });
 
         const actions = matchToolsToQuery(message);
