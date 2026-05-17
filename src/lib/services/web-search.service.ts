@@ -140,7 +140,7 @@ async function searchSearXNG(
     results?: Array<{ title: string; url: string; content: string; publishedDate?: string }>;
   };
   if (!data.results?.length) return [];
-  return data.results.slice(0, 10).map(r => ({
+  return data.results.slice(0, 25).map(r => ({
     title: r.title,
     url: r.url,
     snippet: (r.content || '').slice(0, 500),
@@ -674,6 +674,34 @@ function classifyQueryForSearch(query: string): {
   };
 }
 
+/** Minimum results we aim for after filtering. If below, adaptive recall kicks in. */
+const TARGET_MIN_RESULTS = 10;
+
+async function fetchFromSource(
+  query: string,
+  config: ProviderConfig,
+  searchOptions: SearXNGOptions,
+): Promise<{ results: SearchResult[]; source: string }> {
+  if (config.provider === 'searxng') {
+    const baseUrl = config.baseUrl || 'http://localhost:8081';
+    const results = await searchSearXNG(query, baseUrl, searchOptions);
+    return { results, source: 'SearXNG' };
+  }
+  return searchByProvider(query, config);
+}
+
+/** Merge results from multiple queries, deduplicating by URL. */
+function mergeResults(existing: SearchResult[], incoming: SearchResult[]): SearchResult[] {
+  const seen = new Set(existing.map(r => r.url));
+  for (const r of incoming) {
+    if (!seen.has(r.url)) {
+      existing.push(r);
+      seen.add(r.url);
+    }
+  }
+  return existing;
+}
+
 export async function webSearchWithQuality(
   query: string,
   conversationHistory: ConversationTurn[] = [],
@@ -691,67 +719,127 @@ export async function webSearchWithQuality(
   // Step 3: Classify query for optimal SearXNG params
   const searchOptions = classifyQueryForSearch(primaryQuery);
 
-  // Step 4: Execute primary search with dynamic params
   const config = getConfig();
   let allResults: SearchResult[] = [];
-  let source = 'none';
+  let sources: string[] = [];
 
+  // ── Step 4: Recall-first parallel fetching ─────────────────────────────────
+
+  // 4a: Primary search (SearXNG main engines)
   try {
-    if (config.provider === 'searxng') {
-      const baseUrl = config.baseUrl || 'http://localhost:8081';
-      allResults = await searchSearXNG(primaryQuery, baseUrl, searchOptions);
-      source = 'SearXNG';
-    } else {
-      const result = await searchByProvider(primaryQuery, config);
-      allResults = result.results;
-      source = result.source;
-    }
+    const primary = await fetchFromSource(primaryQuery, config, searchOptions);
+    allResults = primary.results;
+    sources.push(primary.source);
   } catch (err) {
     const msg = (err as Error).message || 'Unknown error';
     console.warn('[web-search-quality] Primary search failed:', msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***'));
   }
 
-  // Step 5: If multi-query rewriting enabled, search additional variants (max 2 more)
-  if (rewrittenQueries.length > 1 && allResults.length < 5) {
-    for (const variant of rewrittenQueries.slice(1, 3)) {
-      try {
-        const extraResults = config.provider === 'searxng'
-          ? await searchSearXNG(variant, config.baseUrl || 'http://localhost:8081', searchOptions)
-          : (await searchByProvider(variant, config)).results;
-        const seenUrls = new Set(allResults.map(r => r.url));
-        for (const r of extraResults) {
-          if (!seenUrls.has(r.url)) {
-            allResults.push(r);
-            seenUrls.add(r.url);
-          }
-        }
-      } catch { /* continue */ }
+  // 4b: Parallel DDG fallback (always runs — adds lexical diversity for free)
+  if (config.provider === 'searxng') {
+    try {
+      const ddgResults = await searchDuckDuckGoHTML(primaryQuery);
+      if (ddgResults.length > 0) {
+        mergeResults(allResults, ddgResults);
+        sources.push('DDG');
+      }
+    } catch { /* DDG is supplementary — silence failures */ }
+  }
+
+  // 4c: Multi-query variant expansion (up to 2 additional queries in parallel)
+  const variantsNeeded = allResults.length < 15;
+  if (rewrittenQueries.length > 1 && variantsNeeded) {
+    const extraQueries = rewrittenQueries.slice(1, 3);
+    const variantResults = await Promise.allSettled(
+      extraQueries.map(vq =>
+        config.provider === 'searxng'
+          ? searchSearXNG(vq, config.baseUrl || 'http://localhost:8081', searchOptions)
+          : searchByProvider(vq, config).then(r => r.results)
+      )
+    );
+    for (const vr of variantResults) {
+      if (vr.status === 'fulfilled' && vr.value.length > 0) {
+        mergeResults(allResults, vr.value);
+      }
     }
   }
 
-  // Step 6: Guard — filter and score
-  const guardTargetLang = /[一-鿿]/.test(primaryQuery) ? 'zh' : 'auto';
-  const guarded = guardResults(allResults, primaryQuery, guardTargetLang as 'zh' | 'en' | 'auto');
+  // ── Step 5: Adaptive recall loop ──────────────────────────────────────────
 
-  let finalResults = guarded.passed ? guarded.results : allResults;
+  let iteration = 0;
+  const MAX_ITERATIONS = 2;
 
-  // Step 7: Rerank
-  finalResults = rerankResults(finalResults, primaryQuery);
+  while (iteration < MAX_ITERATIONS) {
+    // Guard and rerank the current pool
+    const guardTargetLang = /[一-鿿]/.test(primaryQuery) ? 'zh' : 'auto';
+    const guarded = guardResults(allResults, primaryQuery, guardTargetLang as 'zh' | 'en' | 'auto');
+    let pool = guarded.passed ? guarded.results : allResults;
+    pool = rerankResults(pool, primaryQuery);
 
-  // Step 8: Cross-validate
-  const verified = crossValidate(finalResults, primaryQuery);
+    if (pool.length >= TARGET_MIN_RESULTS || iteration === MAX_ITERATIONS - 1) {
+      // Enough results or out of iterations — finalize
+      const verified = crossValidate(pool, primaryQuery);
+      const pipelineMs = Date.now() - startTime;
+      const combinedSource = [...new Set(sources)].join(' + ');
 
+      return {
+        results: pool.slice(0, TARGET_MIN_RESULTS),
+        source: guarded.passed ? combinedSource : `${combinedSource} ⚠️degraded`,
+        diagnostics: {
+          originalQuery: query,
+          rewrittenQueries,
+          guardPassed: guarded.passed,
+          guardReason: guarded.reason,
+          rerankApplied: true,
+          crossValidation: {
+            confidence: verified.confidence,
+            caveats: verified.caveats,
+            supportingSources: verified.supportingSources,
+            sourceCount: verified.sourceCount,
+          },
+          pipelineMs,
+        },
+      };
+    }
+
+    // Not enough results — broaden and refetch
+    iteration++;
+    const broadenedOptions: SearXNGOptions = {
+      ...searchOptions,
+      categories: 'general', // Drop category restrictions
+      time_range: undefined,    // Drop time range filter
+      engines: undefined,       // Use all configured engines
+    };
+
+    try {
+      const broadResults = await fetchFromSource(primaryQuery, config, broadenedOptions);
+      if (broadResults.results.length > 0) {
+        mergeResults(allResults, broadResults.results);
+        sources.push(broadResults.source + '(broad)');
+      }
+    } catch { /* continue */ }
+
+    // Also try a broadened DDG search
+    try {
+      const broadDDG = await searchDuckDuckGoHTML(primaryQuery);
+      if (broadDDG.length > 0) mergeResults(allResults, broadDDG);
+    } catch { /* continue */ }
+  }
+
+  // Should never reach here, but final fallback
+  const verified = crossValidate(allResults, primaryQuery);
   const pipelineMs = Date.now() - startTime;
+  const combinedSource = [...new Set(sources)].join(' + ');
 
   return {
-    results: finalResults.slice(0, 8),
-    source: guarded.passed ? source : `${source} ⚠️degraded`,
+    results: allResults.slice(0, TARGET_MIN_RESULTS),
+    source: combinedSource || 'none',
     diagnostics: {
       originalQuery: query,
       rewrittenQueries,
-      guardPassed: guarded.passed,
-      guardReason: guarded.reason,
-      rerankApplied: true,
+      guardPassed: false,
+      guardReason: 'adaptive_recall_exhausted',
+      rerankApplied: false,
       crossValidation: {
         confidence: verified.confidence,
         caveats: verified.caveats,
