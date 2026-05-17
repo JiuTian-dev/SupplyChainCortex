@@ -8,14 +8,19 @@ server:
   bind_address: "0.0.0.0"
   limiter: false
   image_proxy: false
-  # Enable CORS for local dev
   method: "GET"
 
 search:
   formats:
     - html
     - json
-  safe_search: 0
+  safe_search: 2
+  default_lang: "zh-CN"
+  autocomplete: "duckduckgo"
+
+enabled_plugins:
+  - "Hash plugin"
+  - "ahmia_filter"
 
 ui:
   static_use_hash: true
@@ -24,22 +29,36 @@ ui:
 engines:
   - name: google
     disabled: false
+    categories: [general]
+    timeout: 7.0
+    engine_params:
+      safe_search: strict
   - name: duckduckgo
     disabled: false
+    categories: [general]
+    timeout: 7.0
   - name: bing
     disabled: false
+    categories: [general]
+    timeout: 7.0
   - name: wikipedia
     disabled: false
+    categories: [research]
+    timeout: 5.0
   - name: github
     disabled: false
-  - name: reddit
-    disabled: false
+    categories: [it]
+    timeout: 5.0
   - name: brave
-    disabled: false
+    disabled: true
   - name: qwant
     disabled: false
+    categories: [general]
+    timeout: 7.0
   - name: startpage
-    disabled: false
+    disabled: true
+  - name: reddit
+    disabled: true
 
 outgoing:
   request_timeout: 10.0
