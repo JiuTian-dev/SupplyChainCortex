@@ -15,7 +15,7 @@ import {
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
   Wifi, RefreshCw, CircleDot, Loader2, Check, Square,
   MoreHorizontal, Paperclip, FileDown, FolderOpen, HardDrive, FileText, RotateCcw,
-  PanelRightClose, Eye, EyeOff, Brain, Wrench, CircleDot,
+  PanelRightClose, Eye, EyeOff, Brain, Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS, getProviderModels, getDefaultModel } from '@/lib/services/ai-providers.service';
