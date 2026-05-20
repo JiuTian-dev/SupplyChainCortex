@@ -296,13 +296,11 @@ export function SalesTab() {
   // Category trend chart data - uses real daily sales data with per-category variation
   const categoryTrendChartData = useMemo(() => {
     const today = new Date();
-    // Derive categories from available product data, fallback to all 5
+    // Derive categories from product summaries (API data)
     const cats = new Set<string>();
-    if (Array.isArray(costData?.costs)) {
-      (costData.costs as Array<{ category?: string }>).forEach(c => {
-        if (c.category) cats.add(c.category);
-      });
-    }
+    productSummaries.forEach((p: SalesSummary) => {
+      if (p.category) cats.add(p.category);
+    });
     const categories = cats.size > 0 ? [...cats] : ['厨房电器', '清洁电器', '个人护理', '户外用品', '车载电器'];
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
