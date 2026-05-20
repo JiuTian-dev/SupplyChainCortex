@@ -319,44 +319,6 @@ export function InventoryTab() {
         </div>
       </div>
 
-      <div>
-        {/* 周转天数分布 */}
-        <Card className="card-dashboard chart-container">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">产品周转天数</CardTitle>
-            <CardDescription>周转天数越短代表库存效率越高 | 红色虚线 = 90天滞销线</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={inventory.slice(0, 8).map((i: Inventory) => ({
-                name: i.productName.length > 6 ? i.productName.slice(0, 6) + '...' : i.productName,
-                sku: i.sku,
-                turnoverDays: i.turnoverDays,
-                safetyStock: i.safetyStock,
-              }))} layout="vertical"
-                onClick={(e: { activePayload?: Array<{ payload?: { sku?: string } }> }) => {
-                  if (e?.activePayload?.[0]?.payload?.sku) {
-                    const sku = e.activePayload[0].payload.sku;
-                    updateSkus(selectedSkus.includes(sku) ? selectedSkus.filter(s => s !== sku) : [...selectedSkus, sku]);
-                  }
-                }}
-                style={{ cursor: 'pointer' }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                <ReferenceLine x={90} stroke="#ef4444" strokeDasharray="5 5" label={{ value: '滞销线', position: 'top', fill: '#ef4444', fontSize: 10 }} />
-                <Bar dataKey="turnoverDays" radius={[0, 4, 4, 0]} className="chart-draw-in">
-                  {inventory.slice(0, 8).map((i: Inventory, index: number) => (
-                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[i.stockStatus]} style={{ '--bar-index': index } as React.CSSProperties} />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
       <InventorySlowMovingAlert slowMoving={slowMoving} />
 
       {/* 库存库龄分布 */}

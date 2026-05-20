@@ -454,47 +454,7 @@ export function CostTab() {
       </Card>
       </Collapsible>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* 毛利率对比 */}
-        <Card
-          className="card-dashboard chart-container"
-         
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">产品毛利率对比</CardTitle>
-            <CardDescription>绿色虚线 = 48% 安全线</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={costs.map((c: CostRecord) => ({
-                  name: c.productName.length > 6 ? c.productName.slice(0, 6) + '...' : c.productName,
-                  grossMargin: c.grossMargin,
-                  totalLanded: c.totalLanded,
-                }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} domain={[0, 80]} />
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                <Legend />
-                <ReferenceLine
-                  y={48}
-                  stroke="#ef4444"
-                  strokeDasharray="5 5"
-                  label={{ value: '预警线 48%', position: 'top', fill: '#ef4444', fontSize: 10 }}
-                />
-                <Bar dataKey="grossMargin" name="毛利率 (%)" radius={[4, 4, 0, 0]} className="bar-grow-in">
-                  {costs.map((c: CostRecord, i: number) => (
-                    <Cell key={i} fill={c.grossMargin < 48 ? '#ef4444' : '#22c55e'} style={{ '--bar-index': i } as React.CSSProperties} />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* 成本变动追踪 */}
+      {/* 成本变动追踪 */}
         <Card
           id="cost-tracking"
           className="card-dashboard chart-container border-l-[4px] border-l-rose-400"
@@ -853,7 +813,6 @@ export function CostTab() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* 成本影响热力图 */}
       <CostImpactHeatmap costs={costs} />
