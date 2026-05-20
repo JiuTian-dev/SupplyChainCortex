@@ -1,23 +1,27 @@
 /**
  * Engine Persistence Adapter — wires in-memory buffers to Prisma DB.
+ * All writes async, non-blocking, with retry on failure.
+ * Called once at app startup via dynamic import: initEnginePersistence()
  *
- * decisionLogger.onFlush() → DecisionLog table
- * feedbackStore records → FeedbackLog table
- *
- * All writes are async, non-blocking, with retry on failure.
- * Called once at app startup: initEnginePersistence()
+ * NOTE: db access is always dynamic (await import) to prevent the
+ * Prisma adapter chain (@prisma/adapter-pg → pg → dns) from leaking
+ * into the client-side bundle through page.tsx's module graph.
  */
 
-import { db } from '@/lib/db';
 import { decisionLogger } from './observability';
 import { feedbackStore } from './feedback';
 import type { DecisionLogEntry } from './observability';
 import type { DecisionFeedback } from './feedback';
+import type { PrismaClient } from '@prisma/client';
 
-// ─── DecisionLog Persistence ──────────────────────────────────────────────────
+async function getDb(): Promise<PrismaClient> {
+  const { db } = await import('@/lib/db');
+  return db as unknown as PrismaClient;
+}
 
 async function persistDecisionLogs(entries: DecisionLogEntry[]): Promise<void> {
   try {
+    const db = await getDb();
     await db.decisionLog.createMany({
       data: entries.map(e => ({
         auditId: e.passport?.auditId || e.id,
@@ -36,14 +40,13 @@ async function persistDecisionLogs(entries: DecisionLogEntry[]): Promise<void> {
     if (process.env.NODE_ENV === 'development') {
       console.warn('[EnginePersistence] DecisionLog flush failed:', (err as Error).message);
     }
-    throw err; // Let the buffer retry on next interval
+    throw err;
   }
 }
 
-// ─── Feedback Persistence ─────────────────────────────────────────────────────
-
 async function persistFeedback(entries: DecisionFeedback[]): Promise<void> {
   try {
+    const db = await getDb();
     await db.feedbackLog.createMany({
       data: entries.map(f => ({
         auditId: f.auditId,
@@ -66,32 +69,21 @@ async function persistFeedback(entries: DecisionFeedback[]): Promise<void> {
   }
 }
 
-// ─── Feedback Hook ────────────────────────────────────────────────────────────
-
-/**
- * Wire the in-memory feedback store to auto-persist to DB on each record.
- * Original memory store still holds recent entries for fast stats queries.
- */
 function wireFeedbackPersistence(): void {
   const originalRecord = feedbackStore.record.bind(feedbackStore);
   feedbackStore.record = (fb: DecisionFeedback) => {
     originalRecord(fb);
-    // Async fire-and-forget DB write
-    persistFeedback([fb]).catch(() => { /* retry on next record */ });
+    persistFeedback([fb]).catch(() => {});
   };
 }
-
-// ─── Initialization ───────────────────────────────────────────────────────────
 
 let initialized = false;
 
 export function initEnginePersistence(): void {
   if (initialized) return;
   initialized = true;
-
   decisionLogger.onFlush(persistDecisionLogs);
   wireFeedbackPersistence();
-
   if (process.env.NODE_ENV === 'development') {
     console.log('[EnginePersistence] Initialized — DecisionLog + FeedbackLog → Prisma');
   }

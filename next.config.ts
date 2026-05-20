@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   // ── Rendering & Caching (Next.js 16) ──────────────────────────────────
-  reactCompiler: true,
   cacheComponents: true,
   viewTransition: true,
 
@@ -63,7 +62,6 @@ const nextConfig: NextConfig = {
     turbopackFileSystemCacheForDev: true,
   },
 
-  // Turbopack issue filtering
   turbopack: {
     ignoreIssue: [
       { path: "**/node_modules/**" },
