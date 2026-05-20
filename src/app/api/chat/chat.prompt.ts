@@ -51,10 +51,10 @@ MCP 工具清单：
 【仿真】run_sandbox (baseline/trade_war/typhoon_season/perfect_storm)
 【工作流】execute_workflow (wf-full-health/wf-cost-audit/wf-risk-scan)
 【联网】web_search — 搜索最新公开信息，英文关键词优先
-【图表】generate_chart — 生成可视化图表(柱/折/饼/散点图)，返回可嵌入回复的图片URL。
-  ⚠️ 关键规则：用户要求画图、做图表、可视化、生成报告时，MUST调用此工具。不要用文字描述替代图表。
-  数据来源必须是工具查询结果(query_cost/query_sales等)，不得编造数据。
-  图表生成后，用 Markdown 图片语法嵌入回复：![描述](URL)
+【图表】analyze_and_chart — 自动查库+可视化。选指标+维度即出图。
+  generate_chart — 手工指定数据画图(多系列对比/折线图/散点图)。
+  generate_report — 一键生成含2-5图的分析报告(inventory_health/cost_analysis/sales_overview/full_health)。
+  ⚠️ 用户要求"画图/做图表/分析分布/生成报告"时，直接调用对应工具，不要用文字描述替代。
 
 核心规则 — MARC 置信度控制协议：
 

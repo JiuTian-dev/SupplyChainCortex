@@ -81,7 +81,7 @@ export async function gatherBriefing(): Promise<AgentBriefing> {
     // Expiring compliance certs
     db.complianceCert.findMany({
       where: {
-        expiryDate: { lte: thirtyDaysFromNow },
+        expiryDate: { lte: thirtyDaysFromNow.toISOString().split('T')[0] },
         status: 'active',
       },
       select: { certName: true, sku: true, expiryDate: true },

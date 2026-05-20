@@ -851,4 +851,51 @@ export const intelligenceTools: MCPTool[] = [
       };
     },
   },
+
+  // ─── analyze_and_chart: One-click DB query + chart ─────────────────────────
+  {
+    name: 'analyze_and_chart',
+    description: `一键数据分析+图表生成。选择指标和维度，自动查询数据库、计算聚合、生成可视化图表。返回图片URL。
+指标: grossMargin(毛利率) | turnoverDays(周转天数) | quantity(库存数量) | revenue(销售额) | totalLanded(到岸成本)
+维度: category(品类) | warehouse(仓库) | platform(平台) | category_sub(子品类)
+图表: bar(柱状图) | pie(饼图，默认)`,
+    parameters: {
+      type: 'object',
+      properties: {
+        metric: { type: 'string', enum: ['grossMargin','turnoverDays','quantity','revenue','totalLanded','delayDays'], description: '分析指标' },
+        dimension: { type: 'string', enum: ['category','warehouse','platform','category_sub'], description: '分组维度，默认 category' },
+        chartType: { type: 'string', enum: ['bar','pie'], description: '图表类型，默认 bar' },
+        title: { type: 'string', description: '自定义标题，留空自动生成' },
+      },
+      required: ['metric'],
+    },
+    handler: async (params: Record<string, unknown>) => {
+      const { analyzeAndChart } = await import('@/lib/chart/analyze-chart');
+      return analyzeAndChart({
+        metric: params.metric as any,
+        dimension: (params.dimension as any) || 'category',
+        chartType: (params.chartType as any) || 'bar',
+        title: params.title as string | undefined,
+      });
+    },
+  },
+
+  // ─── generate_report: Batch chart report ───────────────────────────────────
+  {
+    name: 'generate_report',
+    description: `一键生成供应链分析报告（含2-5张图表+摘要）。自动查询DB并生成多张可视化图表。
+报告类型: inventory_health(库存健康+仓库分布), cost_analysis(毛利率+成本区间), sales_overview(平台销售+订单), full_health(综合报告)
+用户说"生成报告"、"出个报告"时直接调用。`,
+    parameters: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['inventory_health','cost_analysis','sales_overview','full_health'], description: '报告类型' },
+      },
+      required: ['type'],
+    },
+    handler: async (params: Record<string, unknown>) => {
+      const { generateReport } = await import('@/lib/chart/report-generator');
+      return generateReport(params.type as any);
+    },
+  },
 ];

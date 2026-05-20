@@ -10,6 +10,7 @@ import * as echarts from 'echarts';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import type { EChartsOption } from 'echarts';
+import sharp from 'sharp';
 
 const OUTPUT_DIR = join(process.cwd(), 'public', 'charts');
 
@@ -70,7 +71,10 @@ function buildOption(spec: ChartSpec): EChartsOption {
   return baseOption;
 }
 
-export async function renderChart(spec: ChartSpec): Promise<{ svgPath: string; url: string }> {
+export async function renderChart(
+  spec: ChartSpec,
+  opts?: { format?: 'svg' | 'png' }
+): Promise<{ svgPath: string; url: string; pngUrl?: string }> {
   await ensureDir();
 
   const option = buildOption(spec);
@@ -83,13 +87,23 @@ export async function renderChart(spec: ChartSpec): Promise<{ svgPath: string; u
   chart.setOption(option);
   const svg = chart.renderToSVGString();
 
-  const filename = `chart_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.svg`;
-  const filepath = join(OUTPUT_DIR, filename);
-  await writeFile(filepath, svg, 'utf-8');
+  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const svgFilename = `chart_${id}.svg`;
+  const svgFilepath = join(OUTPUT_DIR, svgFilename);
+  await writeFile(svgFilepath, svg, 'utf-8');
+
+  let pngUrl: string | undefined;
+  if (opts?.format === 'png') {
+    const pngFilename = `chart_${id}.png`;
+    const pngFilepath = join(OUTPUT_DIR, pngFilename);
+    await sharp(Buffer.from(svg)).png().toFile(pngFilepath);
+    pngUrl = `/charts/${pngFilename}`;
+  }
 
   return {
-    svgPath: filepath,
-    url: `/charts/${filename}`,
+    svgPath: svgFilepath,
+    url: pngUrl || `/charts/${svgFilename}`,
+    pngUrl,
   };
 }
 
