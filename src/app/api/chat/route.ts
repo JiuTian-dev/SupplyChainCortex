@@ -126,6 +126,8 @@ async function handleReActStream(
                 toolsUsed: event.toolsUsed,
                 steps: event.steps?.length,
                 durationMs: event.durationMs,
+                mode: 'react',
+                tier: routing?.primaryTier,
                 claimsExtracted,
                 passport: event.passport,
               });
