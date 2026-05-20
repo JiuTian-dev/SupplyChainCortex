@@ -335,6 +335,20 @@ export function renderMarkdown(content: string): React.ReactNode[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    // Image: ![alt](url)
+    const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+    if (imgMatch) {
+      const alt = imgMatch[1] || '图表';
+      const src = imgMatch[2];
+      nodes.push(
+        <div key={`img-${i}`} className="my-2">
+          <img src={src} alt={alt} className="max-w-full rounded-lg border" style={{ maxHeight: '320px' }} />
+          {alt && alt !== '图表' && <p className="text-[10px] text-muted-foreground text-center mt-1">{alt}</p>}
+        </div>
+      );
+      continue;
+    }
+
     // ### headers → h4
     if (line.startsWith('### ')) {
       flushOrderedList();
@@ -437,6 +451,17 @@ export function renderMarkdown(content: string): React.ReactNode[] {
         i = j - 1; // skip processed rows
         continue;
       }
+    }
+
+    // Chart URL embedded in text → render as image
+    const chartUrl = line.match(/\/charts\/chart_[^\s)]+/);
+    if (chartUrl) {
+      nodes.push(
+        <div key={`chart-${i}`} className="my-2">
+          <img src={chartUrl[0]} alt="数据图表" className="max-w-full rounded-lg border" style={{ maxHeight: '320px' }} />
+        </div>
+      );
+      continue;
     }
 
     // Empty lines → line break with spacing
