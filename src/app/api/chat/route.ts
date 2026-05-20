@@ -44,6 +44,7 @@ import {
   type ToolAction,
 } from './chat.helpers';
 import { SYSTEM_PROMPT } from './chat.prompt';
+import { generateReport } from '@/lib/chart/report-generator';
 
 export const dynamic = 'force-dynamic';
 
@@ -300,9 +301,8 @@ async function handlePost(request: NextRequest) {
   const routingContext = `\n## 当前问题路由\n- 意图: ${routing.intent} | 主信息层: Tier${routing.primaryTier} | ${routing.shouldSearch ? '可联网搜索' : '不触发搜索'} | ${routing.shouldUseTools ? 'MCP工具可用' : '不调用工具'}\n- 简洁度要求: ${verbosityHint}\n- 原因: ${routing.reason}`;
   // Pre-generate charts when user asks for visualization (DeepSeek tool-calling unreliable)
   let preGeneratedCharts = '';
-  if (/[画出|做图|图表|可视化|生成报告|生成.*图|图.*分析|做个.*图|柱状|饼图|折线|散点|帕累托|热力图]/.test(message)) {
+  if (/(画出|做图|图表|可视化|柱状|饼图|折线|散点|帕累托|热力图|生成报告|生成.*图)/.test(message)) {
     try {
-      const { generateReport } = await import('@/lib/chart/report-generator');
       const report = await generateReport('full_health');
       preGeneratedCharts = '\n## 已生成的图表（可直接在回复中使用）\n' +
         report.charts.map(c => `![${c.title}](${c.url})`).join('\n') +
