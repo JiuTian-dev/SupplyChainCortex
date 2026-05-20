@@ -73,11 +73,11 @@ export async function getStats(period = '30d', sku?: string): Promise<StatsResul
     cacheKey('stats', period, sku || 'all'),
     async () => {
       const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
-      const startDateStr = daysAgo(days);
-      const endDateStr = todayISO();
+      const startDate = new Date(daysAgo(days));
+      const endDate = new Date(todayISO());
 
       const dateFilter = {
-        date: { gte: startDateStr, lte: endDateStr },
+        date: { gte: startDate, lte: endDate },
         ...(sku ? { sku } : {}),
       };
 
@@ -196,7 +196,7 @@ export async function getStats(period = '30d', sku?: string): Promise<StatsResul
       const unresolvedNotes = noteGroups.find(n => !n.isResolved)?._count || 0;
 
       return {
-        period: { type: period, days, startDate: startDateStr, endDate: endDateStr },
+        period: { type: period, days, startDate: startDate.toISOString(), endDate: endDate.toISOString() },
         revenue: { total: Math.round(totalRevenue), quantity: totalQuantity, avgDailyRevenue: Math.round(totalRevenue / days) },
         revenueTrend,
         topProducts,
