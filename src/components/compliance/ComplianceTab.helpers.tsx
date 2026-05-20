@@ -138,10 +138,10 @@ export const REG_STATUS_LABELS: Record<string, string> = {
   reviewing: '审核中',
   action_required: '需行动',
   compliant: '已合规',
-  non_compliant: '未合规',
+  non_compliant: '不合规',
 };
 
-export const PIE_COLORS = ['#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
+export const PIE_COLORS = ['#ef4444', '#8b5cf6', '#22c55e', '#f59e0b', '#6b7280'];
 
 // ==================== Helper functions ====================
 
@@ -152,17 +152,16 @@ export function daysUntil(dateStr: string): number {
 }
 
 export function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('zh-CN');
 }
 
 // ==================== Custom Pie Tooltip ====================
 
 export function CustomPieTooltip({ active, payload }: any) {
-  if (active && payload && payload.length > 0) {
+  if (active && payload && payload.length) {
     return (
-      <div className="bg-popover text-popover-foreground border shadow-lg rounded-lg px-3 py-2 text-xs">
+      <div className="rounded-lg border bg-background p-2 shadow-md text-xs">
         <p className="font-medium">{payload[0].name}</p>
         <p className="text-muted-foreground">{payload[0].value} 个证书</p>
       </div>

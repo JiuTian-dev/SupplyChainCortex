@@ -16,10 +16,8 @@ import { rewriteQuery, injectContext, type ConversationTurn } from './web-search
 import { guardResults } from './web-search-guard';
 import { rerankResults } from './web-search-reranker';
 import { crossValidate } from './web-search-cross-validator';
-import { zhToEnTermMap, zhToEnRewriterMap } from './web-search-keywords';
 import {
-  searchSearXNG, searchBrave, searchTavily, searchJina,
-  searchDuckDuckGoHTML, searchWikipedia, searchPublicSearXNGPool,
+  searchSearXNG, searchDuckDuckGoHTML, searchWikipedia, searchPublicSearXNGPool,
   searchReddit, searchGitHub, searchHackerNews,
   searchByProvider, fetchPageContent,
   type SearXNGOptions,
@@ -48,20 +46,6 @@ export interface ProviderConfig {
 
 function sanitizeQuery(query: string): string {
   return query.replace(/[<>"']/g, '').slice(0, 500);
-}
-
-function hasChinese(text: string): boolean {
-  return /[一-鿿]/.test(text);
-}
-
-function extractEnglishKeywords(query: string): string {
-  const termMap = { ...zhToEnRewriterMap, ...zhToEnTermMap };
-  let result = query;
-  for (const [zh, en] of Object.entries(termMap)) {
-    result = result.replace(new RegExp(zh, 'g'), ' ' + en + ' ');
-  }
-  result = result.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
-  return result || query.replace(/[一-鿿]/g, '').trim() || 'supply chain';
 }
 
 // ─── Search Diagnostics Type ──────────────────────────────────────────────────
@@ -162,7 +146,7 @@ async function tryAllSources(query: string, config: ProviderConfig): Promise<{ r
   }
 
   // Tier 2-4: Reddit → GitHub → Hacker News
-  const fallbackSources: Array<{ name: string; fn: (q: string) => Promise<SearchResult[]> }> = [
+  const fallbackSources: Array<{ name: string; fn: (_q: string) => Promise<SearchResult[]> }> = [
     { name: 'Reddit', fn: searchReddit },
     { name: 'GitHub', fn: searchGitHub },
     { name: 'Hacker News', fn: searchHackerNews },
@@ -329,7 +313,6 @@ export function getSearchProvider(): SearchProvider {
 }
 
 export function getAvailableProviders(): Array<{ name: SearchProvider; available: boolean; reason: string }> {
-  const config = getConfig();
   return [
     { name: 'ddg', available: true, reason: 'DuckDuckGo — free, no API key, no Docker' },
     { name: 'searxng', available: true, reason: 'Self-hosted — requires Docker' },

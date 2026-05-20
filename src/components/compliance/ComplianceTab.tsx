@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import {
-  FileCheck, AlertTriangle, Clock, ShieldCheck, Plus, ExternalLink,
-  ChevronDown, ChevronUp, X, FileText, BookOpen,
+  FileCheck, AlertTriangle, Clock, ShieldCheck, Plus, ExternalLink, BookOpen,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

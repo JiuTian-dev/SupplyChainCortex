@@ -1,4 +1,4 @@
-import type { SearchResult, SearchProvider, ProviderConfig } from './web-search.service';
+import type { SearchResult, ProviderConfig } from './web-search.service';
 
 // ─── URL Safety ───────────────────────────────────────────────────────────────────
 

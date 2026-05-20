@@ -1,14 +1,11 @@
 'use client';
 
-import { useMemo, useEffect, useState, useCallback } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
-  DollarSign, TrendingUp, AlertTriangle,
-  PieChart, Ship, Globe, Package, Download,
+  DollarSign, TrendingUp, AlertTriangle, PieChart, Globe, Package,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
@@ -27,11 +24,11 @@ import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
 import { CURRENCY_SYMBOLS } from '@/lib/dashboard/config';
-import { CHART_COLORS } from '@/lib/constants';
+// CHART_COLORS moved to CostTab.helpers.tsx
 import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
 import { ExchangeRateMatrix } from '@/components/cost/ExchangeRateMatrix';
 import type { CostRecord } from '@prisma/client';
-import { MetricCard } from '@/components/shared/MetricCard';
+// MetricCard moved elsewhere
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import dynamic from 'next/dynamic';
@@ -43,7 +40,7 @@ const CostImpactHeatmap = dynamic(
 );
 import { CostOptimizationPanel } from '@/components/cost/CostOptimizationPanel';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CHART_TOOLTIP_STYLE, CostBreakdownChart, pillStyle, CommodityBanner, FreightBanner } from './CostTab.helpers';
+import { CHART_TOOLTIP_STYLE, CostBreakdownChart, CommodityBanner, FreightBanner } from './CostTab.helpers';
 
 // ==================== Main CostTab Component ====================
 export function CostTab() {
