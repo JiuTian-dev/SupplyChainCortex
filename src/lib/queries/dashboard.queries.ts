@@ -53,9 +53,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   return cachedFetch(
     cacheKey('dashboard', 'metrics'),
     async () => {
-      const currentMonthStart = startOfMonth();
-      const prevMonthStart = startOfMonth(-1);
-      const prevMonthEnd = endOfMonth(-1);
+      const currentMonthStart = new Date(startOfMonth());
+      const prevMonthStart = new Date(startOfMonth(-1));
+      const prevMonthEnd = new Date(endOfMonth(-1));
 
       const [
         productCount,
@@ -172,8 +172,8 @@ export async function getSalesTrend(startDate?: string, endDate?: string): Promi
   return cachedFetch(
     cacheKey('dashboard', 'salesTrend', startDate || 'default', endDate || 'default'),
     async () => {
-      const trendStartDate = startDate || daysAgo(7);
-      const trendEndDate = endDate || todayISO();
+      const trendStartDate = new Date(startDate || daysAgo(7));
+      const trendEndDate = new Date(endDate || todayISO());
 
       const dailyGroups = await db.salesRecord.groupBy({
         by: ['date'],
