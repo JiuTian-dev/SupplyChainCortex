@@ -80,7 +80,11 @@ export function SupplierAnalyticsPanel({ suppliers, supplierPerformance }: Suppl
 
   // 2. Performance Trend - Line Chart (simulated 6-month trend)
   const performanceTrendData = useMemo(() => {
-    const months = ['1月', '2月', '3月', '4月', '5月', '6月'];
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return `${d.getMonth() + 1}月`;
+    });
     return months.map((month, idx) => {
       const point: Record<string, string | number> = { month };
       // Show top 4 suppliers trend

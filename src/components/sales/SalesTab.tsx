@@ -246,7 +246,7 @@ export function SalesTab() {
   // Fetch heatmap data from stats
   const stats30dQuery = useStats('30d');
 
-  // Derive heatmap data from stats when available, fallback to SALES_HEATMAP_DATA constant
+  // Derive heatmap data from stats API, empty if no data yet
   const salesHeatmapData = useMemo(() => {
     const statsData = (stats30dQuery.data as any)?.data ?? stats30dQuery.data as Record<string, unknown> | undefined;
     if (statsData && Array.isArray(statsData.revenueTrend) && (statsData.revenueTrend as Array<Record<string, unknown>>).length > 0) {
@@ -296,7 +296,14 @@ export function SalesTab() {
   // Category trend chart data - uses real daily sales data with per-category variation
   const categoryTrendChartData = useMemo(() => {
     const today = new Date();
-    const categories = ['厨房电器', '清洁电器', '个人护理'];
+    // Derive categories from available product data, fallback to all 5
+    const cats = new Set<string>();
+    if (Array.isArray(costData?.costs)) {
+      (costData.costs as Array<{ category?: string }>).forEach(c => {
+        if (c.category) cats.add(c.category);
+      });
+    }
+    const categories = cats.size > 0 ? [...cats] : ['厨房电器', '清洁电器', '个人护理', '户外用品', '车载电器'];
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() - (6 - i));

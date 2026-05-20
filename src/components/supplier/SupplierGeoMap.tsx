@@ -18,29 +18,30 @@ interface GeoLocation {
   leadTime?: number;
 }
 
-const SUPPLIER_LOCATIONS: GeoLocation[] = [
-  { name: '东莞精密', type: 'supplier', city: '东莞', x: 62, y: 68, color: '#f59e0b', leadTime: 5 },
-  { name: '佛山制造', type: 'supplier', city: '佛山', x: 55, y: 72, color: '#f97316', leadTime: 7 },
-  { name: '上海电子', type: 'supplier', city: '上海', x: 78, y: 38, color: '#06b6d4', leadTime: 10 },
-  { name: '义乌日用品', type: 'supplier', city: '义乌', x: 74, y: 52, color: '#8b5cf6', leadTime: 8 },
-  { name: '深圳科技', type: 'supplier', city: '深圳', x: 60, y: 74, color: '#ef4444', leadTime: 4 },
-  { name: '杭州贸易', type: 'supplier', city: '杭州', x: 76, y: 48, color: '#22c55e', leadTime: 9 },
-];
+// Region → approximate (x, y) position on SVG map
+const REGION_COORDS: Record<string, { city: string; x: number; y: number }> = {
+  '华南': { city: '深圳', x: 58, y: 72 },
+  '华东': { city: '上海', x: 76, y: 42 },
+  '西南': { city: '成都', x: 38, y: 60 },
+  '华北': { city: '天津', x: 68, y: 22 },
+  '华中': { city: '郑州', x: 58, y: 42 },
+};
 
-const WAREHOUSE_LOCATIONS: GeoLocation[] = [
-  { name: '华东仓', type: 'warehouse', city: '上海', x: 78, y: 35, color: '#22c55e' },
-  { name: '华南仓', type: 'warehouse', city: '佛山', x: 55, y: 69, color: '#10b981' },
-];
+const WAREHOUSE_REGION_MAP: Record<string, { city: string; x: number; y: number; color: string }> = {
+  '深圳仓': { city: '深圳', x: 60, y: 76, color: '#22c55e' },
+  '义乌仓': { city: '义乌', x: 74, y: 50, color: '#8b5cf6' },
+  '宁波仓': { city: '宁波', x: 80, y: 44, color: '#06b6d4' },
+  '越南仓': { city: '海防', x: 46, y: 82, color: '#f59e0b' },
+};
 
-// ==================== Connection lines: supplier -> nearest warehouse ====================
-const CONNECTIONS = [
-  { from: '东莞精密', to: '华南仓' },
-  { from: '佛山制造', to: '华南仓' },
-  { from: '深圳科技', to: '华南仓' },
-  { from: '上海电子', to: '华东仓' },
-  { from: '义乌日用品', to: '华东仓' },
-  { from: '杭州贸易', to: '华东仓' },
-];
+const SUPPLIER_COLORS = ['#f59e0b','#f97316','#06b6d4','#8b5cf6','#ef4444','#22c55e','#ec4899','#14b8a6','#eab308','#6366f1'];
+
+function getWarehouseForRegion(region: string): string {
+  if (region === '华南') return '深圳仓';
+  if (region === '华东') return '义乌仓';
+  if (region === '西南' || region === '华中') return '宁波仓';
+  return '越南仓';
+}
 
 // ==================== Tooltip State ====================
 interface TooltipInfo {
@@ -65,28 +66,54 @@ export function SupplierGeoMap() {
     return (supplierData as Record<string, unknown>)?.suppliers as Record<string, unknown>[] || [];
   }, [supplierData]);
 
-  // Merge API supplier data with geo locations
-  const enrichedLocations = useMemo(() => {
-    return SUPPLIER_LOCATIONS.map((loc) => {
-      const apiSupplier = suppliers.find((s) => s.name === loc.name);
+  // Build geo locations dynamically from API supplier data
+  const supplierLocations = useMemo((): GeoLocation[] => {
+    return suppliers.map((s, idx) => {
+      const region = (s.region as string) || '华南';
+      const coords = REGION_COORDS[region] || REGION_COORDS['华南'];
       return {
-        ...loc,
-        region: (apiSupplier?.region as string) || loc.city,
-        leadTime: (apiSupplier?.leadTime as number) || loc.leadTime || 0,
+        name: (s.name as string) || s.code as string,
+        type: 'supplier' as const,
+        city: coords.city,
+        x: coords.x + (idx % 3 - 1) * 3, // slight offset to avoid overlap
+        y: coords.y + (idx % 2) * 2,
+        color: SUPPLIER_COLORS[idx % SUPPLIER_COLORS.length],
+        region,
+        leadTime: (s.leadTime as number) || 0,
       };
     });
   }, [suppliers]);
 
+  // Build warehouse locations dynamically from real warehouse names
+  const warehouseLocations = useMemo((): GeoLocation[] => {
+    return Object.entries(WAREHOUSE_REGION_MAP).map(([name, coords]) => ({
+      name,
+      type: 'warehouse' as const,
+      city: coords.city,
+      x: coords.x,
+      y: coords.y,
+      color: coords.color,
+    }));
+  }, []);
+
+  // Build connections dynamically from supplier region → warehouse
+  const connections = useMemo(() => {
+    return supplierLocations.map(s => ({
+      from: s.name,
+      to: getWarehouseForRegion(s.region || '华南'),
+    }));
+  }, [supplierLocations]);
+
   // Statistics
-  const totalSuppliers = enrichedLocations.length;
-  const activeSuppliers = suppliers.filter((s) => s.status === 'active').length || enrichedLocations.length;
-  const avgLeadTime = enrichedLocations.length > 0
-    ? Math.round(enrichedLocations.reduce((sum, s) => sum + (s.leadTime || 0), 0) / enrichedLocations.length)
+  const totalSuppliers = suppliers.length;
+  const activeSuppliers = suppliers.filter((s) => s.status === 'active').length;
+  const avgLeadTime = suppliers.length > 0
+    ? Math.round(suppliers.reduce((sum, s) => sum + ((s.leadTime as number) || 0), 0) / suppliers.length)
     : 0;
-  const regions = [...new Set(enrichedLocations.map((s) => s.city))];
+  const regions = [...new Set(suppliers.map((s) => s.region as string).filter(Boolean))];
 
   // Find connection coordinates
-  const allLocations = [...enrichedLocations, ...WAREHOUSE_LOCATIONS];
+  const allLocations = [...supplierLocations, ...warehouseLocations];
   const getLocation = (name: string) => allLocations.find((l) => l.name === name);
 
   return (
@@ -99,7 +126,7 @@ export function SupplierGeoMap() {
           <MapPin className="h-4 w-4 text-orange-500" />
           供应商地理分布
           <Badge variant="outline" className="ml-auto text-xs font-normal">
-            {totalSuppliers} 供应商 · {WAREHOUSE_LOCATIONS.length} 仓库
+            {totalSuppliers} 供应商 · {warehouseLocations.length} 仓库
           </Badge>
         </CardTitle>
         <CardDescription>供应商与仓库分布可视化</CardDescription>
@@ -128,7 +155,7 @@ export function SupplierGeoMap() {
             <text x="50" y="82" fontSize="3" fill="currentColor" className="text-muted-foreground/40" textAnchor="middle">华南地区</text>
 
             {/* Connection lines with animated flow */}
-            {CONNECTIONS.map((conn, idx) => {
+            {connections.map((conn, idx) => {
               const from = getLocation(conn.from);
               const to = getLocation(conn.to);
               if (!from || !to) return null;
@@ -165,7 +192,7 @@ export function SupplierGeoMap() {
             })}
 
             {/* Warehouse markers */}
-            {WAREHOUSE_LOCATIONS.map((wh) => (
+            {warehouseLocations.map((wh) => (
               <g key={wh.name}>
                 {/* Warehouse pulse ring */}
                 <circle
@@ -228,7 +255,7 @@ export function SupplierGeoMap() {
             ))}
 
             {/* Supplier markers */}
-            {enrichedLocations.map((loc, idx) => (
+            {supplierLocations.map((loc, idx) => (
               <g key={loc.name}>
                 {/* Supplier pulse ring */}
                 <circle
