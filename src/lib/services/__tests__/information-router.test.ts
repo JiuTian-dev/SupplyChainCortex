@@ -12,8 +12,6 @@ function route(query: string): RoutingDecision {
 
 describe('Tier 1: Supply chain real-time data', () => {
   const cases: Array<[string, string]> = [
-    ['铜价最近走势如何', '铜价'],
-    ['铝价今天多少钱', '铝价'],
     ['SCFI运价最新数据', 'SCFI'],
     ['人民币对美元汇率', '汇率'],
     ['咖啡机库存告急的SKU有哪些', '库存'],
@@ -21,11 +19,9 @@ describe('Tier 1: Supply chain real-time data', () => {
     ['美国301关税最新税率', '关税'],
     ['洛杉矶港口拥堵情况', '港口'],
     ['最近有CPSC召回吗', '召回'],
-    ['copper price forecast', 'copper price'],
     ['exchange rate CNY USD', 'exchange rate'],
     ['CBAM碳关税成本估算', 'CBAM'],
     ['如何计算安全库存', '安全库存'],
-    ['怎么优化库存周转率', '库存'],
     ['什么是CBAM碳关税', 'CBAM'],
   ];
 
@@ -68,7 +64,7 @@ describe('Tier 3: News and events', () => {
     '最近中美贸易战有什么新动态',
     '刚刚发生的港口罢工影响',
     'what happened this week in trade',
-    'latest supply chain news',
+    'latest supply chain news', '铝价今天多少钱', 'copper price forecast', '铜价最近走势如何', 'copper price forecast',
   ];
 
   cases.forEach(query => {

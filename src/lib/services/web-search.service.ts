@@ -120,8 +120,10 @@ async function tryAllSources(query: string, config: ProviderConfig): Promise<{ r
     diagnostics.failedProviders.push({ provider: config.provider, error: safeMsg });
   }
 
-  // Tier 2-4: Reddit → GitHub → Hacker News
+  // Tier 2-5: DDG → Wikipedia → Reddit → GitHub → Hacker News
   const fallbackSources: Array<{ name: string; fn: (_q: string) => Promise<SearchResult[]> }> = [
+    { name: 'DDG', fn: searchDuckDuckGoHTML },
+    { name: 'Wikipedia', fn: searchWikipedia },
     { name: 'Reddit', fn: searchReddit },
     { name: 'GitHub', fn: searchGitHub },
     { name: 'Hacker News', fn: searchHackerNews },

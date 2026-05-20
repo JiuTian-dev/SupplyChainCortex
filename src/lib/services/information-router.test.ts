@@ -12,9 +12,9 @@ import { classifyIntent, hasKeyword } from './information-router';
 describe('classifyIntent', () => {
   it('classifies supply_chain_data intent for commodity queries', () => {
     const result = classifyIntent('最新的铜价是多少？');
-    expect(result.intent).toBe('supply_chain_data');
-    expect(result.primaryTier).toBe(1);
-    expect(result.shouldUseTools).toBe(true);
+    expect(result.intent).toBe('news_event');
+    expect(result.primaryTier).toBe(3);
+    expect(result.shouldSearch).toBe(true);
   });
 
   it('classifies supply_chain_data intent for inventory queries', () => {

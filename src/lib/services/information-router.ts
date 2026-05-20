@@ -99,8 +99,10 @@ const INTENTS: IntentConfig[] = [
   {
     intent: 'news_event',
     keywords: ['这周', '本周', '今天', '昨天', '最近', '最新', '刚刚', '新闻',
+      '走势', '趋势', '走向', '预测', '预期', '展望', '前景',
       '动态', '事件', '发生了什么', '大事件', '新规', '法规更新',
       'this week', 'latest', 'breaking', 'news', 'what happened', 'update',
+      'forecast', 'trend', 'outlook', 'prediction',
       '特朗普', '拜登', '访华', '制裁', '贸易战', '中美博弈', '中美关系',
       '大选', '竞选', '白宫', '国会', '谈判', '协议', '关税战',
       'Trump', 'Biden', 'Xi', 'trade war', 'election', 'summit', 'diplomat',
@@ -158,14 +160,24 @@ export function classifyIntent(query: string): RoutingDecision {
     }
   }
 
-  // For Tier 1-3: score all intents, pick highest (excluding Tier 0)
+  // For Tier 1-3: score all intents, pick highest (excluding Tier 0).
+  // Tie-break: prefer higher tier (Tier 3 > Tier 2 > Tier 1) —
+  // a query matching both "copper price" (Tier 1) and "forecast" (Tier 3)
+  // should trigger web search.
   let best: IntentConfig | null = null;
   let bestScore = 0;
 
   for (const config of INTENTS) {
     if (config.primaryTier === 0) continue;
     const score = countMatches(trimmed, config.keywords);
-    if (score > bestScore) {
+    // Tie-break: Tier 3 (news/search) wins over Tier 1 (data) at equal score
+    const tieBreak =
+      best &&
+      score === bestScore &&
+      config.primaryTier === 3 &&
+      best.primaryTier === 1;
+
+    if (score > bestScore || tieBreak) {
       bestScore = score;
       best = config;
     }
