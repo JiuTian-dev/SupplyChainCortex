@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart as RechartsPieChart, Pie, Cell,
+  Cell,
   ComposedChart, ReferenceLine,
 } from 'recharts';
 import { toast } from 'sonner';
@@ -320,45 +320,9 @@ export function InventoryTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* ABC 分类 */}
-        <Card className="card-dashboard chart-container">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">ABC 分类分布</CardTitle>
-            <CardDescription>基于销售额贡献的产品分级</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <RechartsPieChart className="pie-slice-in">
-                <Pie data={[
-                  { class: 'A (核心)', count: 3, color: '#f97316' },
-                  { class: 'B (重要)', count: 4, color: '#06b6d4' },
-                  { class: 'C (一般)', count: 5, color: '#8b5cf6' },
-                ]} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="count" nameKey="class" animationBegin={200}>
-                  {[0, 1, 2].map(i => <Cell key={i} fill={['#f97316', '#06b6d4', '#8b5cf6'][i]} style={{ '--slice-index': i } as React.CSSProperties} />)}
-                </Pie>
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 mt-2">
-              {[{ cls: 'A (核心)', desc: '占 80% 销售额', cnt: 3, color: '#f97316' }, { cls: 'B (重要)', desc: '占 15% 销售额', cnt: 4, color: '#06b6d4' }, { cls: 'C (一般)', desc: '占 5% 销售额', cnt: 5, color: '#8b5cf6' }].map(item => (
-                <div key={item.cls} className="flex items-center justify-between text-sm p-1.5 rounded hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <div>
-                      <span className="font-medium">{item.cls}</span>
-                      <span className="text-xs text-muted-foreground ml-2">{item.desc}</span>
-                    </div>
-                  </div>
-                  <span className="font-semibold">{item.cnt} 项</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
+      <div>
         {/* 周转天数分布 */}
-        <Card className="sm:col-span-2 lg:col-span-2 card-dashboard chart-container">
+        <Card className="card-dashboard chart-container">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">产品周转天数</CardTitle>
             <CardDescription>周转天数越短代表库存效率越高 | 红色虚线 = 90天滞销线</CardDescription>
