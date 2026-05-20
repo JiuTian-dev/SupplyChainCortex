@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   // ── Rendering & Caching (Next.js 16) ──────────────────────────────────
-  cacheComponents: true,
+  // cacheComponents: true,  // enable after removing force-dynamic from route segments
   viewTransition: true,
 
   // ── Images ────────────────────────────────────────────────────────────
