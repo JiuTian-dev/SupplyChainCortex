@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 function buildUrl(): string {
   const base = process.env.DATABASE_URL || "postgresql://localhost:5432/test";
