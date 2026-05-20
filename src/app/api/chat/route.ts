@@ -302,12 +302,12 @@ async function handlePost(request: NextRequest) {
   // Pre-generate charts when user asks for visualization (DeepSeek tool-calling unreliable)
   let preGeneratedCharts = '';
   if (/(画出|做图|图表|可视化|柱状|饼图|折线|散点|帕累托|热力图|生成报告|生成.*图)/.test(message)) {
-    try {
-      const report = await generateReport('full_health');
-      preGeneratedCharts = '\n## 已生成的图表（可直接在回复中使用）\n' +
-        report.charts.map(c => `![${c.title}](${c.url})`).join('\n') +
-        '\n使用以上图片URL嵌入回复，不要编造其他 /charts/ 路径。';
-    } catch { /* chart gen failed, let LLM handle without charts */ }
+    console.log('[Chat] Pre-generating charts...');
+    const report = await generateReport('full_health');
+    console.log('[Chat] Generated', report.charts.length, 'charts');
+    preGeneratedCharts = '\n## 已生成的图表（可直接在回复中使用）\n' +
+      report.charts.map(c => `![${c.title}](${c.url})`).join('\n') +
+      '\n使用以上图片URL嵌入回复，不要编造其他 /charts/ 路径。';
   }
   const tieredSystemPrompt = SYSTEM_PROMPT + routingContext + preGeneratedCharts;
 
