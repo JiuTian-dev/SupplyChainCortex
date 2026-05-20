@@ -812,4 +812,43 @@ export const intelligenceTools: MCPTool[] = [
       };
     },
   },
+
+  // ─── Chart Generation ────────────────────────────────────────────────────────
+  {
+    name: 'generate_chart',
+    description: `生成数据可视化图表（柱状图/折线图/饼图/散点图），返回可嵌入回复的图片URL。
+使用场景：用户要求"画图"、"做图表"、"可视化"、"生成报告"时调用。
+支持类型: bar(柱状图), line(折线图), pie(饼图), scatter(散点图)。
+数据格式: categories(横轴标签数组) + series(系列数据，每项包含 name 和 data 数组)。`,
+    parameters: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['bar', 'line', 'pie', 'scatter'], description: '图表类型' },
+        title: { type: 'string', description: '图表标题（中文）' },
+        categories: { type: 'array', items: { type: 'string' }, description: '横轴分类标签，饼图为扇区名称' },
+        series: { type: 'array', items: {
+          type: 'object', properties: {
+            name: { type: 'string', description: '系列名称' },
+            data: { type: 'array', items: { type: 'number' }, description: '数据值数组' },
+          }
+        }, description: '数据系列数组' },
+      },
+      required: ['type', 'title', 'series'],
+    },
+    handler: async (params: Record<string, unknown>) => {
+      const { renderChart } = await import('@/lib/chart/renderer');
+      const result = await renderChart({
+        type: params.type as 'bar' | 'line' | 'pie' | 'scatter',
+        title: params.title as string,
+        categories: params.categories as string[] | undefined,
+        series: params.series as Array<{ name: string; data: number[] }>,
+      });
+      return {
+        url: result.url,
+        chartType: params.type,
+        title: params.title,
+        hint: '将图片URL嵌入回复: ![图表](URL) 或 <img src="URL" />',
+      };
+    },
+  },
 ];
