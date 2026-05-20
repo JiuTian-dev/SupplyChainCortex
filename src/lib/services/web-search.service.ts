@@ -16,6 +16,7 @@ import { rewriteQuery, injectContext, type ConversationTurn } from './web-search
 import { guardResults } from './web-search-guard';
 import { rerankResults } from './web-search-reranker';
 import { crossValidate } from './web-search-cross-validator';
+import { serverCache, CACHE_TTL } from '@/lib/cache';
 import {
   searchSearXNG, searchDuckDuckGoHTML, searchWikipedia, searchPublicSearXNGPool,
   searchReddit, searchGitHub, searchHackerNews,
@@ -54,12 +55,6 @@ export interface SearchDiagnostics {
   failedProviders: Array<{ provider: string; error: string }>;
 }
 
-// ─── In-Memory Search Result Cache (LRU + TTL) ───────────────────────────────
-
-const searchCache = new Map<string, { data: unknown; expiry: number }>();
-const CACHE_TTL = 60_000;
-const CACHE_MAX = 100;
-
 function getCacheKey(query: string, config: ProviderConfig, extra?: string): string {
   const raw = `${query}|${config.provider}|${config.baseUrl || ''}|${extra || ''}`;
   let hash = 0;
@@ -68,27 +63,7 @@ function getCacheKey(query: string, config: ProviderConfig, extra?: string): str
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash;
   }
-  return hash.toString(36);
-}
-
-function cacheGet<T>(key: string): T | undefined {
-  const entry = searchCache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiry) {
-    searchCache.delete(key);
-    return undefined;
-  }
-  searchCache.delete(key);
-  searchCache.set(key, entry);
-  return entry.data as T;
-}
-
-function cacheSet<T>(key: string, data: T): void {
-  if (searchCache.size >= CACHE_MAX) {
-    const oldest = searchCache.keys().next().value;
-    if (oldest) searchCache.delete(oldest);
-  }
-  searchCache.set(key, { data, expiry: Date.now() + CACHE_TTL });
+  return 'ws:' + hash.toString(36);
 }
 
 // ─── Prompt Injection Sanitizer ───────────────────────────────────────────────
@@ -174,7 +149,7 @@ export async function webSearch(query: string): Promise<{ results: SearchResult[
 
   const config = getConfig();
   const cacheKey = getCacheKey(q, config);
-  const cached = cacheGet<{ results: SearchResult[]; source: string }>(cacheKey);
+  const cached = serverCache.get<{ results: SearchResult[]; source: string }>(cacheKey);
   if (cached) return cached;
 
   const result = await tryAllSources(q, config);
@@ -187,7 +162,7 @@ export async function webSearch(query: string): Promise<{ results: SearchResult[
     diagnostics: result.diagnostics,
   };
 
-  cacheSet(cacheKey, { results: finalResult.results, source: finalResult.source });
+  serverCache.set(cacheKey, { results: finalResult.results, source: finalResult.source }, CACHE_TTL.MEDIUM);
   return finalResult;
 }
 
@@ -411,7 +386,7 @@ export async function webSearchWithQuality(
   // Cache check
   const cacheKey = getCacheKey(primaryQuery, config,
     `${searchOptions.categories || ''}|${searchOptions.time_range || ''}|${searchOptions.engines || ''}`);
-  const cached = cacheGet<QualitySearchResult>(cacheKey);
+  const cached = serverCache.get<QualitySearchResult>(cacheKey);
   if (cached) return cached;
 
   const allResults: SearchResult[] = [];
@@ -500,7 +475,7 @@ export async function webSearchWithQuality(
           pipelineMs,
         },
       };
-      cacheSet(cacheKey, qualityResult);
+      serverCache.set(cacheKey, qualityResult, CACHE_TTL.MEDIUM);
       return qualityResult;
     }
 
@@ -548,6 +523,6 @@ export async function webSearchWithQuality(
       pipelineMs,
     },
   };
-  cacheSet(cacheKey, fallbackResult);
+  serverCache.set(cacheKey, fallbackResult, CACHE_TTL.MEDIUM);
   return fallbackResult;
 }
