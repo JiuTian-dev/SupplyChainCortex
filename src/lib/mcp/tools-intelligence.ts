@@ -871,12 +871,16 @@ export const intelligenceTools: MCPTool[] = [
     },
     handler: async (params: Record<string, unknown>) => {
       const { analyzeAndChart } = await import('@/lib/chart/analyze-chart');
-      return analyzeAndChart({
+      const result = await analyzeAndChart({
         metric: params.metric as any,
         dimension: (params.dimension as any) || 'category',
         chartType: (params.chartType as any) || 'bar',
         title: params.title as string | undefined,
       });
+      return {
+        ...result,
+        embedHint: `在回复中嵌入图片: ![${result.title}](${result.url})`,
+      };
     },
   },
 

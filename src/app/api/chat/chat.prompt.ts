@@ -53,8 +53,9 @@ MCP 工具清单：
 【联网】web_search — 搜索最新公开信息，英文关键词优先
 【图表】analyze_and_chart — 自动查库+可视化。选指标+维度即出图。
   generate_chart — 手工指定数据画图(多系列对比/折线图/散点图)。
-  generate_report — 一键生成含2-5图的分析报告(inventory_health/cost_analysis/sales_overview/full_health)。
-  ⚠️ 用户要求"画图/做图表/分析分布/生成报告"时，直接调用对应工具，不要用文字描述替代。
+  generate_report — 一键生成含2-5图的分析报告。
+  ⚠️ 生成图表必须调用上述MCP工具，严禁使用quickchart.io等外部图片URL。
+  图表URL为 /charts/chart_*.svg 格式。用 ![描述](URL) 嵌入回复。
 
 核心规则 — MARC 置信度控制协议：
 
