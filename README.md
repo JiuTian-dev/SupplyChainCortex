@@ -4,7 +4,7 @@
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-0%20errors-blue)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-356%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-647%20passed-brightgreen)]()
 [![Version](https://img.shields.io/badge/version-1.1.0-orange)]()
 [![MCP Tools](https://img.shields.io/badge/MCP%20tools-61-blueviolet)]()
 [![Python Math](https://img.shields.io/badge/Python%20math-24%20engines-green)]()
@@ -47,8 +47,8 @@ Cross-border supply chains face compounded risks: weather disruptions at ports, 
 │              Self-Evolving Pipeline                               │
 │   Feedback → Bayesian Posterior → Weight Calibration             │
 ├──────────────────────────────────────────────────────────────────┤
-│         Data Layer (Prisma + PostgreSQL / SQLite)                │
-│   23 models · 9 external sources · 60+ API endpoints             │
+│            Data Layer (Prisma + PostgreSQL 16)                    │
+│   28 models · 9 external sources · 62 API endpoints              │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -60,7 +60,7 @@ Cross-border supply chains face compounded risks: weather disruptions at ports, 
 
 | Source | Type | Data |
 |--------|------|------|
-| **Internal DB** | Products, Inventory, Sales, Shipments, Costs | 23 Prisma models, 170+ products, 62K+ sales records |
+| **Internal DB** | Products, Inventory, Sales, Shipments, Costs | 28 Prisma models, 170+ products, 62K+ sales records |
 | **Exchange Rates** | Frankfurter API + PBOC ALAPI | USD/CNY, EUR/CNY, JPY/CNY |
 | **Commodities** | Alpha Vantage + FRED | Copper, Aluminum, Steel, PP, LLDPE, PVC |
 | **Freight** | SCFIS Futures | Shanghai-Europe container freight index |
@@ -210,7 +210,7 @@ curl http://localhost:3000/api/mcp                    # 61 tools
 ### Run Tests
 
 ```bash
-bun test                    # 356 unit tests (Vitest)
+bun test                    # 647 unit tests (Vitest)
 npx playwright test         # end-to-end tests
 ```
 
@@ -273,13 +273,13 @@ npx playwright test         # end-to-end tests
 |-------|-----------|
 | Framework | Next.js 16 (App Router, Turbopack) |
 | Language | TypeScript (strict, 0 errors) + Python 3.10+ |
-| Database | PostgreSQL 16 (SQLite/MySQL schemas available) |
+| Database | PostgreSQL 16 |
 | ORM | Prisma 6 |
 | AI Providers | DeepSeek V4 Pro / OpenAI / Anthropic / Ollama |
 | Math Engines | Python 3 + NumPy + SciPy (24 OR models) |
 | State | Zustand 5 + TanStack React Query 5 |
 | UI | shadcn/ui + Tailwind CSS 4 + Recharts 2 |
-| Testing | Vitest 4 (356 tests) + Playwright |
+| Testing | Vitest 4 (647 tests) + Playwright |
 | Container | Docker + Caddy + docker-compose |
 | Search | SearXNG (self-hosted, 70+ engines) |
 
@@ -314,7 +314,7 @@ SupplyChainCortex/
 │   │   ├── cascade-risk/          # Risk propagation
 │   │   ├── decision-graph/        # Decision recommendations
 │   │   ├── sandbox/               # Simulation sandbox
-│   │   └── ...                    # 60+ API route handlers
+│   │   └── ...                    # 62 API route handlers
 │   ├── lib/
 │   │   ├── engine/
 │   │   │   ├── react-agent.ts     # ReAct reasoning loop
@@ -339,7 +339,7 @@ SupplyChainCortex/
 │   │   └── shared/                # ChatPanel (drawer), ScrollToTop, etc.
 │   └── hooks/                     # React Query hooks
 ├── prisma/
-│   ├── schema.prisma              # 23 models
+│   ├── schema.prisma              # 28 models
 │   └── seed.ts                    # Stress-test seed (170 products × 365 days)
 ├── docker-compose.yml
 ├── Caddyfile
