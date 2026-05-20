@@ -16,12 +16,8 @@ export async function getSupplyChainRiskAnalytics() {
       const suppliers = await db.supplier.findMany({
         where: { status: "active" },
       });
-      const inventory = await db.inventory.findMany({
-        include: { product: true },
-      });
-      const costRecords = await db.costRecord.findMany({
-        include: { product: true },
-      });
+      const inventory = await db.inventory.findMany();
+      const costRecords = await db.costRecord.findMany();
       const shipments = await db.shipmentItem.findMany();
 
       const categorySupplierCount: Record<string, string[]> = {};

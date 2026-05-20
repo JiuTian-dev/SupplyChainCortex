@@ -54,7 +54,7 @@ export async function getSupplierSummary(): Promise<SupplierSummaryResult> {
       const [suppliers, shipments, costRecords] = await Promise.all([
         db.supplier.findMany(),
         db.shipmentItem.findMany(),
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany()
       ]);
 
       const totalSuppliers = suppliers.length;

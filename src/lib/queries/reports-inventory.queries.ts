@@ -81,7 +81,7 @@ export async function getInventorySummary(): Promise<InventorySummaryResult> {
     cacheKey('reports', 'inventory-summary'),
     async () => {
       const [inventory, products, costRecords, salesRecords, reorderOrders] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.product.findMany(),
         db.costRecord.findMany(),
         db.salesRecord.findMany(),
@@ -198,7 +198,7 @@ export async function getInventoryReportEnhanced(): Promise<InventoryReportEnhan
     cacheKey('reports', 'inventory-report-enhanced'),
     async () => {
       const [inventory, products, costRecords, salesRecords] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.product.findMany(),
         db.costRecord.findMany(),
         db.salesRecord.findMany(),

@@ -17,9 +17,7 @@ export async function getInventoryForecastAnalytics(
   return cachedFetch(
     cacheKey('analytics', 'inventory-forecast', forecastDays, alpha, beta),
     async () => {
-      const inventory = await db.inventory.findMany({
-        include: { product: true },
-      });
+      const inventory = await db.inventory.findMany();
 
       const forecasts = await Promise.all(
         inventory.map(async (inv) => {
@@ -170,7 +168,7 @@ export async function getInventoryOptimizationAnalytics() {
     cacheKey('analytics', 'inventory_optimization'),
     async () => {
       const [inventory, products, costRecords, salesRecords, suppliers] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.product.findMany(),
         db.costRecord.findMany(),
         db.salesRecord.findMany(),
@@ -285,7 +283,7 @@ export async function getInventoryTurnoverAnalytics() {
     cacheKey('analytics', 'inventory_turnover'),
     async () => {
       const [inventory, salesRecords, costRecords, products] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.salesRecord.findMany(),
         db.costRecord.findMany(),
         db.product.findMany(),

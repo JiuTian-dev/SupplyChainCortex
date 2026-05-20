@@ -74,7 +74,7 @@ export async function getCostAnalysis(): Promise<CostAnalysisResult> {
     cacheKey('reports', 'cost-analysis'),
     async () => {
       const [costRecords, products, inventory] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.product.findMany(),
         db.inventory.findMany(),
       ]);
@@ -163,7 +163,7 @@ export async function getCostSummary(): Promise<CostSummaryResult> {
     cacheKey('reports', 'cost-summary'),
     async () => {
       const [costRecords, products, inventory] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.product.findMany(),
         db.inventory.findMany(),
       ]);
@@ -262,7 +262,7 @@ export async function getCostReportEnhanced(): Promise<CostReportEnhancedResult>
     cacheKey('reports', 'cost-report-enhanced'),
     async () => {
       const [costRecords, products, inventory, salesRecords] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.product.findMany(),
         db.inventory.findMany(),
         db.salesRecord.findMany(),

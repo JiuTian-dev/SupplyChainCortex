@@ -15,7 +15,13 @@ export async function getCostOptimizationAnalytics() {
     cacheKey('analytics', 'cost-optimization'),
     async () => {
       const costRecords = await db.costRecord.findMany({
-        include: { product: true },
+        select: {
+          sku: true, productName: true, productId: true,
+          totalLanded: true, logistics: true, tariff: true,
+          rawMaterial: true, labor: true, platformFee: true,
+          exchangeRate: true, grossMargin: true,
+          product: { select: { origin: true, category: true } },
+        },
       });
 
       const inventoryRecords = await db.inventory.findMany();
@@ -126,7 +132,13 @@ export async function getCostTrendsAnalytics(months: number = 6) {
     cacheKey('analytics', 'cost_trends', months),
     async () => {
       const [costRecords, salesRecords, products] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany({
+          select: {
+            sku: true, productName: true, productId: true,
+            totalLanded: true, exchangeRate: true, grossMargin: true,
+            product: { select: { category: true } },
+          },
+        }),
         db.salesRecord.findMany(),
         db.product.findMany(),
       ]);
