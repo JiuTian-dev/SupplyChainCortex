@@ -298,7 +298,11 @@ async function handlePost(request: NextRequest) {
   };
   const verbosityHint = verbosityHints[routing.intent] || '要点式回答。';
   const routingContext = `\n## 当前问题路由\n- 意图: ${routing.intent} | 主信息层: Tier${routing.primaryTier} | ${routing.shouldSearch ? '可联网搜索' : '不触发搜索'} | ${routing.shouldUseTools ? 'MCP工具可用' : '不调用工具'}\n- 简洁度要求: ${verbosityHint}\n- 原因: ${routing.reason}`;
-  const tieredSystemPrompt = SYSTEM_PROMPT + routingContext;
+  // Force chart tool usage when user asks for visualization
+  const chartForce=/[画出|做图|图表|可视化|生成报告|生成.*图|图.*分析|做个.*图|柱状|饼图|折线|散点|帕累托|热力图]/.test(message)
+    ? '\n⛔ 本次查询需要图表。你必须调用 analyze_and_chart 或 generate_chart 获取真实URL。严禁编造 /charts/ 路径。没有工具调用=不合格。'
+    : '';
+  const tieredSystemPrompt = SYSTEM_PROMPT + routingContext + chartForce;
 
   if (stream) {
     if (hasApiKey) return handleReActStream(message, history, provider, model, apiKey, webSearchEnabled, currency, timeHorizon, tieredSystemPrompt, routing);

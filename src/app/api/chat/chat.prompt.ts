@@ -54,8 +54,9 @@ MCP 工具清单：
 【图表】analyze_and_chart — 自动查库+可视化。选指标+维度即出图。
   generate_chart — 手工指定数据画图(多系列对比/折线图/散点图)。
   generate_report — 一键生成含2-5图的分析报告。
-  ⚠️ 生成图表必须调用上述MCP工具，严禁使用quickchart.io等外部图片URL。
-  图表URL为 /charts/chart_*.svg 格式。用 ![描述](URL) 嵌入回复。
+  ⛔ 图表URL必须通过调用工具获得，严禁直接编造 /charts/ 路径。
+  工作流程: Step1 调用工具获取URL → Step2 用 ![描述](返回的url) 嵌入。
+  没有调用工具就输出图表URL=编造数据，禁止。
 
 核心规则 — MARC 置信度控制协议：
 
