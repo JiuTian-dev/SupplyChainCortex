@@ -25,10 +25,7 @@ import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
 import { CURRENCY_SYMBOLS } from '@/lib/dashboard/config';
 // CHART_COLORS moved to CostTab.helpers.tsx
-import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
-import { ExchangeRateMatrix } from '@/components/cost/ExchangeRateMatrix';
 import type { CostRecord } from '@prisma/client';
-// MetricCard moved elsewhere
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import dynamic from 'next/dynamic';
@@ -38,7 +35,18 @@ const CostImpactHeatmap = dynamic(
   () => import('@/components/cost/CostImpactHeatmap').then((m) => ({ default: m.CostImpactHeatmap })),
   { loading: () => <LazyLoader type="chart" className="h-[280px]" />, ssr: false }
 );
-import { CostOptimizationPanel } from '@/components/cost/CostOptimizationPanel';
+const CostSimulatorEnhanced = dynamic(
+  () => import('@/components/cost/CostSimulatorEnhanced').then((m) => ({ default: m.CostSimulatorEnhanced })),
+  { ssr: false, loading: () => <LazyLoader type="chart" className="h-[400px]" /> }
+);
+const ExchangeRateMatrix = dynamic(
+  () => import('@/components/cost/ExchangeRateMatrix').then((m) => ({ default: m.ExchangeRateMatrix })),
+  { ssr: false, loading: () => <LazyLoader type="chart" className="h-[200px]" /> }
+);
+const CostOptimizationPanel = dynamic(
+  () => import('@/components/cost/CostOptimizationPanel').then((m) => ({ default: m.CostOptimizationPanel })),
+  { ssr: false, loading: () => <LazyLoader type="chart" className="h-[300px]" /> }
+);
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CHART_TOOLTIP_STYLE, CostBreakdownChart, CommodityBanner, FreightBanner } from './CostTab.helpers';
 
