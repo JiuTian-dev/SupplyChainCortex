@@ -75,8 +75,8 @@ export async function getSalesReportEnhanced(): Promise<SalesReportEnhancedResul
       const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
       const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
       const todayStr = today.toISOString().split('T')[0];
-      const recentRevenue = salesRecords.filter(r => r.date >= thirtyDaysAgoStr && r.date <= todayStr).reduce((s, r) => s + r.revenue, 0);
-      const priorRevenue = salesRecords.filter(r => r.date >= sixtyDaysAgoStr && r.date < thirtyDaysAgoStr).reduce((s, r) => s + r.revenue, 0);
+      const recentRevenue = salesRecords.filter(r => r.date >= new Date(thirtyDaysAgoStr) && r.date <= new Date(todayStr)).reduce((s, r) => s + r.revenue, 0);
+      const priorRevenue = salesRecords.filter(r => r.date >= new Date(sixtyDaysAgoStr) && r.date < new Date(thirtyDaysAgoStr)).reduce((s, r) => s + r.revenue, 0);
       const growthRate = priorRevenue > 0 ? roundTo((recentRevenue - priorRevenue) / priorRevenue * 100, 1) : 0;
 
       const platformBreakdown: Record<string, { platform: string; revenue: number; quantity: number; orders: number; avgOrderValue: number }> = {};
@@ -107,7 +107,7 @@ export async function getSalesReportEnhanced(): Promise<SalesReportEnhancedResul
       for (let i = 29; i >= 0; i--) {
         const d = new Date(today); d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
-        const dayRecords = salesRecords.filter(r => r.date === dateStr);
+        const dayRecords = salesRecords.filter(r => r.date.toISOString().split('T')[0] === dateStr);
         salesTrend.push({ date: dateStr, revenue: Math.round(dayRecords.reduce((s, r) => s + r.revenue, 0)), quantity: dayRecords.reduce((s, r) => s + r.quantity, 0), orders: dayRecords.length });
       }
 

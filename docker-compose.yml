@@ -1,22 +1,18 @@
 # ===========================================
-# 小家电供应链 MCP 数据管道 - Docker Compose
+# SupplyChain Cortex — Docker Compose
 # ===========================================
-# Local development environment with PostgreSQL.
-# MySQL is optional and can be started separately.
+# PostgreSQL is the only supported database.
 #
-# Usage:
-#   Start with PostgreSQL:  docker compose up -d
-#   Start with MySQL:       docker compose --profile mysql up -d
-#   Stop all:               docker compose down
-#   Reset data:             docker compose down -v
+#   docker compose up -d postgres     → PostgreSQL on localhost:5432
+#   docker compose up -d              → full stack (app + postgres + searxng)
+#   docker compose --profile tools up -d → add pgAdmin on port 5050
+#   docker compose down -v            → stop + delete data volumes
 #
-# Prerequisites:
-#   1. Copy .env.example to .env and configure for PostgreSQL:
-#      DATABASE_URL="postgresql://supplychain:supplychain@localhost:5432/supply_chain"
-#      DB_TYPE=postgresql
-#   2. Switch Prisma schema:  bun run db:switch:pg
-#   3. Push schema:           bun run db:push
-#   4. Seed data:             bun run db:seed
+# First-time setup:
+#   1. cp .env.example .env
+#   2. docker compose up -d postgres
+#   3. bun run db:push
+#   4. bun run db:seed
 # ===========================================
 
 services:
@@ -64,19 +60,21 @@ services:
     networks:
       - supply-chain-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
       interval: 30s
       timeout: 10s
       start_period: 15s
       retries: 3
 
   # ─── PostgreSQL 16 ──────────────────────────────────────────────────
+  # Backups: ./scripts/backup-db.sh       (manual)
+  # Cron:    0 3 * * * ./scripts/backup-db.sh >> /var/log/sc-backup.log 2>&1
   postgres:
     image: postgres:16-alpine
     container_name: supply-chain-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_EXTERNAL_PORT:-127.0.0.1:5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-supplychain}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supplychain}
@@ -90,31 +88,6 @@ services:
       interval: 10s
       timeout: 5s
       start_period: 10s
-      retries: 5
-
-  # ─── MySQL 8 (optional - start with --profile mysql) ────────────────
-  mysql:
-    image: mysql:8
-    container_name: supply-chain-mysql
-    restart: unless-stopped
-    profiles:
-      - mysql
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_USER: ${MYSQL_USER:-supplychain}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-supplychain}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-supply_chain}
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - supply-chain-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
       retries: 5
 
   # ─── pgAdmin (optional - database management UI) ────────────────────
@@ -140,9 +113,6 @@ volumes:
   postgres-data:
     driver: local
     name: supply-chain-postgres-data
-  mysql-data:
-    driver: local
-    name: supply-chain-mysql-data
 
 # ─── Network ──────────────────────────────────────────────────────────
 networks:

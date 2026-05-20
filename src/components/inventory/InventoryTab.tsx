@@ -3,30 +3,28 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
-  CheckCircle2, AlertTriangle, XCircle, Layers, Warehouse,
-  Zap, Eye, Search, Download, Filter, RefreshCw, Activity,
-  Shield, Boxes, ShoppingCart, Clock, DollarSign, SlidersHorizontal,
-  TrendingUp, TrendingDown, Minus, ArrowRightLeft,
+  CheckCircle2, AlertTriangle, XCircle, Layers,
+  Zap, Eye, Search, Filter, SlidersHorizontal,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell,
   ComposedChart, ReferenceLine,
-  AreaChart, Area,
 } from 'recharts';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProductFilter } from '@/components/shared/ProductFilter';
 import { FilterChips } from '@/components/shared/FilterChips';
+import { BatchActionsToolbar } from '@/components/shared/BatchActionsToolbar';
+import { useBatchSelection } from '@/hooks/use-batch-selection';
+import { Checkbox } from '@/components/ui/checkbox';
+import { exportToCSV as exportBatchToCSV } from '@/lib/services/batch-export.service';
 
 import {
   useInventory,
@@ -46,22 +44,19 @@ const StockAdjustmentDialog = dynamic(
 );
 import { InventoryAlertTimeline } from '@/components/inventory/InventoryAlertTimeline';
 import { InventoryDataTable } from '@/components/inventory/InventoryDataTable';
+import { ExportMenu } from '@/components/shared/ExportMenu';
 import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { STATUS_COLORS, STATUS_LABELS, AGING_COLORS, CHART_COLORS } from '@/lib/constants';
-import { exportToCSV } from '@/lib/utils';
 import type { Inventory } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 
-// ==================== Tooltip style shared across charts ====================
-const CHART_TOOLTIP_STYLE = {
-  borderRadius: '10px',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-  border: '1px solid #e5e7eb',
-  fontSize: '12px',
-  backgroundColor: 'var(--tooltip-bg, #fff)',
-};
+import { CHART_TOOLTIP_STYLE } from './InventoryTab.helpers';
+import { InventorySlowMovingAlert } from './InventorySlowMovingAlert';
+import { InventoryWarehouseCapacity } from './InventoryWarehouseCapacity';
+import { InventoryDetailDialog } from './InventoryDetailDialog';
+import { InventoryProcurementSection } from './InventoryProcurementSection';
 
 // ==================== Main InventoryTab Component ====================
 
@@ -159,6 +154,12 @@ export function InventoryTab() {
     return items;
   }, [inventory, inventoryFilter, searchQuery]);
 
+  // Batch selection for the inventory detail table
+  const batchSelection = useBatchSelection(
+    filteredInventory,
+    (item: Inventory) => item.sku,
+  );
+
   // View inventory detail (health + safety stock + reorder suggestion)
   const viewInventoryDetail = useCallback(async (sku: string) => {
     setSelectedInventorySku(sku);
@@ -235,6 +236,67 @@ export function InventoryTab() {
       toast.error('补货下单失败', { description: '网络错误' });
     }
   }, [selectedInventorySku, inventoryDetail, reorderQty, reorderWarehouse, reorderPriority, queryClient]);
+
+  // ─── Batch operations ───────────────────────────────────────────────────────
+
+  const handleBatchReorder = useCallback(async () => {
+    const skuList = Array.from(batchSelection.selectedIds);
+    if (skuList.length === 0) return;
+    if (!window.confirm(`确认对 ${skuList.length} 个 SKU 执行批量补货操作？`)) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const sku of skuList) {
+      try {
+        const res = await fetch('/api/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sku, quantity: 0, priority: 'normal' }),
+        });
+        const data = await res.json();
+        if ((data as any).success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
+      }
+    }
+
+    if (failCount === 0) {
+      toast.success('批量补货完成', {
+        description: `全部 ${successCount} 个 SKU 补货订单已提交`,
+      });
+    } else {
+      toast.warning('批量补货部分完成', {
+        description: `${successCount} 个成功，${failCount} 个失败`,
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ['reorder'] });
+    batchSelection.clearSelection();
+  }, [batchSelection, queryClient]);
+
+  const handleBatchExport = useCallback(() => {
+    const selected = filteredInventory.filter((inv) =>
+      batchSelection.selectedIds.has(inv.sku),
+    );
+    if (selected.length === 0) return;
+
+    const mapped = selected.map((inv: Inventory) => ({
+      SKU: inv.sku,
+      产品名称: inv.productName,
+      仓库: inv.warehouse,
+      当前库存: inv.quantity,
+      安全库存: inv.safetyStock,
+      在途: inv.inTransit,
+      周转天数: inv.turnoverDays,
+      状态: STATUS_LABELS[inv.stockStatus],
+    }));
+
+    exportBatchToCSV(mapped, '库存数据_已选');
+  }, [filteredInventory, batchSelection.selectedIds]);
 
   // Loading state
   if (inventoryLoading && !inventoryData) return <DashboardSkeleton />;
@@ -332,33 +394,7 @@ export function InventoryTab() {
         </Card>
       </div>
 
-      {/* 滞销产品预警 */}
-      {slowMoving.length > 0 && (
-        <Card className="card-dashboard border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2 text-amber-700">
-              <AlertTriangle className="h-4 w-4" />
-              滞销产品预警（周转 {'>'} 90 天）
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {slowMoving.map((inv: Inventory) => (
-                <div key={inv.id} className="bg-card rounded-lg p-3 border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{inv.productName}</span>
-                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">{inv.turnoverDays}天</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">库存 {inv.quantity} | 安全库存 {inv.safetyStock}</p>
-                  <p className="text-xs text-amber-600 mt-1">
-                    {inv.turnoverDays > 180 ? '⚠ 建议清仓促销' : inv.turnoverDays > 120 ? '⚡ 建议减少采购' : '📊 关注趋势'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <InventorySlowMovingAlert slowMoving={slowMoving} />
 
       {/* 库存库龄分布 */}
       <Card className="card-dashboard chart-container border-l-[4px] border-l-emerald-400">
@@ -416,313 +452,13 @@ export function InventoryTab() {
         </CardContent>
       </Card>
 
-      {/* 仓库容量热力图 */}
-      <Card className="card-dashboard border-l-[4px] border-l-violet-400">
-        <CardHeader className="pb-2 bg-muted/30">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Warehouse className="h-4 w-4 text-violet-500" />
-              仓库容量热力图
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs font-normal">
-                {warehouseCapacityData ? ((warehouseCapacityData as any)?.capacity || []).length : '-'} 个仓库
-              </Badge>
-              {zoneSummary && (
-                <>
-                  {zoneSummary.criticalZones > 0 && (
-                    <Badge variant="outline" className="text-xs bg-white dark:bg-white/90" style={{ color: '#ef4444', fontWeight: 600 }}>
-                      {zoneSummary.criticalZones} 满仓
-                    </Badge>
-                  )}
-                  {zoneSummary.warningZones > 0 && (
-                    <Badge variant="outline" className="text-xs bg-white dark:bg-white/90" style={{ color: '#b8860b', fontWeight: 600 }}>
-                      {zoneSummary.warningZones} 拥挤
-                    </Badge>
-                  )}
-                </>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30"
-                onClick={() => setTransferDialogOpen(true)}
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5" />
-                库存调拨
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            // Use API data if available, otherwise fallback to constant
-            if (warehouseCapacityData) {
-              const whCapacity = (warehouseCapacityData as any)?.capacity;
-              if (!whCapacity) return null;
-              const allZones = whCapacity.flatMap((wh: any) => wh.zones);
-              const totalCap = whCapacity.reduce((s: number, wh: any) => s + wh.totalCapacity, 0);
-              const totalUsed = whCapacity.reduce((s: number, wh: any) => s + wh.totalUsed, 0);
-              const zoneColors: Record<string, string> = { fast: '#f97316', normal: '#22c55e', bulk: '#06b6d4' };
-              const GOLD = '#b8860b';
-              const allRecommendations = whCapacity.flatMap((wh: any) => wh.recommendations || []);
-              return (
-                <>
-                  {/* 总利用率 */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium">总利用率</span>
-                      <span className="text-sm text-muted-foreground">
-                        {totalUsed.toLocaleString()} / {totalCap.toLocaleString()} (<span style={{ color: GOLD, fontWeight: 600 }}>{((totalUsed / totalCap) * 100).toFixed(1)}%</span>)
-                      </span>
-                    </div>
-                    <Progress value={(totalUsed / totalCap) * 100} className="h-2 transition-all duration-500" />
-                  </div>
-                  {/* 仓库分布 */}
-                  <div className="space-y-3 mb-5">
-                    {whCapacity.map((wh: any) => {
-                      const whPercent = (wh.totalUsed / wh.totalCapacity) * 100;
-                      return (
-                        <div key={wh.warehouse}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-medium">{wh.warehouse}</span>
-                            <span className="text-xs text-muted-foreground">{wh.totalUsed.toLocaleString()} / {wh.totalCapacity.toLocaleString()} (<span style={{ color: GOLD, fontWeight: 600 }}>{whPercent.toFixed(1)}%</span>)</span>
-                          </div>
-                          <Progress value={whPercent} className="h-1.5 transition-all duration-500" />
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* 区域卡片网格 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {allZones.map((zone: any, idx: number) => {
-                      const zonePercent = zone.utilization;
-                      const barColor = zonePercent > 90 ? '#ef4444' : zonePercent > 70 ? '#f59e0b' : '#22c55e';
-                      const zoneColor = zoneColors[zone.type] || CHART_COLORS[idx % CHART_COLORS.length];
-                      return (
-                        <div key={`${zone.warehouse}-${zone.name}`} className="rounded-lg border p-3 hover:shadow-md hover:scale-[1.02] transition-all duration-200" style={{ borderLeftWidth: '3px', borderLeftColor: zoneColor }}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold">{zone.name}</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-block w-2 h-2 rounded-full bg-white border" style={{ borderColor: barColor }} />
-                              <Badge variant="outline" className="text-[10px] bg-white dark:bg-white/90" style={{ color: GOLD, fontWeight: 700 }}>
-                                {zonePercent.toFixed(0)}%
-                              </Badge>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="text-[10px] mb-2">{zone.type === 'fast' ? '高频拣选' : zone.type === 'normal' ? '常规存储' : '大件仓储'}</Badge>
-                          <div className="mt-2">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                              <span>{zone.used.toLocaleString()} / {zone.capacity.toLocaleString()}</span>
-                            </div>
-                            <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                              <div className="h-full rounded-full progress-fill-bar" style={{ width: `${zonePercent}%`, backgroundColor: zoneColor, transition: 'width 1s ease-out' }} />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* 容量建议 */}
-                  {allRecommendations.length > 0 && (
-                    <div className="mt-4 p-3 rounded-lg border bg-violet-50 dark:bg-violet-950/20">
-                      <h4 className="text-sm font-semibold flex items-center gap-2 text-violet-700 dark:text-violet-400">
-                        <Zap className="h-3.5 w-3.5" />
-                        容量建议
-                      </h4>
-                      <div className="mt-2 space-y-1.5">
-                        {allRecommendations.map((rec: string, rIdx: number) => (
-                          <p key={rIdx} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                            <span className="shrink-0" style={{ color: GOLD }}>●</span>
-                            {rec}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* 7天利用率趋势 */}
-                  {trend.length > 0 && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold flex items-center gap-2 text-violet-700 dark:text-violet-400">
-                          {(() => {
-                            const TrendIcon = trendSummary?.trendDirection === 'increasing' ? TrendingUp
-                              : trendSummary?.trendDirection === 'decreasing' ? TrendingDown : Minus;
-                            return <TrendIcon className="h-4 w-4" />;
-                          })()}
-                          7天利用率趋势
-                        </h4>
-                        {trendSummary && (
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>当前: <b>{trendSummary.currentOverallUtilization}%</b></span>
-                            <span>峰值: {trendSummary.peakUtilization}%</span>
-                            <span>趋势:
-                              <span className="ml-1" style={{ color: GOLD, fontWeight: 600 }}>
-                                {trendSummary.trendDirection === 'increasing' ? '↑ 上升' :
-                                 trendSummary.trendDirection === 'decreasing' ? '↓ 下降' : '→ 稳定'}
-                              </span>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <ResponsiveContainer width="100%" height={180}>
-                        <AreaChart data={trend.map((d: any) => ({
-                          date: d.date.slice(5),
-                          utilization: d.overallUtilization,
-                        }))}>
-                          <defs>
-                            <linearGradient id="utilGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-                          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, '利用率']} />
-                          <Area
-                            type="monotone"
-                            dataKey="utilization"
-                            stroke="#8b5cf6"
-                            strokeWidth={2}
-                            fill="url(#utilGradient)"
-                            animationDuration={800}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </>
-              );
-            }
-            // Fallback to constant data
-            return (
-              <>
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium">总利用率</span>
-                    <span className="text-sm text-muted-foreground">
-                      {0} / {1} ({((0 / 1) * 100).toFixed(1)}%)
-                    </span>
-                  </div>
-                  <Progress value={75} className="h-2 transition-all duration-500" />
-                </div>
-                <div className="space-y-3 mb-5">
-                  {([] as Array<{ name: string; used: number; capacity: number }>).map((wh) => {
-                    const whPercent = (wh.used / wh.capacity) * 100;
-                    return (
-                      <div key={wh.name}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium">{wh.name}</span>
-                          <span className="text-xs text-muted-foreground">{wh.used.toLocaleString()} / {wh.capacity.toLocaleString()} ({whPercent.toFixed(1)}%)</span>
-                        </div>
-                        <Progress value={whPercent} className="h-1.5 transition-all duration-500" />
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {([] as Array<{ name: string; used: number; capacity: number; color: string; category: string }>).map((zone) => {
-                    const zonePercent = (zone.used / zone.capacity) * 100;
-                    const badgeColor = zonePercent > 90 ? 'destructive' : zonePercent > 70 ? 'secondary' : 'default';
-                    const badgeTextColor = zonePercent > 90 ? 'text-red-600 dark:text-red-400' : zonePercent > 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400';
-                    return (
-                      <div key={zone.name} className="rounded-lg border p-3 hover:shadow-md hover:scale-[1.02] transition-all duration-200" style={{ borderLeftWidth: '3px', borderLeftColor: zone.color }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-semibold">{zone.name}</span>
-                          <Badge variant={badgeColor as 'default' | 'secondary' | 'destructive'} className={`text-[10px] pulse-soft ${badgeTextColor}`}>
-                            {zonePercent.toFixed(0)}%
-                          </Badge>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] mb-2">{zone.category}</Badge>
-                        <div className="mt-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                            <span>{zone.used.toLocaleString()} / {zone.capacity.toLocaleString()}</span>
-                          </div>
-                          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full progress-fill-bar" style={{ width: `${zonePercent}%`, backgroundColor: zone.color, transition: 'width 1s ease-out' }} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 p-3 rounded-lg border bg-violet-50 dark:bg-violet-950/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2 text-violet-700 dark:text-violet-400">
-                    <Zap className="h-3.5 w-3.5" />
-                    容量建议
-                  </h4>
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                      <span className="text-yellow-500 shrink-0">●</span>
-                      深圳仓 A 区利用率 84%，建议调拨部分库存至义乌仓
-                    </p>
-                    <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                      <span className="text-green-500 shrink-0">●</span>
-                      义乌仓 E 区退货区利用率仅 35%，可临时调整为暂存区
-                    </p>
-                  </div>
-                </div>
-                {/* 7天利用率趋势 */}
-                {trend.length > 0 && (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold flex items-center gap-2 text-violet-700 dark:text-violet-400">
-                        {(() => {
-                          const TrendIcon = trendSummary?.trendDirection === 'increasing' ? TrendingUp
-                            : trendSummary?.trendDirection === 'decreasing' ? TrendingDown : Minus;
-                          return <TrendIcon className="h-4 w-4" />;
-                        })()}
-                        7天利用率趋势
-                      </h4>
-                      {trendSummary && (
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span>当前: <b>{trendSummary.currentOverallUtilization}%</b></span>
-                          <span>峰值: {trendSummary.peakUtilization}%</span>
-                          <span>趋势:
-                            <span className={
-                              trendSummary.trendDirection === 'increasing' ? 'text-red-500 ml-1' :
-                              trendSummary.trendDirection === 'decreasing' ? 'text-green-500 ml-1' : 'ml-1'
-                            }>
-                              {trendSummary.trendDirection === 'increasing' ? '↑ 上升' :
-                               trendSummary.trendDirection === 'decreasing' ? '↓ 下降' : '→ 稳定'}
-                            </span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <ResponsiveContainer width="100%" height={180}>
-                      <AreaChart data={trend.map((d: any) => ({
-                        date: d.date.slice(5),
-                        utilization: d.overallUtilization,
-                      }))}>
-                        <defs>
-                          <linearGradient id="utilGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, '利用率']} />
-                        <Area
-                          type="monotone"
-                          dataKey="utilization"
-                          stroke="#8b5cf6"
-                          strokeWidth={2}
-                          fill="url(#utilGradient)"
-                          animationDuration={800}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </CardContent>
-      </Card>
+      <InventoryWarehouseCapacity
+        warehouseCapacityData={warehouseCapacityData}
+        zoneSummary={zoneSummary}
+        trend={trend}
+        trendSummary={trendSummary}
+        onTransferClick={() => setTransferDialogOpen(true)}
+      />
 
       {/* 库存数据表 */}
       <InventoryDataTable
@@ -740,90 +476,17 @@ export function InventoryTab() {
       {/* 库存资金占用分析 */}
       <InventoryCapitalPanel />
 
-      {/* 采购计划 */}
-      {procurementData && (procurementData as any)?.data?.items && (procurementData as any).data.items.length > 0 && (
-        <Card className="card-dashboard border-l-[4px] border-l-amber-400">
-          <CardHeader className="pb-2 bg-amber-50 dark:bg-amber-950/20">
-            <CardTitle className="text-base font-semibold flex items-center gap-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-              <ShoppingCart className="h-4 w-4 text-amber-500" />
-              采购计划
-              <Badge variant="outline" className="ml-auto text-xs font-normal">{(procurementData as any).data.summary.totalItems} 项</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="rounded-lg border p-3 text-center bg-amber-50 dark:bg-amber-950/15">
-                <p className="text-xs text-muted-foreground">总计划项</p>
-                <p className="text-lg font-bold text-amber-700 dark:text-amber-400">{(procurementData as any).data.summary.totalItems}</p>
-              </div>
-              <div className="rounded-lg border p-3 text-center bg-red-50 dark:bg-red-950/15">
-                <p className="text-xs text-muted-foreground">紧急采购</p>
-                <p className="text-lg font-bold text-red-700 dark:text-red-400">{(procurementData as any).data.summary.urgentItems}</p>
-              </div>
-              <div className="rounded-lg border p-3 text-center bg-emerald-50 dark:bg-emerald-950/15">
-                <p className="text-xs text-muted-foreground">预计预算</p>
-                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">¥{(procurementData as any).data.summary.totalBudget.toLocaleString()}</p>
-              </div>
-            </div>
-
-            {/* Procurement Table */}
-            <div className="max-h-72 overflow-y-auto overflow-x-auto custom-scrollbar">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">产品名</TableHead>
-                    <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">SKU</TableHead>
-                    <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground">当前库存</TableHead>
-                    <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground">安全库存</TableHead>
-                    <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground">建议数量</TableHead>
-                    <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">优先级</TableHead>
-                    <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground">预计成本</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="data-grid-stripe">
-                  {(procurementData as any).data.items.map((item: { sku: string; productName: string; currentStock: number; safetyStock: number; suggestedQty: number; priority: string; estimatedCost: number }, idx: number) => {
-                    const prioColors: Record<string, string> = {
-                      critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                      high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-                      medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-                      low: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                    };
-                    const prioLabels: Record<string, string> = { critical: '紧急', high: '高', medium: '中', low: '低' };
-                    return (
-                      <TableRow key={item.sku} className={`cursor-pointer hover:bg-amber-50/50 dark:hover:bg-amber-950/20 border-l-[3px] border-l-transparent hover:border-l-amber-400 transition-colors duration-200 ${idx % 2 === 0 ? '' : 'bg-muted/20'}`}>
-                        <TableCell className="font-medium text-xs">{item.productName}</TableCell>
-                        <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                        <TableCell className="text-right text-xs">
-                          <span className={item.currentStock < item.safetyStock ? 'text-red-600 font-semibold' : ''}>{item.currentStock.toLocaleString()}</span>
-                        </TableCell>
-                        <TableCell className="text-right text-xs">{item.safetyStock.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-xs font-semibold">{item.suggestedQty.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-[10px] ${prioColors[item.priority] || prioColors.low}`}>
-                            {prioLabels[item.priority] || item.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-xs">¥{item.estimatedCost.toLocaleString()}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 mt-4">
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hover:bg-amber-50 dark:hover:bg-amber-950/20" onClick={fetchBudget}>
-                <DollarSign className="h-3.5 w-3.5" />查看预算
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hover:bg-amber-50 dark:hover:bg-amber-950/20" onClick={fetchTimeline}>
-                <Clock className="h-3.5 w-3.5" />采购时间线
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <InventoryProcurementSection
+        procurementData={procurementData}
+        budgetDialogOpen={budgetDialogOpen}
+        onBudgetDialogOpenChange={setBudgetDialogOpen}
+        budgetData={budgetData}
+        timelineDialogOpen={timelineDialogOpen}
+        onTimelineDialogOpenChange={setTimelineDialogOpen}
+        timelineData={timelineData}
+        onFetchBudget={fetchBudget}
+        onFetchTimeline={fetchTimeline}
+      />
 
       {/* Stock Transfer Dialog */}
       <TransferDialog
@@ -833,128 +496,6 @@ export function InventoryTab() {
         inventory={inventoryForTransfer}
       />
 
-      {/* Budget Dialog */}
-      <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
-        <DialogContent className="max-w-lg backdrop-blur-sm border shadow-2xl dialog-scale-in">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-amber-500" />
-              采购预算详情
-            </DialogTitle>
-            <DialogDescription>预算分解与优化建议</DialogDescription>
-          </DialogHeader>
-          {!!budgetData && (
-            <div className="space-y-4">
-              {/* Total Budget */}
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">总预算金额</span>
-                  <span className="text-xl font-bold text-amber-700 dark:text-amber-400">¥{(budgetData as any).totalBudget.toLocaleString()}</span>
-                </div>
-                {(budgetData as any).bulkDiscount > 0 && (
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-xs text-muted-foreground">批量折扣</span>
-                    <span className="text-sm text-green-600 font-semibold">-¥{(budgetData as any).bulkDiscount.toLocaleString()}</span>
-                  </div>
-                )}
-                {(budgetData as any).bulkDiscount > 0 && (
-                  <div className="flex items-center justify-between mt-1 pt-1 border-t">
-                    <span className="text-xs font-semibold">净预算</span>
-                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">¥{(budgetData as any).netBudget.toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* By Category */}
-              {(budgetData as any).byCategory && (budgetData as any).byCategory.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">按品类分解</h4>
-                  <div className="space-y-2">
-                    {(budgetData as any).byCategory.map((cat: { category: string; amount: number; items: number }) => {
-                      const pct = (budgetData as any).totalBudget > 0 ? (cat.amount / (budgetData as any).totalBudget) * 100 : 0;
-                      return (
-                        <div key={cat.category}>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span>{cat.category} ({cat.items} 项)</span>
-                            <span className="font-semibold">¥{cat.amount.toLocaleString()}</span>
-                          </div>
-                          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* By Priority */}
-              {(budgetData as any).byPriority && (budgetData as any).byPriority.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">按优先级分解</h4>
-                  <div className="space-y-2">
-                    {(budgetData as any).byPriority.map((p: { priority: string; amount: number; items: number }) => {
-                      const prioColors: Record<string, string> = { '紧急': '#ef4444', '高': '#f97316', '中': '#f59e0b', '低': '#22c55e' };
-                      const pct = (budgetData as any).totalBudget > 0 ? (p.amount / (budgetData as any).totalBudget) * 100 : 0;
-                      return (
-                        <div key={p.priority}>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span>{p.priority}优先级 ({p.items} 项)</span>
-                            <span className="font-semibold">¥{p.amount.toLocaleString()}</span>
-                          </div>
-                          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: prioColors[p.priority] || '#f59e0b' }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Timeline Dialog */}
-      <Dialog open={timelineDialogOpen} onOpenChange={setTimelineDialogOpen}>
-        <DialogContent className="max-w-lg backdrop-blur-sm border shadow-2xl dialog-scale-in">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-500" />
-              采购时间线
-            </DialogTitle>
-            <DialogDescription>采购订单排期与预计到货</DialogDescription>
-          </DialogHeader>
-          {!!timelineData && (
-            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
-              {(timelineData as any).timeline.map((item: { sku: string; productName: string; orderDate: string; expectedDelivery: string; leadTime: number; quantity: number; status: string; priority: string }, idx: number) => {
-                const statusColors: Record<string, string> = { ordering: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', planned: 'bg-muted text-muted-foreground' };
-                return (
-                  <div key={item.sku} className="flex items-start gap-3 p-2.5 rounded-lg border hover:bg-muted/30 transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-xs font-bold text-amber-700 dark:text-amber-400 shrink-0">
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">{item.productName}</span>
-                        <Badge className={`text-[10px] ${statusColors[item.status] || statusColors.planned}`}>{item.status === 'ordering' ? '采购中' : '计划中'}</Badge>
-                        <Badge className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">{item.priority}</Badge>
-                      </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                        <span>下单: {item.orderDate}</span>
-                        <span>到货: {item.expectedDelivery}</span>
-                        <span>交期: {item.leadTime}天</span>
-                        <span>数量: {item.quantity}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* 搜索和筛选 + 库存明细 */}
       <Card className="card-dashboard">
@@ -962,22 +503,32 @@ export function InventoryTab() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="text-base font-semibold">库存明细</CardTitle>
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => exportToCSV(
-                filteredInventory.map((inv: Inventory) => ({
-                  sku: inv.sku, productName: inv.productName, warehouse: inv.warehouse,
-                  quantity: inv.quantity, safetyStock: inv.safetyStock, inTransit: inv.inTransit,
-                  turnoverDays: inv.turnoverDays, status: STATUS_LABELS[inv.stockStatus],
-                })),
-                '库存数据',
-                [
-                  { key: 'sku', label: 'SKU' }, { key: 'productName', label: '产品名称' },
-                  { key: 'warehouse', label: '仓库' }, { key: 'quantity', label: '当前库存' },
-                  { key: 'safetyStock', label: '安全库存' }, { key: 'inTransit', label: '在途' },
-                  { key: 'turnoverDays', label: '周转天数' }, { key: 'status', label: '状态' },
-                ]
-              )}>
-                <Download className="h-3 w-3" />导出 CSV
-              </Button>
+              <ExportMenu
+                data={filteredInventory.map((inv: Inventory) => ({
+                  sku: inv.sku,
+                  productName: inv.productName,
+                  warehouse: inv.warehouse,
+                  quantity: inv.quantity,
+                  safetyStock: inv.safetyStock,
+                  inTransit: inv.inTransit,
+                  turnoverDays: inv.turnoverDays,
+                  status: STATUS_LABELS[inv.stockStatus],
+                }))}
+                columns={[
+                  { key: 'sku', label: 'SKU' },
+                  { key: 'productName', label: '产品名称' },
+                  { key: 'warehouse', label: '仓库' },
+                  { key: 'quantity', label: '当前库存' },
+                  { key: 'safetyStock', label: '安全库存' },
+                  { key: 'inTransit', label: '在途' },
+                  { key: 'turnoverDays', label: '周转天数' },
+                  { key: 'status', label: '状态' },
+                ]}
+                filename="库存数据"
+                variant="outline"
+                size="sm"
+                label=""
+              />
               <Button
                 variant="outline"
                 size="sm"
@@ -1016,6 +567,19 @@ export function InventoryTab() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-10 px-2">
+                    <Checkbox
+                      checked={
+                        batchSelection.isAllSelected
+                          ? true
+                          : batchSelection.isIndeterminate
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={() => batchSelection.toggleAll()}
+                      aria-label="全选"
+                    />
+                  </TableHead>
                   <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">SKU</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">产品名称</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:table-cell">仓库</TableHead>
@@ -1035,6 +599,13 @@ export function InventoryTab() {
                     inv.stockStatus === 'overstock' ? 'border-l-purple-500 bg-purple-50/30 dark:bg-purple-950/10' :
                     'border-l-emerald-400'
                   }`} onClick={() => viewInventoryDetail(inv.sku)}>
+                    <TableCell className="w-10 px-2" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={batchSelection.selectedIds.has(inv.sku)}
+                        onCheckedChange={() => batchSelection.toggleItem(inv.sku)}
+                        aria-label={`选择 ${inv.sku}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{inv.sku}</TableCell>
                     <TableCell className="font-medium">{inv.productName}</TableCell>
                     <TableCell className="hidden sm:table-cell">{inv.warehouse}</TableCell>
@@ -1075,129 +646,19 @@ export function InventoryTab() {
         </CardContent>
       </Card>
 
-      {/* 库存详情弹窗 */}
-      <Dialog open={!!selectedInventorySku} onOpenChange={(open) => { if (!open) setSelectedInventorySku(''); }}>
-        <DialogContent className="max-w-lg backdrop-blur-sm border shadow-2xl dialog-scale-in">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-orange-500" />
-              库存详情 - {selectedInventorySku}
-            </DialogTitle>
-            <DialogDescription>库存健康度、安全库存与补货建议</DialogDescription>
-          </DialogHeader>
-          {inventoryDetail ? (
-            <div className="space-y-4">
-              {/* 健康度 */}
-              <div className="p-3 rounded-lg border bg-muted/30">
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-orange-500" />库存健康度
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">当前库存:</span> <span className="font-medium">{(inventoryDetail as any).health.quantity}</span></div>
-                  <div><span className="text-muted-foreground">安全库存:</span> <span className="font-medium">{(inventoryDetail as any).health.safetyStock}</span></div>
-                  <div><span className="text-muted-foreground">周转率:</span> <span className="font-medium">{(inventoryDetail as any).health.turnoverRate}</span></div>
-                  <div><span className="text-muted-foreground">周转天数:</span> <span className="font-medium">{(inventoryDetail as any).health.turnoverDays}</span></div>
-                  <div><span className="text-muted-foreground">ABC 分类:</span> <Badge variant="outline">{(inventoryDetail as any).health.abcClass}</Badge></div>
-                  <div><span className="text-muted-foreground">FSN 分类:</span> <Badge variant="outline">{(inventoryDetail as any).health.fsnClass}</Badge></div>
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">库存水位:</span>
-                  <div className="flex-1">
-                    <Progress value={Math.min(100, ((inventoryDetail as any).health.quantity / (inventoryDetail as any).health.reorderPoint) * 100)} className="h-2 transition-all duration-500" />
-                  </div>
-                  <Badge
-                    style={{ backgroundColor: STATUS_COLORS[(inventoryDetail as any).health.stockStatus] + '20', color: STATUS_COLORS[(inventoryDetail as any).health.stockStatus] }}
-                  >
-                    {STATUS_LABELS[(inventoryDetail as any).health.stockStatus]}
-                  </Badge>
-                </div>
-              </div>
-              {/* 安全库存 */}
-              <div className="p-3 rounded-lg border bg-muted/30">
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-cyan-500" />安全库存计算
-                </h4>
-                <div className="text-sm space-y-1">
-                  <div><span className="text-muted-foreground">服务水平:</span> <span className="font-medium">{((inventoryDetail as any).safety.serviceLevel * 100).toFixed(0)}%</span></div>
-                  <div><span className="text-muted-foreground">安全库存:</span> <span className="font-medium text-lg">{(inventoryDetail as any).safety.safetyStock}</span></div>
-                  <div className="text-xs text-muted-foreground mt-1 font-mono bg-muted/50 p-2 rounded">{(inventoryDetail as any).safety.formula}</div>
-                </div>
-              </div>
-              {/* 补货建议 */}
-              {(inventoryDetail as any).reorder && (
-                <div className="p-3 rounded-lg border bg-muted/30">
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-violet-500" />补货建议
-                  </h4>
-                  <div className="text-sm space-y-1">
-                    <div><span className="text-muted-foreground">当前库存:</span> <span className="font-medium">{(inventoryDetail as any).reorder.currentStock}</span></div>
-                    <div><span className="text-muted-foreground">在途库存:</span> <span className="font-medium">{(inventoryDetail as any).reorder.inTransit}</span></div>
-                    <div><span className="text-muted-foreground">建议补货:</span> <span className="font-bold text-lg text-violet-600">{(inventoryDetail as any).reorder.recommendedOrder}</span></div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-muted-foreground">紧急程度:</span>
-                      <Badge variant={(inventoryDetail as any).reorder.urgency === 'urgent' ? 'destructive' : (inventoryDetail as any).reorder.urgency === 'normal' ? 'default' : 'secondary'}>
-                        {(inventoryDetail as any).reorder.urgency === 'urgent' ? '紧急' : (inventoryDetail as any).reorder.urgency === 'normal' ? '常规' : '低优先'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Separator className="my-3" />
-                  {/* 补货操作表单 */}
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-orange-500" />补货操作
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-muted-foreground">订单数量</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={reorderQty || (inventoryDetail as any).reorder.recommendedOrder || 0}
-                        onChange={(e) => setReorderQty(Number(e.target.value))}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-muted-foreground">目标仓库</label>
-                      <Select value={reorderWarehouse} onValueChange={setReorderWarehouse}>
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="深圳仓">深圳仓</SelectItem>
-                          <SelectItem value="义乌仓">义乌仓</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-muted-foreground">优先级</label>
-                      <Select value={reorderPriority} onValueChange={setReorderPriority}>
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="常规">常规</SelectItem>
-                          <SelectItem value="紧急">紧急</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                      onClick={handleSubmitReorder}
-                    >
-                      <Zap className="h-4 w-4 mr-1" />
-                      确认下单
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <InventoryDetailDialog
+        open={!!selectedInventorySku}
+        onOpenChange={(open) => { if (!open) setSelectedInventorySku(''); }}
+        sku={selectedInventorySku}
+        detail={inventoryDetail}
+        reorderQty={reorderQty}
+        onReorderQtyChange={setReorderQty}
+        reorderWarehouse={reorderWarehouse}
+        onReorderWarehouseChange={setReorderWarehouse}
+        reorderPriority={reorderPriority}
+        onReorderPriorityChange={setReorderPriority}
+        onSubmitReorder={handleSubmitReorder}
+      />
 
       {/* Stock Adjustment Dialog */}
       <StockAdjustmentDialog
@@ -1205,6 +666,14 @@ export function InventoryTab() {
         onOpenChange={setAdjustmentDialogOpen}
         defaultSku={adjustmentDefaultSku}
         inventory={inventory}
+      />
+
+      {/* Batch Actions Toolbar */}
+      <BatchActionsToolbar
+        selectedCount={batchSelection.selectedCount}
+        onBatchReorder={handleBatchReorder}
+        onBatchExport={handleBatchExport}
+        onClearSelection={batchSelection.clearSelection}
       />
     </div>
   );

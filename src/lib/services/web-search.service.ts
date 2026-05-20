@@ -16,6 +16,7 @@ import { rewriteQuery, injectContext, type ConversationTurn } from './web-search
 import { guardResults } from './web-search-guard';
 import { rerankResults } from './web-search-reranker';
 import { crossValidate } from './web-search-cross-validator';
+import { zhToEnTermMap, zhToEnRewriterMap } from './web-search-keywords';
 
 // ─── Types ────────────────────────────────────────────────────────────────────────
 
@@ -67,27 +68,94 @@ function hasChinese(text: string): boolean {
  * Maps common Chinese supply chain terms to English equivalents.
  */
 function extractEnglishKeywords(query: string): string {
-  const termMap: Record<string, string> = {
-    '关税': 'tariff', '贸易战': 'trade war', '中美': 'US China',
-    '供应链': 'supply chain', '小家电': 'small appliance',
-    '运价': 'freight rate', '运费': 'shipping cost', '集装箱': 'container',
-    '铜价': 'copper price', '铜': 'copper', '铝价': 'aluminum price', '铝': 'aluminum',
-    '钢价': 'steel price', '螺纹钢': 'steel rebar', '碳价': 'carbon price',
-    '碳关税': 'CBAM carbon', '召回': 'recall CPSC', '港口': 'port congestion',
-    '汇率': 'exchange rate', '人民币': 'CNY USD', '美元': 'USD',
-    '出口': 'export', '进口': 'import', '政策': 'policy regulation',
-    '合规': 'compliance', '认证': 'certification', '库存': 'inventory',
-    '物流': 'logistics', '供应商': 'supplier', '销售': 'sales',
-    '成本': 'cost', '风险': 'risk', '新闻': 'news', '最新': 'latest',
-    '动态': 'update', '变化': 'change', '2026': '2026', '2025': '2025',
-  };
+  // Use the shared comprehensive map (merge both maps for maximum coverage)
+  const termMap = { ...zhToEnRewriterMap, ...zhToEnTermMap };
   let result = query;
   for (const [zh, en] of Object.entries(termMap)) {
-    result = result.replace(new RegExp(zh, 'g'), en);
+    result = result.replace(new RegExp(zh, 'g'), ' ' + en + ' ');
   }
   // Remove remaining Chinese characters and clean up
   result = result.replace(/[一-鿿]+/g, ' ').replace(/\s+/g, ' ').trim();
   return result || query.replace(/[一-鿿]/g, '').trim() || 'supply chain';
+}
+
+// ─── Search Diagnostics Type ──────────────────────────────────────────────────
+
+export interface SearchDiagnostics {
+  failedProviders: Array<{ provider: string; error: string }>;
+}
+
+// ─── In-Memory Search Result Cache (LRU + TTL) ───────────────────────────────
+
+const searchCache = new Map<string, { data: unknown; expiry: number }>();
+const CACHE_TTL = 60_000; // 60 seconds
+const CACHE_MAX = 100;
+
+function getCacheKey(query: string, config: ProviderConfig, extra?: string): string {
+  const raw = `${query}|${config.provider}|${config.baseUrl || ''}|${extra || ''}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
+function cacheGet<T>(key: string): T | undefined {
+  const entry = searchCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiry) {
+    searchCache.delete(key);
+    return undefined;
+  }
+  // LRU: move to end (most recently used)
+  searchCache.delete(key);
+  searchCache.set(key, entry);
+  return entry.data as T;
+}
+
+function cacheSet<T>(key: string, data: T): void {
+  if (searchCache.size >= CACHE_MAX) {
+    const oldest = searchCache.keys().next().value;
+    if (oldest) searchCache.delete(oldest);
+  }
+  searchCache.set(key, { data, expiry: Date.now() + CACHE_TTL });
+}
+
+// ─── Prompt Injection Sanitizer ───────────────────────────────────────────────
+
+/**
+ * Sanitize text from external sources before injecting into LLM context.
+ * Strips common prompt injection patterns, limits length, and removes
+ * control characters.
+ */
+function sanitizeForLLM(text: string): string {
+  // Remove control characters except newlines (\n), carriage returns (\r), and tabs (\t)
+  let sanitized = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+  // Strip common prompt injection patterns (case-insensitive)
+  const injectionPatterns: RegExp[] = [
+    /ignore\s+(all\s+)?previous\s+instructions/gi,
+    /system:/gi,
+    /you\s+are\s+now/gi,
+    /new\s+instructions/gi,
+    /override\s+(all\s+)?previous/gi,
+    /disregard\s+(all\s+)?previous/gi,
+    /you\s+are\s+(not|no\s+longer)/gi,
+    /your\s+(new\s+)?(task|role|job|mission)\s+is/gi,
+    /ignore\s+all\s+prior/gi,
+  ];
+  for (const pattern of injectionPatterns) {
+    sanitized = sanitized.replace(pattern, '[redacted]');
+  }
+
+  // Limit length
+  if (sanitized.length > 500) {
+    sanitized = sanitized.slice(0, 497) + '...';
+  }
+
+  return sanitized;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────────
@@ -119,7 +187,7 @@ function buildSearXNGUrl(baseUrl: string, query: string, options: SearXNGOptions
   params.set('format', 'json');
   params.set('categories', options.categories || 'general');
   if (options.time_range) params.set('time_range', options.time_range);
-  params.set('language', options.language || 'zh-CN');
+  if (options.language) params.set('language', options.language);
   params.set('safesearch', String(options.safesearch ?? 2));
   if (options.engines) params.set('engines', options.engines);
   return `${baseUrl}/search?${params.toString()}`;
@@ -448,7 +516,10 @@ async function searchReddit(query: string): Promise<SearchResult[]> {
       snippet: (r.selftext || '').slice(0, 500),
       publishedAt: new Date(r.created_utc * 1000).toISOString(),
     }));
-  } catch { return []; }
+  } catch (err) {
+    console.warn('[web-search] Reddit search failed:', (err as Error).message || 'Unknown error');
+    return [];
+  }
 }
 
 async function searchGitHub(query: string): Promise<SearchResult[]> {
@@ -469,7 +540,10 @@ async function searchGitHub(query: string): Promise<SearchResult[]> {
       snippet: r.description || '',
       publishedAt: r.updated_at,
     }));
-  } catch { return []; }
+  } catch (err) {
+    console.warn('[web-search] GitHub search failed:', (err as Error).message || 'Unknown error');
+    return [];
+  }
 }
 
 async function searchHackerNews(query: string): Promise<SearchResult[]> {
@@ -490,7 +564,10 @@ async function searchHackerNews(query: string): Promise<SearchResult[]> {
       snippet: r.comment_text || '',
       publishedAt: r.created_at,
     }));
-  } catch { return []; }
+  } catch (err) {
+    console.warn('[web-search] Hacker News search failed:', (err as Error).message || 'Unknown error');
+    return [];
+  }
 }
 
 // ─── Provider Router ───────────────────────────────────────────────────────────────
@@ -533,67 +610,83 @@ async function searchByProvider(query: string, config: ProviderConfig): Promise<
 /**
  * Run all search tiers with a given query.
  */
-async function tryAllSources(query: string, config: ProviderConfig): Promise<{ results: SearchResult[]; source: string }> {
+async function tryAllSources(query: string, config: ProviderConfig): Promise<{ results: SearchResult[]; source: string; diagnostics: SearchDiagnostics }> {
+  const diagnostics: SearchDiagnostics = { failedProviders: [] };
+
   // Tier 1: Primary provider
   try {
     const result = await searchByProvider(query, config);
-    if (result.results.length > 0) return result;
+    if (result.results.length > 0) return { ...result, diagnostics };
   } catch (err) {
     const msg = (err as Error).message || 'Unknown error';
-    console.warn('[web-search] Primary provider failed:', msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***'));
+    const safeMsg = msg.replace(/key[=:][^\s&]{8,}/gi, 'key=***');
+    console.warn('[web-search] Primary provider failed:', safeMsg);
+    diagnostics.failedProviders.push({ provider: config.provider, error: safeMsg });
   }
 
   // Tier 2: Reddit
   try {
     const reddit = await searchReddit(query);
-    if (reddit.length > 0) return { results: reddit, source: 'Reddit' };
-  } catch { /* continue */ }
+    if (reddit.length > 0) return { results: reddit, source: 'Reddit', diagnostics };
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error';
+    console.warn('[web-search] Reddit search failed:', msg);
+    diagnostics.failedProviders.push({ provider: 'Reddit', error: msg });
+  }
 
   // Tier 3: GitHub
   try {
     const github = await searchGitHub(query);
-    if (github.length > 0) return { results: github, source: 'GitHub' };
-  } catch { /* continue */ }
+    if (github.length > 0) return { results: github, source: 'GitHub', diagnostics };
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error';
+    console.warn('[web-search] GitHub search failed:', msg);
+    diagnostics.failedProviders.push({ provider: 'GitHub', error: msg });
+  }
 
   // Tier 4: Hacker News
   try {
     const hn = await searchHackerNews(query);
-    if (hn.length > 0) return { results: hn, source: 'Hacker News' };
-  } catch { /* continue */ }
+    if (hn.length > 0) return { results: hn, source: 'Hacker News', diagnostics };
+  } catch (err) {
+    const msg = (err as Error).message || 'Unknown error';
+    console.warn('[web-search] Hacker News search failed:', msg);
+    diagnostics.failedProviders.push({ provider: 'Hacker News', error: msg });
+  }
 
-  return { results: [], source: 'none' };
+  return { results: [], source: 'none', diagnostics };
 }
 
-export async function webSearch(query: string): Promise<{ results: SearchResult[]; source: string }> {
+export async function webSearch(query: string): Promise<{ results: SearchResult[]; source: string; diagnostics?: SearchDiagnostics }> {
   const q = sanitizeQuery(query);
   if (!q) return { results: [], source: 'none' };
 
   const config = getConfig();
+  const cacheKey = getCacheKey(q, config);
+  const cached = cacheGet<{ results: SearchResult[]; source: string }>(cacheKey);
+  if (cached) return cached;
 
-  // First attempt with original query
-  const firstTry = await tryAllSources(q, config);
-  if (firstTry.results.length > 0) return firstTry;
+  const result = await tryAllSources(q, config);
+  if (result.results.length === 0) return { results: [], source: 'none', diagnostics: result.diagnostics };
 
-  // If query contains Chinese and got 0 results, retry with English keywords
-  if (hasChinese(q)) {
-    const enKeywords = extractEnglishKeywords(q);
-    if (enKeywords && enKeywords !== q) {
-      console.log('[web-search] Chinese query got 0 results, retrying with:', enKeywords);
-      const retry = await tryAllSources(enKeywords, config);
-      if (retry.results.length > 0) return retry;
-    }
-  }
+  const guarded = guardResults(result.results, q, 'auto');
+  const finalResult = {
+    results: guarded.results.length > 0 ? guarded.results : result.results,
+    source: result.source,
+    diagnostics: result.diagnostics,
+  };
 
-  return { results: [], source: 'none' };
+  cacheSet(cacheKey, { results: finalResult.results, source: finalResult.source });
+  return finalResult;
 }
 
 /**
  * Deep search: primary provider + Jina Reader for full page content.
  * Fetches up to 3 top results' full content via Jina Reader concurrently.
  */
-export async function deepSearch(query: string): Promise<{ results: SearchResult[]; source: string }> {
-  const { results, source } = await webSearch(query);
-  if (results.length === 0) return { results: [], source };
+export async function deepSearch(query: string): Promise<{ results: SearchResult[]; source: string; diagnostics?: SearchDiagnostics }> {
+  const { results, source, diagnostics } = await webSearch(query);
+  if (results.length === 0) return { results: [], source, diagnostics };
 
   // Fetch full content for top 3 results concurrently
   const enriched = await Promise.all(
@@ -607,6 +700,7 @@ export async function deepSearch(query: string): Promise<{ results: SearchResult
   return {
     results: [...enriched, ...results.slice(3)],
     source: `${source} + Jina Reader`,
+    diagnostics,
   };
 }
 
@@ -614,14 +708,21 @@ export async function deepSearch(query: string): Promise<{ results: SearchResult
  * Search supplementary sources only (no primary provider).
  * Used when the user specifically wants community/developer content.
  */
-export async function searchSupplementary(query: string): Promise<{ reddit: SearchResult[]; github: SearchResult[]; hn: SearchResult[] }> {
+export async function searchSupplementary(query: string): Promise<{ reddit: SearchResult[]; github: SearchResult[]; hn: SearchResult[]; diagnostics: SearchDiagnostics }> {
   const q = sanitizeQuery(query);
-  const [reddit, github, hn] = await Promise.all([
+  const diagnostics: SearchDiagnostics = { failedProviders: [] };
+
+  const [redditRes, githubRes, hnRes] = await Promise.allSettled([
     searchReddit(q),
     searchGitHub(q),
     searchHackerNews(q),
   ]);
-  return { reddit, github, hn };
+
+  const reddit = redditRes.status === 'fulfilled' ? redditRes.value : (() => { diagnostics.failedProviders.push({ provider: 'Reddit', error: redditRes.reason?.message || 'Unknown' }); return []; })();
+  const github = githubRes.status === 'fulfilled' ? githubRes.value : (() => { diagnostics.failedProviders.push({ provider: 'GitHub', error: githubRes.reason?.message || 'Unknown' }); return []; })();
+  const hn = hnRes.status === 'fulfilled' ? hnRes.value : (() => { diagnostics.failedProviders.push({ provider: 'Hacker News', error: hnRes.reason?.message || 'Unknown' }); return []; })();
+
+  return { reddit, github, hn, diagnostics };
 }
 
 /**
@@ -636,9 +737,17 @@ export function formatSearchContext(results: SearchResult[], maxResults = 6): st
     return `未找到搜索结果（当前 provider: ${provider}）。建议使用专用MCP工具查询具体数据。`;
   }
 
+  // Sanitize external content before injecting into LLM context
+  const sanitizedResults = results.map(r => ({
+    ...r,
+    title: sanitizeForLLM(r.title),
+    snippet: sanitizeForLLM(r.snippet),
+    content: r.content ? sanitizeForLLM(r.content) : undefined,
+  }));
+
   // Filter out low-quality domains
   const LOW_QUALITY_DOMAINS = ['reddit.com', 'forum.adrenaline.com.br', 'quora.com', 'answers.com'];
-  const filtered = results.filter(r => {
+  const filtered = sanitizedResults.filter(r => {
     try {
       const host = new URL(r.url).hostname.replace('www.', '');
       return !LOW_QUALITY_DOMAINS.some(d => host.includes(d));
@@ -833,8 +942,15 @@ export async function webSearchWithQuality(
   const searchOptions = classifyQueryForSearch(primaryQuery);
 
   const config = getConfig();
-  let allResults: SearchResult[] = [];
-  let sources: string[] = [];
+
+  // ── Cache check ────────────────────────────────────────────────────────
+  const cacheKey = getCacheKey(primaryQuery, config,
+    `${searchOptions.categories || ''}|${searchOptions.time_range || ''}|${searchOptions.engines || ''}`);
+  const cached = cacheGet<QualitySearchResult>(cacheKey);
+  if (cached) return cached;
+
+  const allResults: SearchResult[] = [];
+  const sources: string[] = [];
 
   // ── Step 4: Multi-source parallel racing (all free, all unlimited) ──────────
 
@@ -910,7 +1026,7 @@ export async function webSearchWithQuality(
       const pipelineMs = Date.now() - startTime;
       const combinedSource = [...new Set(sources)].join(' + ');
 
-      return {
+      const qualityResult: QualitySearchResult = {
         results: pool.slice(0, TARGET_MIN_RESULTS),
         source: guarded.passed ? combinedSource : `${combinedSource} ⚠️degraded`,
         diagnostics: {
@@ -928,6 +1044,8 @@ export async function webSearchWithQuality(
           pipelineMs,
         },
       };
+      cacheSet(cacheKey, qualityResult);
+      return qualityResult;
     }
 
     // Not enough results — broaden and refetch
@@ -959,7 +1077,7 @@ export async function webSearchWithQuality(
   const pipelineMs = Date.now() - startTime;
   const combinedSource = [...new Set(sources)].join(' + ');
 
-  return {
+  const fallbackResult: QualitySearchResult = {
     results: allResults.slice(0, TARGET_MIN_RESULTS),
     source: combinedSource || 'none',
     diagnostics: {
@@ -977,4 +1095,6 @@ export async function webSearchWithQuality(
       pipelineMs,
     },
   };
+  cacheSet(cacheKey, fallbackResult);
+  return fallbackResult;
 }

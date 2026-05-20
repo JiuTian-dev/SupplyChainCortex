@@ -202,5 +202,5 @@
 - **`agent-sandbox.service.ts`** — 导出内部类型和函数供策略引擎复用
 
 ### 版本
-- 当前版本：v0.9.0
+- 当前版本：v1.1.0
 - Git 仓库：`https://github.com/JiuTian-dev/SupplyChainCortex.git` main 分支

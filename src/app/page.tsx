@@ -9,6 +9,7 @@ import { LazyLoader } from '@/components/shared/LazyLoader';
 
 // ── TabbedSection (lightweight, always needed) ──────────────────────────────
 import { TabbedSection } from '@/components/dashboard/TabbedSection';
+import { DragDropDashboard } from '@/components/dashboard/DragDropDashboard';
 
 // ── Panel registry + config ─────────────────────────────────────────────────
 import { PANEL_REGISTRY } from '@/lib/dashboard/panel-registry';
@@ -16,12 +17,10 @@ import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 
 // ── Layout (always visible, lightweight) ────────────────────────────────────
 import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
 import { SectionErrorBoundary, OfflineBanner, ErrorReportProvider } from '@/components/error';
 import { UserMenu } from '@/components/auth/UserMenu';
 import { GlobalSearch } from '@/components/shared/GlobalSearch';
 import { ScrollToTop } from '@/components/shared/ScrollToTop';
-import { QuickActions } from '@/components/shared/QuickActions';
 import { MCPConnectorCard } from '@/components/dashboard/MCPConnectorCard';
 
 // ── Stores & hooks ──────────────────────────────────────────────────────────
@@ -68,7 +67,6 @@ function HomePageContent() {
   useEffect(() => { refreshHealth(); }, [refreshHealth]);
 
   // ── Tab state ────────────────────────────────────────────────────────────
-  const [decisionTab, setDecisionTab] = useState('monitor');
   const activeTab = useDashboardUIStore(s => s.activeTab);
   const setActiveTab = useDashboardUIStore(s => s.setActiveTab);
   const setShowScrollTop = useDashboardUIStore(s => s.setShowScrollTop);
@@ -78,14 +76,17 @@ function HomePageContent() {
 
   // ── Panel visibility from config ─────────────────────────────────────────
   const panels = useDashboardConfigStore(s => s.config.panels);
+  const panelOrder = useDashboardConfigStore(s => s.config.panelOrder);
 
-  const decisionPanels = useMemo(() =>
-    PANEL_REGISTRY.filter(p => p.category === 'decision' && (panels[p.id] !== false)),
-  [panels]);
-
-  const opsPanels = useMemo(() =>
-    PANEL_REGISTRY.filter(p => p.category === 'ops' && (panels[p.id] !== false)),
-  [panels]);
+  const opsPanels = useMemo(() => {
+    const panelMap = new Map(PANEL_REGISTRY.map(p => [p.id, p]));
+    return panelOrder
+      .filter(id => {
+        const def = panelMap.get(id);
+        return def && def.category === 'ops' && panels[id] !== false;
+      })
+      .map(id => panelMap.get(id)!);
+  }, [panelOrder, panels]);
 
   // ── Dialog states ────────────────────────────────────────────────────────
   const [productDetailSku, setProductDetailSku] = useState<string | null>(null);
@@ -149,12 +150,8 @@ function HomePageContent() {
         <ConfigToolbarLazy />
 
         <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-          {/* ── Decision Flow ── */}
-          <TabbedSection
-            panels={decisionPanels}
-            activeTab={decisionTab}
-            onTabChange={setDecisionTab}
-          />
+          {/* ── Decision Flow — drag-and-drop dashboard ── */}
+          <DragDropDashboard />
 
           {/* ── MCP Connector Health — live status cards ── */}
           <div className="bg-card border rounded-lg p-4">
@@ -175,8 +172,6 @@ function HomePageContent() {
           />
         </main>
 
-        <Footer />
-
         {/* ── Shared dialogs & overlays ── */}
         <NotificationCenter onNavigate={handleNavigate} onViewInventoryDetail={handleViewInventoryDetail} />
         <ProductDetailSheet sku={productDetailSku || ''} open={productDetailOpen} onOpenChange={setProductDetailOpen} />
@@ -188,7 +183,6 @@ function HomePageContent() {
         <UserManagementPanel open={userManagementOpen} onOpenChange={setUserManagementOpen} />
         <GlobalSearch />
         <ScrollToTop />
-        <QuickActions onRefresh={refreshAll} isRefreshing={false} activeTab={activeTab} />
       </div>
     </ErrorReportProvider>
   );

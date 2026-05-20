@@ -42,7 +42,7 @@ interface IntentConfig {
   reason: string;
 }
 
-function hasKeyword(query: string, keyword: string): boolean {
+export function hasKeyword(query: string, keyword: string): boolean {
   const q = query.toLowerCase();
   const k = keyword.toLowerCase();
   // Short English words: use word boundary to avoid "hi" matching inside "this"
@@ -100,9 +100,14 @@ const INTENTS: IntentConfig[] = [
     intent: 'news_event',
     keywords: ['这周', '本周', '今天', '昨天', '最近', '最新', '刚刚', '新闻',
       '动态', '事件', '发生了什么', '大事件', '新规', '法规更新',
-      'this week', 'latest', 'breaking', 'news', 'what happened', 'update'],
+      'this week', 'latest', 'breaking', 'news', 'what happened', 'update',
+      '特朗普', '拜登', '访华', '制裁', '贸易战', '中美博弈', '中美关系',
+      '大选', '竞选', '白宫', '国会', '谈判', '协议', '关税战',
+      'Trump', 'Biden', 'Xi', 'trade war', 'election', 'summit', 'diplomat',
+      'WTO', 'IMF', 'World Bank', 'G7', 'G20', 'BRICS',
+      '政策转向', '行政令', '总统令', '备忘录', '联合声明'],
     primaryTier: 3, fallbackTier: 1,
-    reason: '时效性新闻/事件，多源搜索优先',
+    reason: '时效性新闻/事件/政策动态，多源搜索优先',
   },
 
   // ── Tier 1+2: Supply chain domain knowledge ───────────────────────────────

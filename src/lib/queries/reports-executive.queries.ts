@@ -121,8 +121,8 @@ export async function getExecutiveDashboard(): Promise<ExecutiveDashboardResult>
       const thirtyDaysAgoStr = daysAgo(30);
       const sixtyDaysAgoStr = daysAgo(60);
       const todayStr = todayISO();
-      const recentRevenue = salesRecords.filter(r => r.date >= thirtyDaysAgoStr && r.date <= todayStr).reduce((sum, r) => sum + r.revenue, 0);
-      const priorRevenue = salesRecords.filter(r => r.date >= sixtyDaysAgoStr && r.date < thirtyDaysAgoStr).reduce((sum, r) => sum + r.revenue, 0);
+      const recentRevenue = salesRecords.filter(r => r.date >= new Date(thirtyDaysAgoStr) && r.date <= new Date(todayStr)).reduce((sum, r) => sum + r.revenue, 0);
+      const priorRevenue = salesRecords.filter(r => r.date >= new Date(sixtyDaysAgoStr) && r.date < new Date(thirtyDaysAgoStr)).reduce((sum, r) => sum + r.revenue, 0);
       const growthRate = priorRevenue > 0 ? ((recentRevenue - priorRevenue) / priorRevenue) * 100 : 0;
       const growthScore = Math.min(40, growthRate >= 20 ? 40 : growthRate >= 10 ? 35 : growthRate >= 5 ? 30 : growthRate >= 0 ? 22 : growthRate >= -10 ? 14 : 5);
       const revenueByProduct: Record<string, number> = {};
@@ -229,7 +229,7 @@ export async function getPerformanceDashboard(): Promise<PerformanceDashboardRes
 
       const salesByMonth: Record<string, { month: string; revenue: number; quantity: number; orders: number }> = {};
       salesRecords.forEach(r => {
-        const month = r.date.substring(0, 7);
+        const month = r.date.toISOString().substring(0, 7);
         if (!salesByMonth[month]) salesByMonth[month] = { month, revenue: 0, quantity: 0, orders: 0 };
         salesByMonth[month].revenue += r.revenue;
         salesByMonth[month].quantity += r.quantity;

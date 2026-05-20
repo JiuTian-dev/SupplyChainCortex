@@ -138,6 +138,24 @@ export async function fetchCompetitorPrices(
     } catch { /* best-effort */ }
   }
 
+  // Final fallback: return structured placeholder so the assistant can still reason
+  // rather than returning empty which causes the AI to produce a meaningless short reply
+  if (results.length === 0) {
+    const fallbackKeyword = keyword || category || '厨房小家电';
+    results.push({
+      keyword: fallbackKeyword,
+      date: new Date().toISOString().split('T')[0],
+      competitorCount: 0,
+      avgPrice: 0,
+      minPrice: 0,
+      maxPrice: 0,
+      avgRating: 0,
+      avgReviews: 0,
+      source: '数据暂不可用 — 请检查网络或手动搜索 amazon.com',
+    });
+    console.warn('[amazon-competitor] All data sources failed, returning empty marker');
+  }
+
   return results;
 }
 

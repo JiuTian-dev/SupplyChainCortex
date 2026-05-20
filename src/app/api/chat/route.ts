@@ -13,11 +13,19 @@ import { withChatRateLimit } from '@/lib/api-protection';
 import { getAuth } from '@/lib/auth-helpers';
 import { getToolSchemas, executeTool } from '@/lib/mcp/tools';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
-import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
-import { classifyIntent, getActiveSources, type Intent, type RoutingDecision } from '@/lib/services/information-router';
+import { webSearch, webSearchWithQuality, formatSearchContext } from '@/lib/services/web-search.service';
+import type { RoutingDecision } from '@/lib/services/information-router';
 import { runReActAgent } from '@/lib/engine/react-agent';
 import { buildDynamicSystemContext, rememberConversationTurn } from '@/lib/engine/context-builder';
 import { episodeStore } from '@/lib/engine/episode-store';
+import { enforceMARC } from '@/lib/services/marc-validator';
+
+/** Apply MARC protocol validation to chat reply, appending audit footer if needed */
+function wrapReply(raw: string): string {
+  const { text } = enforceMARC(raw);
+  return text;
+}
+
 import {
   chatCompletionStream,
   chatCompletion,
@@ -25,271 +33,19 @@ import {
   getDefaultModel,
   type ChatMessage,
 } from '@/lib/services/ai-providers.service';
+import {
+  formatSSE,
+  formatToolResult,
+  isToolCallText,
+  extractToolCallsFromText,
+  DEFAULT_TOOL_ACTIONS,
+  getRoutingDecision,
+  matchToolsToQuery,
+  type ToolAction,
+} from './chat.helpers';
+import { SYSTEM_PROMPT } from './chat.prompt';
 
 export const dynamic = 'force-dynamic';
-
-// ─── System Prompt (legacy, kept for backward compatibility) ──────────────────────
-
-const SYSTEM_PROMPT = `你是"SupplyChain Cortex"的智能供应链决策助手，专门为跨境小家电供应链提供深度分析和决策支持。
-
-你的特性：
-- 配备 61 个 MCP 工具，覆盖数据查询、数学计算、仿真模拟、业务操作全链路
-- 内置联网搜索(web_search) — 可查SCFI运价、LME铜铝钢价格、EU碳价、CPSC召回、关税政策、港口新闻等
-- 上下文窗口大，可以处理复杂多步推理和长篇分析
-
-MCP 工具清单：
-
-📊 数据查询工具 (query_*)
-【库存】query_inventory (overview/list/forecast/risk/detail/reorder/slow_moving/abc-analysis)
-【成本】query_cost (overview/list/detail/benchmark/optimization/trend)
-【销售】query_sales (overview/daily/forecast)
-【物流】query_logistics (list/stats/track/risks) · query_weather (all/summary/marine)
-【汇率】query_exchange_rates (latest/history)
-【大宗商品】query_commodities — 铜/铝/螺纹钢/PP/LLDPE/PVC 日度价格
-【运价】query_scfis — SCFIS欧洲航线期货 → 推算集运运费
-【碳价】query_carbon_price — EUA实时碳价 + CBAM成本
-【港口】query_port_congestion — 全球10港拥堵状况
-【召回】query_cpsc_recalls — 美国CPSC中国产小家电召回
-【供应商】query_suppliers (list/performance) · query_supplier_discovery
-【风险】query_risk · query_cascade_risk (9种场景) · query_recall_risk
-【图谱】query_decision_graph · query_coherence_audit
-【市场】query_amazon_competitors · query_brand_sentiment · query_arbitrage · query_product_feed
-【合规】query_compliance_check · query_tariff
-【金融】query_financial_index · query_financial_sim · query_dashboard · query_analytics
-
-🔧 操作工具
-【补货】create_reorder · adjust_inventory
-【物流】update_shipment_status
-【备注】create_note · resolve_alert
-
-🧮 供应链数学计算工具 (calculate_*) — 精确数学模型，直接计算
-【库存模型】calculate_eoq (经济订货批量+折扣) · calculate_safety_stock · calculate_reorder_point · classify_abc_xyz
-【预测】forecast_demand (SMA/ES/线性/Winters/Croston) · calculate_seasonal_decompose
-【仿真】monte_carlo_inventory (蒙特卡洛库存仿真)
-【批量优化】calculate_wagner_whitin (动态批量最优解) · calculate_newsvendor (报童模型)
-【网络设计】calculate_drp (分销需求计划) · calculate_warehouse_location · calculate_transport_route · calculate_multi_echelon_ss
-【绩效指标】calculate_inventory_kpi · calculate_fill_rate · calculate_lead_time_analysis · calculate_purchase_variance
-【财务】calculate_total_cost · calculate_supplier_scoring
-【生产】calculate_learning_curve (学习曲线) · calculate_break_even (盈亏平衡)
-【定价】calculate_optimal_pricing (需求弹性最优定价)
-【计划】calculate_joint_replenishment (联合补货) · calculate_forecast_accuracy (预测准确度追踪)
-
-⚙️ 仿真与工作流
-【仿真】run_sandbox (baseline/trade_war/typhoon_season/perfect_storm)
-【工作流】execute_workflow (wf-full-health/wf-cost-audit/wf-risk-scan)
-【联网】web_search — 搜索最新公开信息，英文关键词优先
-
-核心规则 — MARC 置信度控制协议：
-
-**1. 来源标注（强制执行）**
-每个事实性数字、声称、数据点必须携带来源标签：
-- [T1-MCP] = MCP工具直连数据（交易所/API/数据库），最权威
-- [T2-KB] = 知识库/Wikipedia/内置RAG
-- [T3-Search] = 联网搜索结果，时效性好但权威性有限
-- [T0-LLM] = 模型知识/推理，非一手数据
-**规则：任何数字声称没有来源标签 = 不合格。禁止连续3个以上段落不带标签。**
-
-**2. 置信度表达（每项关键声称必须标注）**
-- [高] = 多源交叉验证通过，或来自MCP直连数据
-- [中] = 单一来源，或推理推断
-- [低] = 无法验证，或来源过时/冲突
-不确定时不要假装确定。如果数据不足以支撑结论，明确说"当前数据不足以确定"。
-
-**3. 自适应简洁度（按意图分层）**
-- Tier 0 (闲聊/意见): ≤3句话，不调用工具，不搜索。直接给观点，不需要展开分析。
-- Tier 1 (供应链数据): ≤300字。数据+简短解读。只给最相关的数字。
-- Tier 2 (知识/定义): ≤200字。定义+一句话例子+供应链关联。
-- Tier 3 (新闻/分析): 可展开，但优先要点而非长篇。每个部分3-5条要点即可。
-**规则：先给结论，再给支撑。不要先铺垫三段再进入正题。**
-
-**4. 不确定性归因**
-当信息不完整时，明确指出缺什么：
-- "当前数据仅覆盖到X月，Y月数据尚未发布"
-- "该分析基于历史模式推断，非实时监测"
-- "搜索结果存在矛盾：A源说X，B源说Y"
-
-**5. 其他**
-- 数学计算优先使用 calculate_* 工具
-- 多维度交叉分析（铜价涨→查含铜SKU→算毛利影响→建议锁价）
-- 联网搜索规则：系统自动决定是否搜索，不要主动调用 web_search 除非提示要求。`;
-
-// ─── SSE Helpers ────────────────────────────────────────────────────────────────
-
-function formatSSE(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
-
-function streamSSE(controller: ReadableStreamDefaultController, event: string, data: unknown): void {
-  controller.enqueue(new TextEncoder().encode(formatSSE(event, data)));
-}
-
-// ─── Tool Formatting ────────────────────────────────────────────────────────────
-
-function formatToolResult(tool: string, action: string, result: unknown): string {
-  if (!result || typeof result !== 'object') return '查询完成，但没有找到相关数据。';
-  const data = result as Record<string, unknown>;
-
-  switch (tool) {
-    case 'query_inventory': {
-      if (action === 'overview') return `📦 库存概览: 总产品${data.totalItems}项, 总库存${data.totalQuantity}, 低库存预警${data.lowStockAlerts}项, 平均周转${data.avgTurnoverDays}天`;
-      if (action === 'reorder') { const s = data.summary as Record<string, unknown>; return `📋 补货建议: ${s?.totalRecommendations}项, 紧急${s?.urgentCount}项, 预估成本¥${s?.totalEstimatedCost}`; }
-      return `📦 库存查询完成: ${JSON.stringify(data).substring(0, 400)}`;
-    }
-    case 'query_cost': {
-      if (action === 'overview') return `💰 成本概览: ${data.totalProducts}产品, 平均毛利率${data.avgGrossMargin}%`;
-      return `💰 成本查询完成: ${JSON.stringify(data).substring(0, 400)}`;
-    }
-    case 'query_sales': {
-      if (action === 'overview') return `📈 销售概览(${data.period}): 总收入¥${data.totalRevenue}`;
-      return `📈 销售查询完成: ${JSON.stringify(data).substring(0, 400)}`;
-    }
-    case 'query_logistics': {
-      if (action === 'stats') return `🚢 物流统计: ${data.totalShipments}批, 准时率${data.onTimeDeliveryRate}%, 高风险${data.highRiskCount}批`;
-      return `🚢 物流查询完成: ${JSON.stringify(data).substring(0, 400)}`;
-    }
-    case 'query_dashboard': {
-      if (action === 'summary') return `📊 供应链概览: ${data.totalProducts}产品, 收入¥${data.totalRevenue}, 健康评分${data.healthScore}/100`;
-      return `📊 仪表盘查询完成`;
-    }
-    case 'query_risk': {
-      if (action === 'dashboard') return `⚠️ 风险评估: 评分${data.overallRisk}/100, 等级${data.riskLevel}`;
-      return `⚠️ 风险查询完成`;
-    }
-    case 'query_suppliers': return `🏭 供应商查询完成: ${JSON.stringify(data).substring(0, 400)}`;
-    case 'query_analytics': return `🔬 分析完成: ${JSON.stringify(data).substring(0, 400)}`;
-    case 'adjust_inventory': {
-      const adj = data.adjustment as Record<string, unknown> | undefined;
-      return adj ? `📦 库存调整: ${adj.productName} ${adj.adjustment}件, ${adj.previousQuantity}→${adj.newQuantity}` : `📦 调整完成`;
-    }
-    case 'create_note': return `📝 备注已创建`;
-    case 'query_exchange_rates': {
-      if (action === 'latest') {
-        const rates = data.rates as Record<string, number> | undefined;
-        const trend = data.trend as Record<string, { direction: string; change: number }> | undefined;
-        if (rates) {
-          const parts = Object.entries(rates).map(([c, r]) => {
-            const t = trend?.[c];
-            const arrow = t?.direction === 'up' ? '↑' : t?.direction === 'down' ? '↓' : '→';
-            return `${c}: ${r} ${arrow}${t?.change || 0}%`;
-          });
-          return `💱 人民币汇率 (${data.base}): ${parts.join(', ')}`;
-        }
-      }
-      return `💱 汇率查询完成`;
-    }
-    case 'query_weather': {
-      const alerts = data.activeAlerts as Array<{ port: string; type: string; severity: string }> | undefined;
-      if (alerts?.length) {
-        return `🌤 港口天气预警: ${alerts.map(a => `${a.port}(${a.type}/${a.severity})`).join(', ')}`;
-      }
-      return `🌤 港口天气: 所有港口海况正常，无恶劣天气预警`;
-    }
-    case 'web_search': {
-      if (data.error === 'search_engine_requires_english') {
-        return `⚠️ 搜索失败: ${data.message}\n请用英文关键词重新搜索。例如: ${data.example || '将中文翻译为英文'}`;
-      }
-      const ctx = data.formattedContext as string | undefined;
-      return `🔍 联网搜索结果 (${data.source}):\n${ctx || JSON.stringify(data.results).substring(0, 1000)}`;
-    }
-    case 'query_commodities': {
-      const summary = data.summary as string | undefined;
-      return `🧱 大宗商品: ${summary || `共${data.count}种商品`}`;
-    }
-    case 'query_scfis': {
-      if (data.error) return `📦 SCFIS: ${data.error}`;
-      return `📦 SCFIS运价: ${data.index}点, 约$${data.estimatedFreightUSD}/FEU, ${data.route}`;
-    }
-    case 'query_carbon_price': {
-      if (data.error) return `🌍 碳价: ${data.error}`;
-      return `🌍 EU碳价: €${data.euaPrice}/t CO2, ${data.cbamExample || ''}`;
-    }
-    case 'query_cpsc_recalls': {
-      if (data.message) return `⚠️ CPSC召回: ${data.message}`;
-      const risk = data.riskSummary as string | undefined;
-      return `⚠️ CPSC召回(${data.totalRecalls}条):\n${risk || ''}`;
-    }
-    case 'query_port_congestion': {
-      return `⚓ 港口拥堵: 全球${data.globalLevel}级, 热点: ${(data.affectedRoutes as string[])?.join(', ') || '无'}`;
-    }
-    case 'query_financial_index': {
-      return `📈 金融指数:\n${(data.summary as string) || JSON.stringify(data.indices)}`;
-    }
-    default: return `查询完成: ${JSON.stringify(data).substring(0, 800)}`;
-  }
-}
-
-// ─── DeepSeek Tool Call Text Detection ────────────────────────────────────────────
-
-/** Known tool names for detecting when DeepSeek emits tool calls as text */
-const KNOWN_TOOL_NAMES = [
-  'query_inventory', 'query_cost', 'query_sales', 'query_logistics',
-  'query_suppliers', 'query_dashboard', 'query_risk', 'query_analytics',
-  'query_exchange_rates', 'query_weather', 'query_tariff', 'query_cascade_risk',
-  'query_decision_graph', 'query_commodities', 'query_scfis', 'query_carbon_price',
-  'query_cpsc_recalls', 'query_port_congestion', 'query_financial_index',
-  'execute_workflow', 'run_sandbox',
-  'web_search', 'adjust_inventory', 'create_reorder', 'create_note', 'update_shipment_status',
-];
-
-/**
- * Check if a text token looks like it might be the start of a tool call
- * (DeepSeek bug: emits function calls as plain text)
- */
-function isToolCallText(token: string): boolean {
-  for (const name of KNOWN_TOOL_NAMES) {
-    if (token.includes(name + '(') || token.startsWith(name)) return true;
-  }
-  return false;
-}
-
-/**
- * Extract tool calls that DeepSeek emitted as plain text instead of tool_calls.
- * Matches patterns like: `tool_name({"key": "value"})`
- */
-function extractToolCallsFromText(text: string): Array<{ id: string; function: { name: string; arguments: string } }> {
-  const results: Array<{ id: string; function: { name: string; arguments: string } }> = [];
-  const toolNames = KNOWN_TOOL_NAMES.join('|');
-  const regex = new RegExp(`(${toolNames})\\s*\\(\\s*(\\{[\\s\\S]*?\\})\\s*\\)`, 'g');
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    results.push({
-      id: crypto.randomUUID(),
-      function: { name: match[1], arguments: match[2].trim() },
-    });
-  }
-  return results;
-}
-
-// ─── Default Tool Actions ─────────────────────────────────────────────────────────
-
-const DEFAULT_TOOL_ACTIONS: Record<string, string> = {
-  query_inventory: 'overview',
-  query_cost: 'overview',
-  query_sales: 'overview',
-  query_logistics: 'stats',
-  query_suppliers: 'list',
-  query_dashboard: 'summary',
-  query_risk: 'dashboard',
-  query_exchange_rates: 'latest',
-  query_weather: 'summary',
-  query_analytics: 'supplier_performance',
-  query_tariff: 'overview',
-  query_cascade_risk: 'auto',
-  query_decision_graph: 'cross_domain',
-  query_commodities: '',
-  query_scfis: '',
-  query_carbon_price: '',
-  query_cpsc_recalls: '',
-  query_port_congestion: '',
-  execute_workflow: 'wf-full-health',
-  web_search: '',
-};
-
-// ─── Intent-Aware Search Gating (replaces crude keyword-based shouldAutoSearch) ───
-
-function getRoutingDecision(query: string): RoutingDecision {
-  return classifyIntent(query);
-}
 
 // ─── ReAct Agent Stream Handler ──────────────────────────────────────────────────
 
@@ -358,11 +114,19 @@ async function handleReActStream(
               enqueue('confirm_required', { confirmationCard: event.confirmationCard });
               break;
             case 'done':
+              let claimsExtracted = 0;
+              if (event.content) {
+                try {
+                  claimsExtracted = JSON.parse(event.content).claimsExtracted ?? 0;
+                } catch {
+                  claimsExtracted = 0;
+                }
+              }
               enqueue('done', {
                 toolsUsed: event.toolsUsed,
                 steps: event.steps?.length,
                 durationMs: event.durationMs,
-                claimsExtracted: event.content ? JSON.parse(event.content).claimsExtracted : 0,
+                claimsExtracted,
                 passport: event.passport,
               });
               break;
@@ -467,7 +231,7 @@ async function handleReActNonStream(
     return NextResponse.json({
       success: true,
       data: {
-        reply: fullResponse,
+        reply: wrapReply(fullResponse),
         toolsUsed,
         steps: steps.length,
         durationMs,
@@ -475,6 +239,9 @@ async function handleReActNonStream(
         intent: routing?.intent,
         tier: routing?.primaryTier,
         passport,
+        ...(durationMs > 8000 ? {
+          hint: '本次查询耗时较长。对于复杂分析（仿真、多维报告），建议使用流式模式（stream: true）实时查看进度。',
+        } : {}),
       },
     });
   } catch (err) {
@@ -575,7 +342,7 @@ async function handleHybrid(
     return NextResponse.json({
       success: true,
       data: {
-        reply: `[T${routing.primaryTier}] ${routing.reason}。该问题适合从模型知识或Wikipedia获取答案，不需要搜索或工具调用。`,
+        reply: wrapReply(`[T${routing.primaryTier}] ${routing.reason}。该问题适合从模型知识或Wikipedia获取答案，不需要搜索或工具调用。`),
         mode: routing.primaryTier === 0 ? 'tier0-skip' : 'tier2-skip',
         intent: routing.intent,
       },
@@ -587,10 +354,10 @@ async function handleHybrid(
   const ragResults = retrieveKnowledge(message, 2);
   const ragContext = augmentPrompt(message, ragResults);
 
-  // Web search (if enabled) — auto-retries with English keywords internally
+  // Web search (if enabled) — quality pipeline: rewrite → multi-source → guard → rerank → cross-validate
   let webContext = '';
   if (webSearchEnabled) {
-    const searchResult = await webSearch(message);
+    const searchResult = await webSearchWithQuality(message, history as any);
     if (searchResult.results.length > 0) {
       webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
     }
@@ -611,7 +378,7 @@ async function handleHybrid(
     return NextResponse.json({
       success: true,
       data: {
-        reply: llmResult.content,
+        reply: wrapReply(llmResult.content),
         toolsUsed,
         dataContext: dataContext.slice(0, 1000),
         mode: 'hybrid',
@@ -623,7 +390,7 @@ async function handleHybrid(
       return NextResponse.json({
         success: true,
         data: {
-          reply: `[T${routing.primaryTier}] ${routing.reason}。该问题适合从模型知识获取答案。LLM 服务暂不可用。`,
+          reply: wrapReply(`[T${routing.primaryTier}] ${routing.reason}。该问题适合从模型知识获取答案。LLM 服务暂不可用。`),
           mode: 'local-fallback-routed',
           intent: routing.intent,
         },
@@ -632,7 +399,7 @@ async function handleHybrid(
     return NextResponse.json({
       success: true,
       data: {
-        reply: toolResults.map(r => r.result).join('\n\n'),
+        reply: wrapReply(toolResults.map(r => r.result).join('\n\n')),
         toolsUsed,
         mode: 'local-fallback',
         note: 'LLM 调用失败，显示原始数据。',
@@ -667,14 +434,12 @@ function handleHybridStream(
 
         let webContext = '';
         if (webSearchEnabled) {
-          let searchResult = await webSearch(message);
-          // If Chinese query got 0 results, webSearch auto-retries with English keywords internally
+          const searchResult = await webSearchWithQuality(message, history as any);
           if (searchResult.results.length > 0) {
             webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
             enqueue('tool_call', { tool: 'web_search' });
-            enqueue('tool_result', { tool: 'web_search', result: `从 ${searchResult.source} 获取 ${searchResult.results.length} 条结果` });
+            enqueue('tool_result', { tool: 'web_search', result: `从 ${searchResult.source} 获取 ${searchResult.results.length} 条结果 (置信度: ${searchResult.diagnostics?.crossValidation?.confidence || 'unknown'})` });
           }
-          // If still 0 results, send a diagnostic event (not error) so frontend knows search was attempted
         }
 
         // Build LLM messages
@@ -688,7 +453,7 @@ function handleHybridStream(
         const MAX_ROUNDS = 3;
         const toolsUsed: string[] = [];
         let accumulatedContent = '';
-        let allToolResults: string[] = [];  // accumulate across rounds for fallback
+        const allToolResults: string[] = [];  // accumulate across rounds for fallback
 
         for (let round = 0; round < MAX_ROUNDS; round++) {
           let toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
@@ -812,83 +577,13 @@ function handleHybridStream(
 
 // ─── Local Mode (no API key) ─────────────────────────────────────────────────────
 
-type ToolAction = { tool: string; action: string; params: Record<string, unknown> };
-
-function hasKeyword(text: string, keywords: string[]): boolean {
-  return keywords.some(k => text.includes(k));
-}
-
-function matchToolsToQuery(query: string): ToolAction[] {
-  const q = query.toLowerCase();
-  const actions: ToolAction[] = [];
-
-  // Inventory-related
-  if (hasKeyword(q, ['库存', '缺货', '补货', '周转', '滞销', '安全库存', 'inventory'])) {
-    actions.push({ tool: 'query_inventory', action: 'overview', params: { action: 'overview' } });
-    if (hasKeyword(q, ['缺货', '补货', '紧急'])) actions.push({ tool: 'query_inventory', action: 'reorder', params: { action: 'reorder' } });
-  }
-
-  // Cost-related
-  if (hasKeyword(q, ['成本', '毛利', '费用', '利润', 'margin', 'cost'])) {
-    actions.push({ tool: 'query_cost', action: 'overview', params: { action: 'overview' } });
-  }
-
-  // Sales-related
-  if (hasKeyword(q, ['销售', '收入', '订单', '增长', 'sales'])) {
-    actions.push({ tool: 'query_sales', action: 'overview', params: { action: 'overview', days: '7' } });
-  }
-
-  // Logistics
-  if (hasKeyword(q, ['物流', '货运', '航运', '港口', '延迟', 'delivery', 'ship'])) {
-    actions.push({ tool: 'query_logistics', action: 'stats', params: { action: 'stats' } });
-  }
-
-  // Risk / Cascade risk
-  if (hasKeyword(q, ['风险', 'risk', '中断', '传播', 'cascade'])) {
-    actions.push({ tool: 'query_cascade_risk', action: '', params: { scenario: 'auto' } });
-  }
-
-  // Suppliers
-  if (hasKeyword(q, ['供应商', 'supplier'])) {
-    actions.push({ tool: 'query_suppliers', action: 'list', params: { action: 'list' } });
-  }
-
-  // Dashboard overview
-  if (hasKeyword(q, ['概览', '仪表', 'dashboard', '整体', '健康', '总览'])) {
-    actions.push({ tool: 'query_dashboard', action: 'summary', params: { action: 'summary' } });
-  }
-
-  // Exchange rates
-  if (hasKeyword(q, ['汇率', '人民币', '美元', '欧元', '外汇', 'fx', 'cny', 'usd'])) {
-    actions.push({ tool: 'query_exchange_rates', action: 'latest', params: { action: 'latest', base: 'CNY' } });
-  }
-
-  // Weather
-  if (hasKeyword(q, ['天气', '台风', '海况', 'weather', '气候'])) {
-    actions.push({ tool: 'query_weather', action: 'summary', params: { action: 'summary' } });
-  }
-
-  // Decision graph
-  if (hasKeyword(q, ['决策', '建议', '怎么办', '如何', '怎么', '方案', '优化', '改善'])) {
-    actions.push({ tool: 'query_decision_graph', action: '', params: { query } });
-  }
-
-  // If nothing matched, give a dashboard + inventory overview
-  if (actions.length === 0) {
-    actions.push({ tool: 'query_dashboard', action: 'summary', params: { action: 'summary' } });
-    actions.push({ tool: 'query_inventory', action: 'overview', params: { action: 'overview' } });
-  }
-
-  return actions.slice(0, 4);
-}
-
 async function handleLocalMode(message: string, routing?: RoutingDecision): Promise<NextResponse> {
   // For Tier 0 queries (chat/opinion), skip tools entirely — LLM would handle these
   if (routing && routing.primaryTier === 0) {
     return NextResponse.json({
       success: true,
       data: {
-        reply: `[T0-LLM] ${routing.reason}。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 驱动的自然语言回答。当前问题类型: ${routing.intent}`,
+        reply: wrapReply(`[T0-LLM] ${routing.reason}。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 驱动的自然语言回答。当前问题类型: ${routing.intent}`),
         mode: 'local-tier0',
         intent: routing.intent,
       },
@@ -900,7 +595,7 @@ async function handleLocalMode(message: string, routing?: RoutingDecision): Prom
     return NextResponse.json({
       success: true,
       data: {
-        reply: `[T2-KB] ${routing.reason}。该问题适合从 Wikipedia 或知识库获取答案。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 驱动的知识回答。当前问题类型: ${routing.intent}`,
+        reply: wrapReply(`[T2-KB] ${routing.reason}。该问题适合从 Wikipedia 或知识库获取答案。请在设置中配置 DEEPSEEK_API_KEY 以启用 AI 驱动的知识回答。当前问题类型: ${routing.intent}`),
         mode: 'local-tier2',
         intent: routing.intent,
       },

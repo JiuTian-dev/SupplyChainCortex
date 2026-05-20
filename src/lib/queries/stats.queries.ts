@@ -1,6 +1,7 @@
 /**
  * Stats Queries — statistics aggregation for /api/stats.
- * Migrated from services/stats.service.ts. Caching contract preserved.
+ * Uses database-level aggregation (groupBy, aggregate, count) to avoid
+ * loading full tables into JavaScript memory.
  */
 
 import { db } from '@/lib/db';
@@ -24,7 +25,7 @@ export interface StatsResult {
     quantity: number;
     avgDailyRevenue: number;
   };
-  revenueTrend: Array<{ date: string; revenue: number; quantity: number }>;
+  revenueTrend: Array<{ date: Date; revenue: number; quantity: number }>;
   topProducts: Array<{ sku: string; name: string; revenue: number; quantity: number }>;
   platformDistribution: Array<{ platform: string; revenue: number; quantity: number; orderCount: number }>;
   inventoryHealth: {
@@ -64,13 +65,9 @@ export interface StatsResult {
   };
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────────
-
-const MAX_TAKE = 5000;
-
 // ─── Core ────────────────────────────────────────────────────────────────────────
 
-/** Get aggregated statistics for a given period */
+/** Get aggregated statistics for a given period — uses DB aggregation throughout */
 export async function getStats(period = '30d', sku?: string): Promise<StatsResult> {
   return cachedFetch(
     cacheKey('stats', period, sku || 'all'),
@@ -79,123 +76,124 @@ export async function getStats(period = '30d', sku?: string): Promise<StatsResul
       const startDateStr = daysAgo(days);
       const endDateStr = todayISO();
 
-      // 1. Revenue stats
-      const salesRecords = await db.salesRecord.findMany({
-        where: {
-          date: { gte: startDateStr, lte: endDateStr },
-          ...(sku ? { sku } : {}),
-        },
-        take: MAX_TAKE,
+      const dateFilter = {
+        date: { gte: startDateStr, lte: endDateStr },
+        ...(sku ? { sku } : {}),
+      };
+
+      // 1. Revenue aggregates (DB-level)
+      const revenueAgg = await db.salesRecord.aggregate({
+        where: dateFilter,
+        _sum: { revenue: true, quantity: true },
       });
+      const totalRevenue = revenueAgg._sum.revenue || 0;
+      const totalQuantity = revenueAgg._sum.quantity || 0;
 
-      const totalRevenue = salesRecords.reduce((sum, r) => sum + r.revenue, 0);
-      const totalQuantity = salesRecords.reduce((sum, r) => sum + r.quantity, 0);
-
-      // 2. Revenue trend
-      const revenueByDate = new Map<string, { revenue: number; quantity: number }>();
-      salesRecords.forEach(r => {
-        const entry = revenueByDate.get(r.date) || { revenue: 0, quantity: 0 };
-        entry.revenue += r.revenue;
-        entry.quantity += r.quantity;
-        revenueByDate.set(r.date, entry);
+      // 2. Revenue trend — groupBy date (DB-level)
+      const trendGroups = await db.salesRecord.groupBy({
+        by: ['date'],
+        where: dateFilter,
+        _sum: { revenue: true, quantity: true },
       });
+      const revenueTrend = trendGroups
+        .map(g => ({ date: g.date, revenue: g._sum.revenue || 0, quantity: g._sum.quantity || 0 }))
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-      const revenueTrend = [...revenueByDate.entries()]
-        .map(([date, data]) => ({ date, ...data }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      // 3. Top 5 products
-      const revenueByProduct = new Map<string, { sku: string; name: string; revenue: number; quantity: number }>();
-      salesRecords.forEach(r => {
-        const entry = revenueByProduct.get(r.sku) || { sku: r.sku, name: r.productName, revenue: 0, quantity: 0 };
-        entry.revenue += r.revenue;
-        entry.quantity += r.quantity;
-        revenueByProduct.set(r.sku, entry);
+      // 3. Top 5 products — groupBy sku (DB-level)
+      const productGroups = await db.salesRecord.groupBy({
+        by: ['sku', 'productName'],
+        where: dateFilter,
+        _sum: { revenue: true, quantity: true },
+        orderBy: { _sum: { revenue: 'desc' } },
+        take: 5,
       });
+      const topProducts = productGroups.map(g => ({
+        sku: g.sku,
+        name: g.productName,
+        revenue: g._sum.revenue || 0,
+        quantity: g._sum.quantity || 0,
+      }));
 
-      const topProducts = [...revenueByProduct.values()]
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
-
-      // 4. Platform distribution
-      const revenueByPlatform = new Map<string, { platform: string; revenue: number; quantity: number; orderCount: number }>();
-      salesRecords.forEach(r => {
-        const entry = revenueByPlatform.get(r.platform) || { platform: r.platform, revenue: 0, quantity: 0, orderCount: 0 };
-        entry.revenue += r.revenue;
-        entry.quantity += r.quantity;
-        entry.orderCount += 1;
-        revenueByPlatform.set(r.platform, entry);
+      // 4. Platform distribution — groupBy platform (DB-level)
+      const platformGroups = await db.salesRecord.groupBy({
+        by: ['platform'],
+        where: dateFilter,
+        _sum: { revenue: true, quantity: true },
+        _count: true,
       });
-      const platformDistribution = [...revenueByPlatform.values()]
+      const platformDistribution = platformGroups
+        .map(g => ({
+          platform: g.platform,
+          revenue: g._sum.revenue || 0,
+          quantity: g._sum.quantity || 0,
+          orderCount: g._count,
+        }))
         .sort((a, b) => b.revenue - a.revenue);
 
-      // 5. Inventory health — groupBy for counting
-      const inventoryHealthCounts = await db.inventory.groupBy({
+      // 5. Inventory health — groupBy (DB-level)
+      const invGroups = await db.inventory.groupBy({
         by: ['stockStatus'],
         _count: true,
         _avg: { turnoverDays: true },
       });
-
-      const totalInventory = inventoryHealthCounts.reduce((sum, g) => sum + g._count, 0);
+      const totalInventory = invGroups.reduce((sum, g) => sum + g._count, 0);
       const inventoryHealth = {
-        healthy: inventoryHealthCounts.find(g => g.stockStatus === 'healthy')?._count || 0,
-        warning: inventoryHealthCounts.find(g => g.stockStatus === 'warning')?._count || 0,
-        critical: inventoryHealthCounts.find(g => g.stockStatus === 'critical')?._count || 0,
-        overstock: inventoryHealthCounts.find(g => g.stockStatus === 'overstock')?._count || 0,
+        healthy: invGroups.find(g => g.stockStatus === 'healthy')?._count || 0,
+        warning: invGroups.find(g => g.stockStatus === 'warning')?._count || 0,
+        critical: invGroups.find(g => g.stockStatus === 'critical')?._count || 0,
+        overstock: invGroups.find(g => g.stockStatus === 'overstock')?._count || 0,
         total: totalInventory,
         avgTurnoverDays: Math.round(
-          inventoryHealthCounts.reduce((sum, g) => sum + (g._avg.turnoverDays || 0) * g._count, 0) / Math.max(totalInventory, 1)
+          invGroups.reduce((sum, g) => sum + (g._avg.turnoverDays || 0) * g._count, 0) / Math.max(totalInventory, 1)
         ),
       };
 
-      // 6. Shipment stats
-      const [totalShipments, deliveredCount, delayedCount] = await Promise.all([
+      // 6. Shipment stats — aggregate + count (DB-level)
+      const [totalShipments, deliveredCount, delayedCount, deliveryAgg] = await Promise.all([
         db.shipmentItem.count(),
         db.shipmentItem.count({ where: { status: 'delivered' } }),
         db.shipmentItem.count({ where: { status: 'delayed' } }),
+        db.shipmentItem.aggregate({
+          where: { status: 'delivered', delayDays: { lte: 0 } },
+          _count: true,
+        }),
       ]);
-
-      const deliveredShipments = await db.shipmentItem.findMany({
-        where: { status: 'delivered' },
-        select: { delayDays: true },
-        take: MAX_TAKE,
-      });
-      const onTimeDeliveries = deliveredShipments.filter(s => s.delayDays <= 0).length;
-      const shipmentOnTimeRate = deliveredShipments.length > 0
-        ? Math.round((onTimeDeliveries / deliveredShipments.length) * 100)
+      const onTimeDeliveries = deliveryAgg._count || 0;
+      const deliveredTotal = await db.shipmentItem.count({ where: { status: 'delivered' } });
+      const shipmentOnTimeRate = deliveredTotal > 0
+        ? Math.round((onTimeDeliveries / deliveredTotal) * 100)
         : 0;
 
-      // 7. Cost stats
-      const costAggregate = await db.costRecord.aggregate({
-        _avg: { grossMargin: true, totalLanded: true },
-        _count: true,
-      });
+      // 7. Cost stats — aggregate (DB-level)
+      const [costAgg, belowMarginThreshold] = await Promise.all([
+        db.costRecord.aggregate({
+          _avg: { grossMargin: true, totalLanded: true },
+          _count: true,
+        }),
+        db.costRecord.count({ where: { grossMargin: { lt: 48 } } }),
+      ]);
 
-      const belowMarginThreshold = await db.costRecord.count({
-        where: { grossMargin: { lt: 48 } },
-      });
-
-      // 8. Supplier stats
-      const [supplierTotal, supplierActive, supplierAggregate] = await Promise.all([
+      // 8. Supplier stats — aggregate + count (DB-level)
+      const [supplierTotal, supplierActive, supplierAgg] = await Promise.all([
         db.supplier.count(),
         db.supplier.count({ where: { status: 'active' } }),
         db.supplier.aggregate({ _avg: { leadTime: true, rating: true } }),
       ]);
 
-      // 9. Reorder stats
+      // 9. Reorder stats — counts (DB-level)
       const [reorderTotal, reorderPending, reorderUrgent] = await Promise.all([
         db.reorderOrder.count(),
         db.reorderOrder.count({ where: { status: 'pending' } }),
         db.reorderOrder.count({ where: { priority: '紧急' } }),
       ]);
 
-      // 10. Notes stats
-      const noteStats = await db.supplyChainNote.groupBy({
+      // 10. Notes stats — groupBy (DB-level)
+      const noteGroups = await db.supplyChainNote.groupBy({
         by: ['isResolved'],
         _count: true,
       });
-      const totalNotes = noteStats.reduce((sum, n) => sum + n._count, 0);
-      const unresolvedNotes = noteStats.find(n => !n.isResolved)?._count || 0;
+      const totalNotes = noteGroups.reduce((sum, n) => sum + n._count, 0);
+      const unresolvedNotes = noteGroups.find(n => !n.isResolved)?._count || 0;
 
       return {
         period: { type: period, days, startDate: startDateStr, endDate: endDateStr },
@@ -204,18 +202,18 @@ export async function getStats(period = '30d', sku?: string): Promise<StatsResul
         topProducts,
         platformDistribution,
         inventoryHealth,
-        shipment: { onTimeRate: shipmentOnTimeRate, total: totalShipments, delivered: deliveredCount, delayed: delayedCount },
+        shipment: { onTimeRate: shipmentOnTimeRate, total: totalShipments, delivered: deliveredTotal, delayed: delayedCount },
         cost: {
-          avgMargin: roundTo(costAggregate._avg.grossMargin || 0, 1),
-          avgLandedCost: roundTo(costAggregate._avg.totalLanded || 0, 2),
-          totalProducts: costAggregate._count,
+          avgMargin: roundTo(costAgg._avg.grossMargin || 0, 1),
+          avgLandedCost: roundTo(costAgg._avg.totalLanded || 0, 2),
+          totalProducts: costAgg._count,
           belowMarginThreshold,
         },
         supplier: {
           total: supplierTotal,
           active: supplierActive,
-          avgLeadTime: Math.round(supplierAggregate._avg.leadTime || 0),
-          avgRating: roundTo(supplierAggregate._avg.rating || 0, 1),
+          avgLeadTime: Math.round(supplierAgg._avg.leadTime || 0),
+          avgRating: roundTo(supplierAgg._avg.rating || 0, 1),
         },
         reorder: { total: reorderTotal, pending: reorderPending, urgent: reorderUrgent },
         notes: { total: totalNotes, unresolved: unresolvedNotes },

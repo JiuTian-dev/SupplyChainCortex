@@ -134,7 +134,7 @@ export async function getCostTrendsAnalytics(months: number = 6) {
       // Month-over-Month Cost Changes
       const salesByMonth: Record<string, { month: string; revenue: number; quantity: number; cogs: number }> = {};
       salesRecords.forEach(r => {
-        const month = r.date.substring(0, 7);
+        const month = r.date.toISOString().substring(0, 7);
         if (!salesByMonth[month]) {
           salesByMonth[month] = { month, revenue: 0, quantity: 0, cogs: 0 };
         }

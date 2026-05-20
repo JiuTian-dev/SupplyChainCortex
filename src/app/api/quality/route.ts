@@ -112,7 +112,8 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       for (const d of allDefects) {
         byType[d.defectType] = (byType[d.defectType] || 0) + 1;
         bySeverity[d.severity] = (bySeverity[d.severity] || 0) + 1;
-        byDetectedAt[d.detectedAt] = (byDetectedAt[d.detectedAt] || 0) + 1;
+        const detectedKey = d.detectedAt instanceof Date ? d.detectedAt.toISOString().split('T')[0] : String(d.detectedAt);
+        byDetectedAt[detectedKey] = (byDetectedAt[detectedKey] || 0) + 1;
         if (d.status === "open" || d.status === "investigating") openCount++;
         totalDefectQty += d.quantity;
       }

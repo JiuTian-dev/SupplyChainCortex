@@ -34,13 +34,16 @@ export const GET = withApiRateLimit(withErrorHandler(async (_request: NextReques
   };
 
   // Security headers summary (redact full CSP for readability)
+  // Cross-Origin headers are commented out of SECURITY_HEADERS intentionally
+  // (too restrictive for the preview panel), so we use a type-safe fallback.
+  const secHeaders = SECURITY_HEADERS as Record<string, string>;
   const securityHeaders = {
-    'X-Frame-Options': SECURITY_HEADERS['X-Frame-Options'],
-    'X-Content-Type-Options': SECURITY_HEADERS['X-Content-Type-Options'],
-    'Referrer-Policy': SECURITY_HEADERS['Referrer-Policy'],
-    'Cross-Origin-Opener-Policy': SECURITY_HEADERS['Cross-Origin-Opener-Policy'],
-    'Cross-Origin-Resource-Policy': SECURITY_HEADERS['Cross-Origin-Resource-Policy'],
-    'Cross-Origin-Embedder-Policy': SECURITY_HEADERS['Cross-Origin-Embedder-Policy'],
+    'X-Frame-Options': secHeaders['X-Frame-Options'],
+    'X-Content-Type-Options': secHeaders['X-Content-Type-Options'],
+    'Referrer-Policy': secHeaders['Referrer-Policy'],
+    'Cross-Origin-Opener-Policy': secHeaders['Cross-Origin-Opener-Policy'] ?? 'disabled',
+    'Cross-Origin-Resource-Policy': secHeaders['Cross-Origin-Resource-Policy'] ?? 'disabled',
+    'Cross-Origin-Embedder-Policy': secHeaders['Cross-Origin-Embedder-Policy'] ?? 'credentialless',
     cspDirectives: [
       'default-src', 'script-src', 'style-src', 'img-src',
       'font-src', 'connect-src', 'frame-ancestors', 'worker-src',

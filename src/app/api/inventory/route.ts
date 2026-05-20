@@ -57,19 +57,27 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
         if (!health) throw NotFoundError(`未找到 SKU: ${sku}`);
         return apiSuccess(health);
       }
-      // No SKU → summary of all inventory health
-      const allInv = await db.inventory.findMany({
-        select: { sku: true, productName: true, quantity: true, safetyStock: true, stockStatus: true },
-      });
-      const critical = allInv.filter(i => i.stockStatus === 'critical');
-      const warning = allInv.filter(i => i.stockStatus === 'warning');
+      // No SKU → summary of inventory health using DB-level groupBy
+      const [statusGroups, criticalItems, warningItems] = await Promise.all([
+        db.inventory.groupBy({ by: ['stockStatus'], _count: true }),
+        db.inventory.findMany({
+          where: { stockStatus: 'critical' },
+          select: { sku: true, productName: true, quantity: true, safetyStock: true },
+          take: 20,
+        }),
+        db.inventory.findMany({
+          where: { stockStatus: 'warning' },
+          select: { sku: true, productName: true, quantity: true, safetyStock: true },
+          take: 20,
+        }),
+      ]);
+      const healthyCount = statusGroups.find(g => g.stockStatus === 'healthy')?._count || 0;
+      const totalSkus = statusGroups.reduce((s, g) => s + g._count, 0);
       return apiSuccess({
-        critical: critical.map(i => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, safetyStock: i.safetyStock })),
-        warning: warning.map(i => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, safetyStock: i.safetyStock })),
-        healthyRate: allInv.length > 0
-          ? Math.round((allInv.filter(i => i.stockStatus === 'healthy').length / allInv.length) * 100)
-          : 100,
-        totalSkus: allInv.length,
+        critical: criticalItems.map(i => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, safetyStock: i.safetyStock })),
+        warning: warningItems.map(i => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, safetyStock: i.safetyStock })),
+        healthyRate: totalSkus > 0 ? Math.round((healthyCount / totalSkus) * 100) : 100,
+        totalSkus,
       });
     }
 

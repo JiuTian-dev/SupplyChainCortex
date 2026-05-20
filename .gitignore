@@ -60,6 +60,7 @@ server.log
 /upload/
 /download/
 /screenshots/
+/backups/
 /db/custom.db
 *.tar
 mcp-card-*.png.idea/

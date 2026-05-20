@@ -176,7 +176,7 @@ export async function loadWeightsFromDB(engine: string): Promise<CalibratedWeigh
       engine: row.engine,
       sources,
       totalSamples: row.totalSamples,
-      calibratedAt: row.calibratedAt,
+      calibratedAt: row.calibratedAt instanceof Date ? row.calibratedAt.toISOString() : String(row.calibratedAt),
     };
     weightCache.set(engine, weights);
     return weights;

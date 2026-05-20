@@ -15,7 +15,9 @@ import { executeWithPolicy } from '@/lib/engine/autonomy-policy';
 import { createPassport, provenanceEntry, computeConfidence } from '@/lib/engine/passport';
 import { chatCompletionStream, type ChatMessage } from '@/lib/services/ai-providers.service';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
-import { webSearch, formatSearchContext } from '@/lib/services/web-search.service';
+import { webSearch, webSearchWithQuality, formatSearchContext } from '@/lib/services/web-search.service';
+import { formatToolResult, DEFAULT_TOOL_ACTIONS } from '@/lib/mcp/tool-formatters';
+import { SYSTEM_PROMPT } from '@/app/api/chat/chat.prompt';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,8 @@ export interface ReActOptions {
   enableRAG?: boolean;
   serverSide?: boolean;
   tieredSystemPrompt?: string;
+  /** Max estimated context tokens before summarization is injected (default: 64000) */
+  maxContextTokens?: number;
 }
 
 // ─── Tool Registry for Prompt ────────────────────────────────────────────────────
@@ -130,24 +134,16 @@ function buildToolRegistryPrompt(): string {
 // ─── System Prompt Builder ───────────────────────────────────────────────────────
 
 function buildReActSystemPrompt(context?: string): string {
-  return `你是 SupplyChain Cortex 的智能供应链决策助手，专门为跨境小家电供应链提供深度分析和决策支持。
+  return `${SYSTEM_PROMPT}
 
-## 核心原则
+## ReAct 工具调用协议
 
-1. **先查数据再回答** — 绝不编造数字。任何关于库存、成本、物流、汇率的陈述必须有工具查询结果支撑。
-2. **多维度交叉分析** — 铜价涨→查含铜SKU→算毛利影响→建议锁价。不要孤立看数据。每个结论至少交叉2个数据源。
-3. **每条结论标注来源+日期** — 使用 [claim-N] 格式标记，注明数据来源**和信息的发布日期**。搜索结果的日期决定其可信度。
-4. **联网搜索用英文** — web_search 必须用英文关键词。首次搜索后，如数据不足，换个角度再搜一轮。
-5. **中文回复** — 金额用美元/人民币，数字保留合理精度。
+<tool>工具名称</tool>
+<params>{"key": "value"}</params>
 
-## ⚠️ 时效性检查（每次必须执行）
+一次可并行调用多个工具，依次写出即可。系统会执行所有工具后返回结果。
 
-1. 对于联网搜索结果: 检查每条的发布日期。超过7天的标记"[最新]"，超过90天的标记"⚠️过时"且不作为主要依据。
-2. 对于系统数据: query_* 返回的是实时数据，置信度为高。搜索结果中的数字如与系统数据冲突，以系统数据为准。
-3. **绝对禁止** 使用过时的关税/政策数字。关税税率必须先查 query_tariff 获取当前适用税率。不同HS编码的税率不同——家电行业(HS 8509等)的关税和钢铁/半导体完全不同。
-4. 对于新闻事件类信息: 构建时间线。先搜"最新进展"，再搜"背景"。区分"正在发生"、"已停火"、"已解除"。
-
-## 推理流程
+## ReAct 推理流程
 
 对于复杂问题（涉及多个领域或需要外部信息）：
 1. **第一轮**: 并行调用所有独立工具（库存+成本+物流+风险+联网搜索一次性全调）。每轮调用4-6个工具。
@@ -158,6 +154,13 @@ function buildReActSystemPrompt(context?: string): string {
 **关键**: 每轮尽量批量调用多个工具，减少总轮数。独立工具必须并行调用。8轮封顶。
 如果达到轮次上限但分析未完成，在回复末尾说明"需要继续分析，请输入'继续'"。
 
+## ⚠️ 时效性检查（每次必须执行）
+
+1. 对于联网搜索结果: 检查每条的发布日期。超过7天的标记"[最新]"，超过90天的标记"⚠️过时"且不作为主要依据。
+2. 对于系统数据: query_* 返回的是实时数据，置信度为高。搜索结果中的数字如与系统数据冲突，以系统数据为准。
+3. **绝对禁止** 使用过时的关税/政策数字。关税税率必须先查 query_tariff 获取当前适用税率。不同HS编码的税率不同——家电行业(HS 8509等)的关税和钢铁/半导体完全不同。
+4. 对于新闻事件类信息: 构建时间线。先搜"最新进展"，再搜"背景"。区分"正在发生"、"已停火"、"已解除"。
+
 ## 输出规划（写报告前先规划结构）
 
 对于需要生成完整报告的问题，先在心里规划报告结构：
@@ -166,18 +169,11 @@ function buildReActSystemPrompt(context?: string): string {
 - 如果需要财务影响 → 先查具体SKU的成本和毛利
 - 规划好后再逐段输出，最后给出带优先级的建议
 
-## 工具调用协议
-
-<tool>工具名称</tool>
-<params>{"key": "value"}</params>
-
-一次可并行调用多个工具，依次写出即可。系统会执行所有工具后返回结果。
-
 ${buildToolRegistryPrompt()}
 
 ${context || ''}
 
-## 输出格式
+## ReAct 输出格式
 
 最终报告使用以下结构：
 
@@ -226,88 +222,24 @@ function stripToolCalls(text: string): string {
   return text.replace(/<tool>[\s\S]*?<\/tool>\s*<params>[\s\S]*?<\/params>/g, '').trim();
 }
 
-// ─── Default Tool Actions ─────────────────────────────────────────────────────────
+// ─── Token Budget Estimation ──────────────────────────────────────────────────────
 
-const DEFAULT_TOOL_ACTIONS: Record<string, string> = {
-  query_inventory: 'overview',
-  query_cost: 'overview',
-  query_sales: 'overview',
-  query_logistics: 'stats',
-  query_suppliers: 'list',
-  query_dashboard: 'summary',
-  query_risk: 'dashboard',
-  query_exchange_rates: 'latest',
-  query_weather: 'summary',
-  query_analytics: 'supplier_performance',
-  query_tariff: 'overview',
-  query_cascade_risk: 'auto',
-  query_decision_graph: 'cross_domain',
-  execute_workflow: 'wf-full-health',
-};
+/**
+ * Rough token estimate: ~1 token per 3 Chinese chars, ~1 token per 4 English chars,
+ * ~1 token per word for mixed content. Overestimates slightly for safety.
+ */
+export function estimateTokens(text: string): number {
+  if (!text) return 0;
+  // Count CJK characters (each ~0.3 tokens per char → ~1 token per 3 chars)
+  const cjkChars = (text.match(/[一-鿿㐀-䶿豈-﫿]/g) || []).length;
+  // Count remaining non-CJK characters
+  const otherChars = text.length - cjkChars;
+  return Math.ceil(cjkChars / 3 + otherChars / 4);
+}
 
-function formatToolResult(tool: string, action: string, result: unknown): string {
-  if (!result || typeof result !== 'object') return '查询完成，但没有找到相关数据。';
-  const data = result as Record<string, unknown>;
-
-  switch (tool) {
-    case 'query_inventory': {
-      if (action === 'overview') return `库存概览: 总产品${data.totalItems}项, 总库存${data.totalQuantity}, 低库存预警${data.lowStockAlerts}项, 平均周转${data.avgTurnoverDays}天`;
-      if (action === 'reorder') { const s = data.summary as Record<string, unknown>; return `补货建议: ${s?.totalRecommendations}项, 紧急${s?.urgentCount}项, 预估成本¥${s?.totalEstimatedCost}`; }
-      return `库存查询: ${JSON.stringify(data).substring(0, 500)}`;
-    }
-    case 'query_cost': {
-      if (action === 'overview') return `成本概览: ${data.totalProducts}产品, 平均毛利率${data.avgGrossMargin}%`;
-      if (action === 'detail') return `成本明细: ${JSON.stringify(data).substring(0, 600)}`;
-      return `成本查询: ${JSON.stringify(data).substring(0, 500)}`;
-    }
-    case 'query_sales': {
-      if (action === 'overview') return `销售概览(${data.period}): 总收入¥${data.totalRevenue}`;
-      return `销售查询: ${JSON.stringify(data).substring(0, 500)}`;
-    }
-    case 'query_logistics': {
-      if (action === 'stats') return `物流统计: ${data.totalShipments}批, 准时率${data.onTimeDeliveryRate}%, 高风险${data.highRiskCount}批`;
-      return `物流查询: ${JSON.stringify(data).substring(0, 500)}`;
-    }
-    case 'query_dashboard': return `供应链概览: ${data.totalProducts}产品, 收入¥${data.totalRevenue}, 健康评分${data.healthScore}/100`;
-    case 'query_risk': return `风险评估: 评分${data.overallRisk}/100, 等级${data.riskLevel}`;
-    case 'query_suppliers': return `供应商: ${JSON.stringify(data).substring(0, 500)}`;
-    case 'query_exchange_rates': {
-      const rates = data.rates as Record<string, number> | undefined;
-      if (rates) {
-        const parts = Object.entries(rates).map(([c, r]) => `${c}: ${r}`);
-        return `汇率 (${data.base}): ${parts.join(', ')}`;
-      }
-      return `汇率查询完成`;
-    }
-    case 'query_weather': {
-      const alerts = data.activeAlerts as Array<{ port: string; type: string; severity: string }> | undefined;
-      if (alerts?.length) return `港口天气预警: ${alerts.map(a => `${a.port}(${a.type}/${a.severity})`).join(', ')}`;
-      return '港口天气: 所有港口海况正常';
-    }
-    case 'web_search': {
-      const ctx = data.formattedContext as string | undefined;
-      return `联网搜索结果 (${data.source}):\n${ctx || JSON.stringify(data.results).substring(0, 1000)}`;
-    }
-    case 'query_commodities': return `大宗商品: ${(data.summary as string) || `共${data.count}种商品`}`;
-    case 'query_scfis': return `SCFIS运价: ${data.index}点, 约$${data.estimatedFreightUSD}/FEU, ${data.route}`;
-    case 'query_carbon_price': return `EU碳价: €${data.euaPrice}/t CO2`;
-    case 'query_cpsc_recalls': return `CPSC召回(${data.totalRecalls}条): ${(data.riskSummary as string) || ''}`;
-    case 'query_port_congestion': return `港口拥堵: 全球${data.globalLevel}级`;
-    case 'query_financial_index': return `金融指数: ${(data.summary as string) || JSON.stringify(data.indices)}`;
-    case 'adjust_inventory': {
-      const adj = data.adjustment as Record<string, unknown> | undefined;
-      return adj ? `库存调整: ${adj.productName} ${adj.adjustment}件, ${adj.previousQuantity}→${adj.newQuantity}` : '调整完成';
-    }
-    case 'create_note': return '备注已创建';
-    case 'create_reorder': return `补货订单: ${JSON.stringify(data).substring(0, 400)}`;
-    case 'update_shipment_status': return `货运状态已更新`;
-    case 'query_tariff': return `关税: ${JSON.stringify(data).substring(0, 500)}`;
-    case 'query_cascade_risk': return `级联风险: ${JSON.stringify(data).substring(0, 500)}`;
-    case 'query_decision_graph': return `决策图: ${JSON.stringify(data).substring(0, 500)}`;
-    case 'execute_workflow': return `工作流: ${JSON.stringify(data).substring(0, 500)}`;
-    case 'run_sandbox': return `仿真结果: ${JSON.stringify(data).substring(0, 500)}`;
-    default: return `查询完成: ${JSON.stringify(data).substring(0, 800)}`;
-  }
+/** Estimate token count for a ChatMessage array */
+function estimateMessagesTokens(messages: ChatMessage[]): number {
+  return messages.reduce((sum, m) => sum + estimateTokens(m.content || '') + estimateTokens(m.role), 0);
 }
 
 // ─── Main ReAct Runner ────────────────────────────────────────────────────────────
@@ -347,7 +279,7 @@ export async function* runReActAgent(
   let webContext = '';
   if (options.enableWebSearch) {
     try {
-      const searchResult = await webSearch(query);
+      const searchResult = await webSearchWithQuality(query, []);
       if (searchResult.results.length > 0) {
         webContext = `\n\n联网搜索结果 (${searchResult.source}):\n${formatSearchContext(searchResult.results)}`;
       }
@@ -430,10 +362,11 @@ export async function* runReActAgent(
         },
       });
 
-      // Stream the cleaned response
-      for (let i = 0; i < cleanResponse.length; i += 3) {
-        yield { type: 'token', content: cleanResponse.slice(i, i + 3) };
-        await new Promise(r => setTimeout(r, 5));
+      // Stream the cleaned response in larger chunks (200 chars) for performance
+      const cleanChars = Array.from(cleanResponse);
+      for (let i = 0; i < cleanChars.length; i += 200) {
+        yield { type: 'token', content: cleanChars.slice(i, i + 200).join('') };
+        if (i + 200 < cleanChars.length) await new Promise(r => setTimeout(r, 5));
       }
 
       steps.push(step);
@@ -537,9 +470,10 @@ export async function* runReActAgent(
       }
 
       const cleanResponse = stripToolCalls(finalContent);
-      for (let i = 0; i < cleanResponse.length; i += 3) {
-        yield { type: 'token', content: cleanResponse.slice(i, i + 3) };
-        await new Promise(r => setTimeout(r, 5));
+      const cleanChars = Array.from(cleanResponse);
+      for (let i = 0; i < cleanChars.length; i += 200) {
+        yield { type: 'token', content: cleanChars.slice(i, i + 200).join('') };
+        if (i + 200 < cleanChars.length) await new Promise(r => setTimeout(r, 5));
       }
 
       const claimsExtracted = (cleanResponse.match(/\[claim-\d+\]/g) || []).length;
@@ -559,6 +493,24 @@ export async function* runReActAgent(
       role: 'user',
       content: `工具执行结果:\n\n${toolOutputTexts.join('\n\n')}\n\n请基于以上数据继续分析。如果数据足够，直接给出结论和建议。如果还需要更多数据，继续使用 <tool>/<params> 调用工具。`,
     });
+
+    // ── Context Window Budget Check ─────────────────────────────────────
+    const maxCtxTokens = options.maxContextTokens || 64000;
+    const estimatedTokens = estimateMessagesTokens(messages);
+    if (estimatedTokens > maxCtxTokens) {
+      console.warn(`[ReAct] Context budget exceeded: ~${estimatedTokens} tokens (limit: ${maxCtxTokens}). Injecting summarization directive.`);
+      // Inject a system-level summarization directive for the next round
+      messages.push({
+        role: 'system',
+        content: `[上下文窗口管理] 当前对话已达约${estimatedTokens} tokens（上限${maxCtxTokens}）。请在下一轮直接给出最终综合分析结论，不要再调用新的工具。请基于已获取的数据做完整总结，涵盖所有关键发现。使用 [claim-N] 格式标注数据来源。如果数据不足以支撑完整结论，请明确指出缺失部分。`,
+      });
+      // Keep system prompt + the most recent 2 rounds + the budget warning
+      const systemMessages = messages.filter(m => m.role === 'system');
+      const nonSystemMessages = messages.filter(m => m.role !== 'system');
+      const recentMessages = nonSystemMessages.slice(-4); // last 2 user-assistant exchanges
+      messages.length = 0;
+      messages.push(...systemMessages, ...recentMessages);
+    }
   }
 
   // Max rounds reached — force final response with higher token limit
@@ -596,6 +548,9 @@ export async function* runReActAgent(
 /**
  * Non-streaming ReAct runner — returns complete result.
  */
+// ─── Test-support exports for pure functions ─────────────────────────
+export { stripToolCalls, formatToolResult };
+
 export async function runReActAgentSync(
   query: string,
   history: ChatMessage[],

@@ -86,18 +86,19 @@ export async function buildNotifications(): Promise<Notification[]> {
     }),
     (async () => {
       const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       return db.salesRecord.findMany({
-        where: { date: { startsWith: currentMonth } },
+        where: { date: { gte: currentMonthStart, lt: nextMonthStart } },
         take: MAX_TAKE,
       });
     })(),
     (async () => {
       const now = new Date();
-      const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       return db.salesRecord.findMany({
-        where: { date: { startsWith: prevMonth } },
+        where: { date: { gte: prevMonthStart, lt: currentMonthStart } },
         take: MAX_TAKE,
       });
     })(),

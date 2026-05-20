@@ -24,6 +24,11 @@ export const riskThresholdsSchema = z.object({
 
 export const panelsSchema = z.record(z.string(), z.boolean());
 
+export const panelOrderSchema = z.array(z.string()).default([
+  'monitor', 'cascade-risk', 'decision-center', 'sandbox', 'calibration',
+  'inventory', 'cost', 'logistics', 'sales', 'supplier', 'risk',
+]);
+
 export const dashboardConfigSchema = z.object({
   currency: currencySchema.default('CNY'),
   currencyRate: z.number().positive().default(7.25),
@@ -31,6 +36,7 @@ export const dashboardConfigSchema = z.object({
   riskThresholds: riskThresholdsSchema.default({ low: 15, medium: 40, high: 70 }),
   timeHorizon: timeHorizonSchema.default('30d'),
   aggregation: aggregationSchema.default('daily'),
+  panelOrder: panelOrderSchema,
   panels: panelsSchema.default({
     monitor: true, 'cascade-risk': true, 'decision-center': true, sandbox: false,
     inventory: true, cost: true, logistics: true, supplier: true, risk: true,
@@ -59,6 +65,8 @@ export const DEFAULT_CONFIG: DashboardConfig = {
   riskThresholds: { low: 15, medium: 40, high: 70 },
   timeHorizon: '30d',
   aggregation: 'daily',
+  panelOrder: ['monitor', 'cascade-risk', 'decision-center', 'sandbox', 'calibration',
+    'inventory', 'cost', 'logistics', 'sales', 'supplier', 'risk'],
   panels: { monitor: true, analysis: true, decision: true, simulation: true },
   showCounterfactual: true,
   enableFeedbackTracking: true,

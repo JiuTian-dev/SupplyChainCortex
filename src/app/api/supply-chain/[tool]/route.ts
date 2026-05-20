@@ -1,38 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import { withApiRateLimit } from "@/lib/api-protection";
-import { withErrorHandler, apiSuccess, apiError } from "@/lib/api-utils";
+import { withErrorHandler, apiSuccess, apiError, sanitizeObject } from "@/lib/api-utils";
+import { validateToolArgs, TOOL_SCHEMAS } from "@/lib/validators/supply-chain-tools";
 
 const execFileAsync = promisify(execFile);
 
-const VALID_TOOLS = new Set([
-  "calculate_eoq",
-  "calculate_safety_stock",
-  "calculate_reorder_point",
-  "classify_abc_xyz",
-  "forecast_demand",
-  "calculate_seasonal_decompose",
-  "monte_carlo_inventory",
-  "calculate_wagner_whitin",
-  "calculate_newsvendor",
-  "calculate_drp",
-  "calculate_warehouse_location",
-  "calculate_transport_route",
-  "calculate_multi_echelon_ss",
-  "calculate_inventory_kpi",
-  "calculate_fill_rate",
-  "calculate_lead_time_analysis",
-  "calculate_purchase_variance",
-  "calculate_total_cost",
-  "calculate_supplier_scoring",
-  "calculate_learning_curve",
-  "calculate_break_even",
-  "calculate_optimal_pricing",
-  "calculate_joint_replenishment",
-  "calculate_forecast_accuracy",
-]);
+const VALID_TOOLS = new Set(Object.keys(TOOL_SCHEMAS));
 
 const TIMEOUTS: Record<string, number> = {
   monte_carlo_inventory: 60000,
@@ -53,8 +29,15 @@ export const POST = withApiRateLimit(
       return apiError("请求体必须是有效的 JSON", 400, "INVALID_JSON");
     }
 
+    // Sanitize and validate against per-tool Zod schema
+    const sanitized = sanitizeObject(body as Record<string, unknown>);
+    const validation = validateToolArgs(tool, sanitized);
+    if (!validation.success) {
+      return apiError(`参数校验失败: ${validation.error}`, 400, "INVALID_ARGS");
+    }
+
     const bridgePath = path.join(process.cwd(), "mcp-server", "bridge.py");
-    const argsJson = JSON.stringify(body);
+    const argsJson = JSON.stringify(validation.data);
     const timeout = TIMEOUTS[tool] || 15000;
 
     try {

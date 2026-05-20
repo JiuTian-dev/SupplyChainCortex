@@ -33,8 +33,8 @@ interface SupplierRatingDialogProps {
     leadTime: number;
     rating: number;
     status: string;
-    ratingDetails?: Record<string, unknown> | string | null;
-    updatedAt?: string;
+    ratingDetails?: unknown;
+    updatedAt?: string | Date;
   } | null;
 }
 

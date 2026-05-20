@@ -44,10 +44,6 @@ const envSchema = z.object({
     .max(65535)
     .default(3000),
 
-  // ─── Database Type ────────────────────────────────────────────────────
-  DB_TYPE: z
-    .enum(['sqlite', 'postgresql', 'mysql'])
-    .default('sqlite'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -69,7 +65,6 @@ function validateEnv(): Env {
       NEXTAUTH_URL: 'http://localhost:3000',
       NODE_ENV: 'development',
       PORT: 3000,
-      DB_TYPE: 'sqlite',
     };
   }
 
@@ -97,7 +92,6 @@ function validateEnv(): Env {
       NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
       NODE_ENV: (process.env.NODE_ENV as Env['NODE_ENV']) || 'test',
       PORT: Number(process.env.PORT) || 3000,
-      DB_TYPE: (process.env.DB_TYPE as Env['DB_TYPE']) || 'sqlite',
     };
   }
 

@@ -88,7 +88,6 @@ export async function exportInventoryData(
   const salesRecords = await db.salesRecord.findMany();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
 
   return records.map((r) => {
     // Compute stock status label
@@ -100,7 +99,7 @@ export async function exportInventoryData(
 
     // Compute days of supply based on recent sales velocity
     const recentSales = salesRecords.filter(
-      (s) => s.sku === r.sku && s.date >= thirtyDaysAgoStr
+      (s) => s.sku === r.sku && s.date >= thirtyDaysAgo
     );
     const dailyVelocity =
       recentSales.length > 0
@@ -244,16 +243,12 @@ export async function exportSalesData(
   endDate?: string
 ): Promise<Record<string, unknown>[]> {
   const where: Record<string, unknown> = {};
-  if (startDate)
-    where.date = {
-      ...((where.date as Record<string, string>) || {}),
-      gte: startDate,
-    };
-  if (endDate)
-    where.date = {
-      ...((where.date as Record<string, string>) || {}),
-      lte: endDate,
-    };
+  if (startDate || endDate) {
+    const dateFilter: Record<string, Date | string> = {};
+    if (startDate) dateFilter.gte = startDate;
+    if (endDate) dateFilter.lte = endDate;
+    where.date = dateFilter;
+  }
 
   const records = await db.salesRecord.findMany({
     where,

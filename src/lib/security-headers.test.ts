@@ -28,8 +28,9 @@ describe('Security Headers', () => {
 
   it('skips Cross-Origin headers for preview panel compatibility', () => {
     // These are intentionally omitted for z.ai preview panel compatibility
-    expect(SECURITY_HEADERS['Cross-Origin-Opener-Policy']).toBeUndefined();
-    expect(SECURITY_HEADERS['Cross-Origin-Resource-Policy']).toBeUndefined();
+    const secHeaders = SECURITY_HEADERS as Record<string, string | undefined>;
+    expect(secHeaders['Cross-Origin-Opener-Policy']).toBeUndefined();
+    expect(secHeaders['Cross-Origin-Resource-Policy']).toBeUndefined();
   });
 
   describe('rateLimitHeaders', () => {

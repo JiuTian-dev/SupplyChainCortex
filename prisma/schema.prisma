@@ -1,5 +1,4 @@
-// 小家电供应链 MCP 数据管道 - PostgreSQL Schema
-// 使用方式: bun run scripts/switch-db.ts postgresql
+// SupplyChain Cortex — PostgreSQL Schema
 
 generator client {
   provider = "prisma-client-js"
@@ -55,7 +54,7 @@ model Inventory {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  product       Product  @relation(fields: [productId], references: [id])
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([sku])
   @@index([warehouse])
@@ -70,13 +69,13 @@ model SalesRecord {
   productId   String   @map("product_id")
   sku         String
   productName String   @map("product_name")
-  date        String   // YYYY-MM-DD
+  date        DateTime // YYYY-MM-DD
   quantity    Int
   revenue     Float
   platform    String   // Amazon, Shopify, Walmart, eBay
   createdAt   DateTime @default(now()) @map("created_at")
 
-  product     Product  @relation(fields: [productId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([date])
@@ -98,15 +97,15 @@ model ShipmentItem {
   destination     String
   carrier         String
   status          String   @default("pending") // pending, in_transit, customs, delivered, delayed, exception
-  eta             String?
-  actualDelivery  String?  @map("actual_delivery")
+  eta             DateTime?
+  actualDelivery  DateTime?  @map("actual_delivery")
   delayDays       Int      @default(0) @map("delay_days")
   riskLevel       String   @default("low") @map("risk_level") // low, medium, high, critical
   events          Json     @default("[]") // JSON array of logistics events
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  product         Product  @relation(fields: [productId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([status])
@@ -135,7 +134,7 @@ model CostRecord {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  product       Product  @relation(fields: [productId], references: [id])
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([sku])
   @@map("cost_records")
@@ -336,7 +335,7 @@ model DefectRecord {
   defectType      String    @map("defect_type")
   severity        String    @default("minor")
   quantity        Int       @default(1)
-  detectedAt      String    @map("detected_at")
+  detectedAt      DateTime    @map("detected_at")
   rootCause       String?   @map("root_cause")
   correctiveAction String?  @map("corrective_action")
   status          String    @default("open")
@@ -428,4 +427,109 @@ model RegulationChange {
   @@index([status])
   @@index([effectiveDate])
   @@map("regulation_changes")
+}
+
+// ==================== 关税引擎 ====================
+
+// HS编码映射：产品品类 -> HS编码
+model ProductHSCode {
+  id          String   @id @default(uuid())
+  category    String
+  subCategory String?  @map("sub_category")
+  hsCode      String   @map("hs_code")
+  description String?
+  section     String?  // e.g. '301-list1', '301-list3', null = exempt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([subCategory])
+  @@index([category, subCategory])
+  @@map("product_hs_codes")
+}
+
+// 关税规则：国家 x HS编码 x 贸易协定 x 生效日期
+model TariffRule {
+  id             String   @id @default(uuid())
+  countryCode    String   @map("country_code")
+  countryName    String   @map("country_name")
+  hsCode         String   @map("hs_code")
+  rate           Float
+  rateType       String   @map("rate_type")       // additional, MFN, FTA
+  tradeAgreement String?  @map("trade_agreement") // Section301-list1, WTO-MFN, RCEP-JP, etc.
+  originCountry  String   @default("CN") @map("origin_country")
+  isActive       Boolean  @default(true) @map("is_active")
+  effectiveFrom  String   @map("effective_from")  // YYYY-MM-DD
+  effectiveTo    String?  @map("effective_to")    // YYYY-MM-DD
+  priority       Int      @default(3)             // lower number = applied first
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([countryCode])
+  @@index([hsCode])
+  @@index([isActive])
+  @@index([rate])
+  @@index([countryCode, hsCode, originCountry])
+  @@map("tariff_rules")
+}
+
+// ==================== 引擎决策日志 ====================
+
+// 引擎决策日志
+model DecisionLog {
+  id              String   @id @default(uuid())
+  auditId         String   @map("audit_id")
+  engine          String
+  action          String
+  input           String?  // JSON serialized
+  output          String?  // JSON serialized
+  durationMs      Int      @map("duration_ms")
+  cacheHit        Boolean  @default(false) @map("cache_hit")
+  degradedSources String?  @map("degraded_sources") // JSON array
+  errors          String?  // JSON serialized
+  version         String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([auditId])
+  @@index([engine])
+  @@index([action])
+  @@index([createdAt])
+  @@map("decision_logs")
+}
+
+// 用户反馈日志
+model FeedbackLog {
+  id            String    @id @default(uuid())
+  auditId       String    @map("audit_id")
+  engine        String
+  action        String    // accepted, rejected, modified, ignored, deferred
+  modifications String?   @map("modifications")  // JSON of modifications made by the user
+  userNotes     String?   @map("user_notes")
+  userId        String?   @map("user_id")
+  suggestedAt   DateTime? @map("suggested_at")
+  actedAt       DateTime  @map("acted_at")
+  tags          String?   // JSON array of tags
+  outcomeJson   String?   @map("outcome_json")   // structured outcome data
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([auditId])
+  @@index([engine])
+  @@index([action])
+  @@index([createdAt])
+  @@map("feedback_logs")
+}
+
+// 贝叶斯权重持久化
+model EngineWeight {
+  id            String   @id @default(uuid())
+  engine        String   @unique
+  version       String
+  sourcesJson   String   @map("sources_json")  // JSON array of SourceWeight[]
+  totalSamples  Int      @default(0) @map("total_samples")
+  calibratedAt  DateTime @map("calibrated_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("engine_weights")
 }

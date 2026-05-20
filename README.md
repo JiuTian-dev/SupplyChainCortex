@@ -1,11 +1,11 @@
-# SupplyChain Cortex v1.0.0
+# SupplyChain Cortex v1.1.0
 
 **MCP-driven supply chain decision intelligence for cross-border small-appliance e-commerce.**
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-0%20errors-blue)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-356%20passed-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-1.0.0-orange)]()
+[![Version](https://img.shields.io/badge/version-1.1.0-orange)]()
 [![MCP Tools](https://img.shields.io/badge/MCP%20tools-61-blueviolet)]()
 [![Python Math](https://img.shields.io/badge/Python%20math-24%20engines-green)]()
 
@@ -70,7 +70,7 @@ Cross-border supply chains face compounded risks: weather disruptions at ports, 
 | **Weather** | Open-Meteo | 10 global port marine weather |
 | **Financial** | Yahoo Finance | QQQ, SPY, SMH, ^IXIC |
 
-### Layer 2: Mathematical Optimization (NEW in v1.0)
+### Layer 2: Mathematical Optimization (NEW in v1.0, enhanced in v1.1)
 
 24 Python-powered supply chain math engines accessible via MCP tools. Each is a rigorously implemented operations research model.
 
@@ -131,9 +131,9 @@ Agent suggestion → User accept/reject/modify → Evidence-level feedback
 
 ---
 
-## v1.0.0 Release Notes
+## v1.1.0 Release Notes
 
-### New in v1.0
+### New in v1.1
 
 | Module | Description |
 |--------|-------------|
@@ -148,7 +148,7 @@ Agent suggestion → User accept/reject/modify → Evidence-level feedback
 
 ### Changes from v0.8.x
 
-| Area | v0.8.x | v1.0.0 |
+| Area | v0.8.x | v1.1.0 |
 |------|--------|--------|
 | MCP Tools | 27 | **61** (+24 math + 10 query) |
 | Chat Layout | Floating draggable modal | **Right-side drawer** (resizable) |
@@ -360,6 +360,7 @@ SupplyChainCortex/
 | **v0.7** | Frontend: 4-layer decision flow, 6 operational tabs, sandbox replay |
 | **v0.8** | 2026 upgrades: ReAct agent, dynamic context, evidence feedback, policy-as-code |
 | **v1.0.0** | Math engines, chat drawer, data consistency, stress-tested seed, 61 tools |
+| **v1.1.0** | Database unification, security hardening, cost module upgrade, batch ops, drag-drop dashboard, 647 tests |
 
 ### 📋 Planned
 
@@ -383,4 +384,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-**SupplyChain Cortex v1.0.0** — Built by [JiuTian-dev](https://github.com/JiuTian-dev)
+**SupplyChain Cortex v1.1.0** — Built by [JiuTian-dev](https://github.com/JiuTian-dev)

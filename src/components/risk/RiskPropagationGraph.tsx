@@ -78,7 +78,8 @@ export function RiskPropagationGraph({ sourceNodes = [], propagation = [], maxDe
       const colH = items.length * ROW_GAP;
       const startY = 40 + (maxPerCol * ROW_GAP - colH) / 2;
       items.forEach((item, i) => {
-        nodePos.set(item.nodeId, {
+        const nodeId = 'nodeId' in item ? (item as GraphNode).nodeId : (item as SourceNode).id;
+        nodePos.set(nodeId, {
           x: colX, y: startY + i * ROW_GAP,
           type: (item as GraphNode).type || 'SOURCE',
           label: item.label, riskScore: item.riskScore,

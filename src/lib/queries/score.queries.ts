@@ -129,7 +129,7 @@ export function computeLogisticsScore(shipments: Array<{ status: string; delayDa
 }
 
 export function computeSalesScore(
-  salesRecords: Array<{ sku: string; revenue: number; quantity: number; date: string }>
+  salesRecords: Array<{ sku: string; revenue: number; quantity: number; date: Date }>
 ) {
   const totalRevenue = salesRecords.reduce((sum, r) => sum + r.revenue, 0);
 
@@ -145,8 +145,8 @@ export function computeSalesScore(
   const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
   const todayStr = today.toISOString().split('T')[0];
 
-  const recentRevenue = salesRecords.filter(r => r.date >= thirtyDaysAgoStr && r.date <= todayStr).reduce((sum, r) => sum + r.revenue, 0);
-  const priorRevenue = salesRecords.filter(r => r.date >= sixtyDaysAgoStr && r.date < thirtyDaysAgoStr).reduce((sum, r) => sum + r.revenue, 0);
+  const recentRevenue = salesRecords.filter(r => r.date >= new Date(thirtyDaysAgoStr) && r.date <= new Date(todayStr)).reduce((sum, r) => sum + r.revenue, 0);
+  const priorRevenue = salesRecords.filter(r => r.date >= new Date(sixtyDaysAgoStr) && r.date < new Date(thirtyDaysAgoStr)).reduce((sum, r) => sum + r.revenue, 0);
   const growthRate = priorRevenue > 0 ? ((recentRevenue - priorRevenue) / priorRevenue) * 100 : 0;
 
   const growthScore = clamp(Math.round(

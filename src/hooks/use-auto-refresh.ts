@@ -5,7 +5,30 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useConnectionStore } from '@/stores/connection-store';
 
-// ==================== Auto-Refresh Hook ====================
+// Query key prefixes that should be refreshed on the polling cycle.
+// Only invalidate data that actually changes frequently — not stable references.
+const REFRESH_PREFIXES = [
+  'dashboard',
+  'inventory',
+  'logistics',
+  'sales',
+  'cost',
+  'risk',
+  'supply-chain-score',
+  'stats',
+  'events',
+  'notifications',
+  'performance',
+  'alerts',
+  'warehouse',
+  'suppliers',
+  'procurement',
+  'analytics',
+  'reports',
+  'quality',
+  'compliance',
+  'exchange-rates',
+] as const;
 
 export function useAutoRefresh() {
   const queryClient = useQueryClient();
@@ -17,15 +40,19 @@ export function useAutoRefresh() {
   const setLastSyncTime = useDashboardUIStore((s) => s.setLastSyncTime);
   const wsConnected = useConnectionStore((s) => s.wsConnected);
 
-  // When SSE is connected, disable polling entirely (SSE handles real-time updates)
-  // Use 0 to indicate no polling needed; the countdown will not trigger refreshAll
+  // When SSE is connected, disable polling entirely
   const interval = wsConnected ? 0 : 60;
   const countdownRef = useRef(interval);
 
   const refreshAll = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await queryClient.invalidateQueries();
+      // Targeted invalidation by prefix — avoids cache stampede of all queries
+      await Promise.all(
+        REFRESH_PREFIXES.map(prefix =>
+          queryClient.invalidateQueries({ queryKey: [prefix] })
+        )
+      );
       setLastSyncTime(new Date());
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('刷新数据失败:', err);
@@ -37,7 +64,6 @@ export function useAutoRefresh() {
   }, [queryClient, setIsRefreshing, setLastSyncTime, setRefreshCountdown, interval]);
 
   useEffect(() => {
-    // When SSE is connected (interval === 0), skip polling entirely
     if (interval <= 0) {
       setRefreshCountdown(0);
       countdownRef.current = 0;

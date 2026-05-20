@@ -238,7 +238,7 @@ export async function getSalesForecastAnalytics(forecastDays: number = 30) {
       const products = await db.product.findMany();
       const inventory = await db.inventory.findMany();
 
-      const salesByProduct: Record<string, Array<{ date: string; quantity: number; revenue: number }>> = {};
+      const salesByProduct: Record<string, Array<{ date: Date; quantity: number; revenue: number }>> = {};
       salesRecords.forEach(r => {
         if (!salesByProduct[r.productId]) {
           salesByProduct[r.productId] = [];

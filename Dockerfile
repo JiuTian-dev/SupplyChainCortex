@@ -68,6 +68,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Install Python 3 + NumPy for MCP supply-chain math engines
+RUN apk add --no-cache python3 py3-numpy
+
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
@@ -84,6 +87,9 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy database switch script (useful for runtime DB config)
 COPY --from=builder /app/scripts ./scripts
+
+# Copy Python MCP math engines (used by supply-chain/[tool] endpoint)
+COPY --from=builder /app/mcp-server ./mcp-server
 
 # Create data directory for SQLite and set ownership
 RUN mkdir -p /app/db && chown nextjs:nodejs /app/db

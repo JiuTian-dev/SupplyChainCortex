@@ -52,11 +52,10 @@ export async function getKPIAnalytics() {
 
       // Revenue growth rate (MoM)
       const today = new Date();
-      const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-      const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split("T")[0];
-      const lastMonthEnd = thisMonthStart;
+      const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const thisMonthRevenue = salesRecords.filter(r => r.date >= thisMonthStart).reduce((s, r) => s + r.revenue, 0);
-      const lastMonthRevenue = salesRecords.filter(r => r.date >= lastMonthStart && r.date < lastMonthEnd).reduce((s, r) => s + r.revenue, 0);
+      const lastMonthRevenue = salesRecords.filter(r => r.date >= lastMonthStart && r.date < thisMonthStart).reduce((s, r) => s + r.revenue, 0);
       const revenueGrowthRate = lastMonthRevenue > 0
         ? Math.round((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 1000) / 10
         : 0;
@@ -118,19 +117,20 @@ export async function getTimeSeriesAnalytics(params: TimeSeriesParams = {}) {
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split("T")[0];
 
+        const byDate = (r: { date: Date }) => r.date.toISOString().split('T')[0] === dateStr;
         let value = 0;
         switch (metric) {
           case "revenue":
-            value = Math.round(salesRecords.filter(r => r.date === dateStr).reduce((s, r) => s + r.revenue, 0));
+            value = Math.round(salesRecords.filter(byDate).reduce((s, r) => s + r.revenue, 0));
             break;
           case "quantity":
-            value = salesRecords.filter(r => r.date === dateStr).reduce((s, r) => s + r.quantity, 0);
+            value = salesRecords.filter(byDate).reduce((s, r) => s + r.quantity, 0);
             break;
           case "inventory_level":
             value = inventory.reduce((s, inv) => s + inv.quantity, 0);
             break;
           case "cost": {
-            const daySales = salesRecords.filter(r => r.date === dateStr);
+            const daySales = salesRecords.filter(byDate);
             value = Math.round(daySales.reduce((s, r) => {
               const cost = costRecords.find(c => c.productId === r.productId);
               return s + r.quantity * (cost?.totalLanded || 0);
@@ -141,7 +141,7 @@ export async function getTimeSeriesAnalytics(params: TimeSeriesParams = {}) {
             value = shipments.filter(s => s.createdAt.toISOString().split("T")[0] === dateStr).length;
             break;
           default:
-            value = Math.round(salesRecords.filter(r => r.date === dateStr).reduce((s, r) => s + r.revenue, 0));
+            value = Math.round(salesRecords.filter(byDate).reduce((s, r) => s + r.revenue, 0));
         }
         dataPoints.push({ date: dateStr, value });
       }
@@ -184,8 +184,8 @@ export async function getComparisonAnalytics() {
       ]);
 
       const today = new Date();
-      const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-      const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split("T")[0];
+      const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
 
       // Current month metrics
       const currentRevenue = salesRecords.filter(r => r.date >= thisMonthStart).reduce((s, r) => s + r.revenue, 0);
@@ -197,7 +197,7 @@ export async function getComparisonAnalytics() {
         const cost = costRecords.find(c => c.sku === i.sku);
         return s + i.quantity * (cost?.totalLanded || 0);
       }, 0);
-      const currentShipmentCount = shipments.filter(s => s.createdAt.toISOString() >= thisMonthStart).length;
+      const currentShipmentCount = shipments.filter(s => s.createdAt >= thisMonthStart).length;
 
       // Previous month metrics
       const prevRevenue = salesRecords.filter(r => r.date >= lastMonthStart && r.date < thisMonthStart).reduce((s, r) => s + r.revenue, 0);
@@ -205,7 +205,7 @@ export async function getComparisonAnalytics() {
         const cost = costRecords.find(c => c.productId === r.productId);
         return s + r.quantity * (cost?.totalLanded || 0);
       }, 0);
-      const prevShipmentCount = shipments.filter(s => s.createdAt.toISOString() >= lastMonthStart && s.createdAt.toISOString() < thisMonthStart).length;
+      const prevShipmentCount = shipments.filter(s => s.createdAt >= lastMonthStart && s.createdAt < thisMonthStart).length;
 
       const pctChange = (curr: number, prev: number) => prev > 0 ? Math.round((curr - prev) / prev * 1000) / 10 : 0;
 
@@ -280,17 +280,14 @@ export async function getAnomaliesAnalytics() {
       const today = new Date();
       const fifteenDaysAgo = new Date(today); fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
       const thirtyDaysAgo = new Date(today); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const fifteenDaysAgoStr = fifteenDaysAgo.toISOString().split("T")[0];
-      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
-      const todayStr = today.toISOString().split("T")[0];
 
       const recentSales: Record<string, number> = {};
       const priorSales: Record<string, number> = {};
       salesRecords.forEach(r => {
-        if (r.date >= fifteenDaysAgoStr && r.date <= todayStr) {
+        if (r.date >= fifteenDaysAgo && r.date <= today) {
           recentSales[r.sku] = (recentSales[r.sku] || 0) + r.quantity;
         }
-        if (r.date >= thirtyDaysAgoStr && r.date < fifteenDaysAgoStr) {
+        if (r.date >= thirtyDaysAgo && r.date < fifteenDaysAgo) {
           priorSales[r.sku] = (priorSales[r.sku] || 0) + r.quantity;
         }
       });

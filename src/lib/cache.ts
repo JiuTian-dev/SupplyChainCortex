@@ -34,7 +34,7 @@ class MemoryCache {
   private cache = new Map<string, CacheEntry<unknown>>();
   private maxSize: number;
 
-  constructor(maxSize = 200) {
+  constructor(maxSize = 500) {
     this.maxSize = maxSize;
   }
 

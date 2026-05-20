@@ -101,6 +101,160 @@ export const AI_PROVIDERS: Record<string, AIProvider> = {
   },
 };
 
+// ─── Anthropic Translation Layer ───────────────────────────────────────────────
+// Anthropic uses the Messages API (not /chat/completions), so we translate
+// between the OpenAI-compatible format used internally and Anthropic's format.
+
+const ANTHROPIC_API_PATH = '/messages';
+const ANTHROPIC_API_VERSION = '2023-06-01';
+
+function isAnthropicProvider(providerId: string): boolean {
+  return providerId === 'anthropic';
+}
+
+function buildAnthropicHeaders(apiKey: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': ANTHROPIC_API_VERSION,
+    // Required for browser-side CORS requests to Anthropic
+    'anthropic-dangerous-direct-browser-access': 'true',
+  };
+}
+
+/**
+ * OpenAI-format messages have `system` as a message role.
+ * Anthropic requires it as a top-level `system` string and does not
+ * allow `role: "system"` inside the `messages` array.
+ */
+function separateSystemMessage(
+  messages: ChatMessage[],
+): { system: string | undefined; nonSystemMessages: Array<{ role: string; content: string }> } {
+  const systemMsg = messages.find(m => m.role === 'system');
+  return {
+    system: systemMsg?.content,
+    nonSystemMessages: messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content })),
+  };
+}
+
+/** Translate an Anthropic non-streaming response to OpenAI-compatible shape. */
+function fromAnthropicResponse(
+  data: Record<string, unknown>,
+  requestedModel: string,
+): Record<string, unknown> {
+  const contentBlocks = (data.content as Array<Record<string, unknown>>) ?? [];
+  const textBlock = contentBlocks.find(c => c.type === 'text');
+  const usage = (data.usage as Record<string, number>) ?? {};
+
+  return {
+    id: data.id,
+    object: 'chat.completion',
+    model: data.model ?? requestedModel,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: (textBlock?.text as string) ?? '',
+        },
+        finish_reason: 'stop',
+      },
+    ],
+    usage: {
+      prompt_tokens: usage.input_tokens ?? 0,
+      completion_tokens: usage.output_tokens ?? 0,
+    },
+  };
+}
+
+/**
+ * Parse Anthropic Messages API SSE stream and emit typed events
+ * in the same shape as the OpenAI-compatible stream parser.
+ */
+async function* handleAnthropicStream(
+  response: Response,
+  requestedModel: string,
+): AsyncGenerator<
+  | { type: 'token'; content: string }
+  | { type: 'tool_call'; toolCall: { name: string; arguments: string } }
+  | { type: 'done'; usage?: { promptTokens: number; completionTokens: number } }
+  | { type: 'error'; error: string },
+  void,
+  unknown
+> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let inputTokens = 0;
+  let doneYielded = false;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const raw = trimmed.slice(6);
+
+        try {
+          const event = JSON.parse(raw) as Record<string, unknown>;
+
+          switch (event.type) {
+            case 'message_start': {
+              const msg = (event.message as Record<string, unknown>) ?? {};
+              inputTokens = ((msg.usage as Record<string, number>)?.input_tokens) ?? 0;
+              break;
+            }
+
+            case 'content_block_delta': {
+              const delta = (event.delta as Record<string, unknown>) ?? {};
+              if (delta.type === 'text_delta' && delta.text) {
+                yield { type: 'token', content: delta.text as string };
+              }
+              break;
+            }
+
+            case 'message_delta': {
+              const outputTokens = ((event.usage as Record<string, number>)?.output_tokens) ?? 0;
+              yield {
+                type: 'done',
+                usage: {
+                  promptTokens: inputTokens,
+                  completionTokens: outputTokens,
+                },
+              };
+              doneYielded = true;
+              break;
+            }
+
+            // Events we can safely ignore in the text-only path:
+            case 'message_stop':
+            case 'ping':
+            case 'content_block_start':
+            case 'content_block_stop':
+              break;
+          }
+        } catch {
+          // Skip unparseable lines
+        }
+      }
+    }
+
+    // Guard: if the stream ended without message_delta, still emit done
+    if (!doneYielded) {
+      yield { type: 'done' };
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Resolve API key: frontend input > env var > empty (will error) */
@@ -139,6 +293,44 @@ export async function chatCompletion(params: ChatCompletionParams): Promise<{
   const key = resolveApiKey(providerId, apiKey);
   if (!key) throw new Error(`请设置 ${provider.name} 的 API Key（在聊天面板设置中配置或设置环境变量 ${provider.envKeyName}）`);
 
+  // ── Anthropic Messages API (non-streaming) ──
+  if (isAnthropicProvider(providerId)) {
+    const { system, nonSystemMessages } = separateSystemMessage(messages);
+
+    const anthropicBody: Record<string, unknown> = {
+      model,
+      messages: nonSystemMessages,
+      max_tokens: maxTokens ?? 4096,
+      stream: false,
+    };
+    if (system) anthropicBody.system = system;
+    if (temperature !== undefined) anthropicBody.temperature = temperature;
+    if (tools?.length) anthropicBody.tools = tools;
+
+    const response = await fetch(`${provider.baseURL}${ANTHROPIC_API_PATH}`, {
+      method: 'POST',
+      headers: { ...buildAnthropicHeaders(key) },
+      body: JSON.stringify(anthropicBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`${provider.name} API 错误 (${response.status}): ${errorText}`);
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+    const openaiCompatible = fromAnthropicResponse(data, model);
+    const choice = (openaiCompatible.choices as Array<Record<string, unknown>>)?.[0];
+    const msg = choice?.message as Record<string, unknown> | undefined;
+
+    return {
+      content: (msg?.content as string) || '',
+      model: (openaiCompatible.model as string) || model,
+      usage: openaiCompatible.usage as { promptTokens: number; completionTokens: number } | undefined,
+    };
+  }
+
+  // ── OpenAI-compatible API (DeepSeek, OpenAI, Ollama) ──
   const body: Record<string, unknown> = {
     model,
     messages,
@@ -203,6 +395,48 @@ export async function* chatCompletionStream(params: ChatCompletionParams): Async
     return;
   }
 
+  // ── Anthropic Messages API streaming ──
+  if (isAnthropicProvider(providerId)) {
+    const { system, nonSystemMessages } = separateSystemMessage(messages);
+
+    const anthropicBody: Record<string, unknown> = {
+      model,
+      messages: nonSystemMessages,
+      max_tokens: maxTokens ?? 4096,
+      stream: true,
+    };
+    if (system) anthropicBody.system = system;
+    if (temperature !== undefined) anthropicBody.temperature = temperature;
+    if (tools?.length) anthropicBody.tools = tools;
+
+    let response: Response;
+    try {
+      response = await fetch(`${provider.baseURL}${ANTHROPIC_API_PATH}`, {
+        method: 'POST',
+        headers: { ...buildAnthropicHeaders(key) },
+        body: JSON.stringify(anthropicBody),
+      });
+    } catch (err) {
+      yield { type: 'error', error: `无法连接到 ${provider.name}: ${(err as Error).message}` };
+      return;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      yield { type: 'error', error: `${provider.name} API 错误 (${response.status}): ${errorText}` };
+      return;
+    }
+
+    if (!response.body) {
+      yield { type: 'error', error: '响应体为空' };
+      return;
+    }
+
+    yield* handleAnthropicStream(response, model);
+    return;
+  }
+
+  // ── OpenAI-compatible API streaming (DeepSeek, OpenAI, Ollama) ──
   const body: Record<string, unknown> = {
     model,
     messages,

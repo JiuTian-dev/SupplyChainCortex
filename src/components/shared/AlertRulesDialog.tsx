@@ -21,7 +21,7 @@ export function AlertRulesDialog() {
   const alertRulesOpen = useDashboardUIStore((s) => s.alertRulesOpen);
   const setAlertRulesOpen = useDashboardUIStore((s) => s.setAlertRulesOpen);
 
-  const [alertRules, setAlertRules] = useState<AlertRule[]>(DEFAULT_ALERT_RULES);
+  const [alertRules, setAlertRules] = useState<Omit<AlertRule, 'createdAt' | 'updatedAt' | 'ruleId'>[]>(DEFAULT_ALERT_RULES);
 
   // Fetch alert rules from API on mount
   useEffect(() => {

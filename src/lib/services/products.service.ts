@@ -4,6 +4,7 @@
  */
 
 import { db } from '@/lib/db';
+import type { SalesRecord } from '@prisma/client';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -341,8 +342,8 @@ export async function getProductDetail(
   if (!product) return null;
 
   // Compute summary stats
-  const totalSales = product.salesRecords.reduce((sum, r) => sum + r.revenue, 0);
-  const totalQty = product.salesRecords.reduce((sum, r) => sum + r.quantity, 0);
+  const totalSales = product.salesRecords.reduce((sum: number, r: SalesRecord) => sum + r.revenue, 0);
+  const totalQty = product.salesRecords.reduce((sum: number, r: SalesRecord) => sum + r.quantity, 0);
   const avgDailySales = product.salesRecords.length > 0
     ? Math.round((totalQty / product.salesRecords.length) * 10) / 10
     : 0;

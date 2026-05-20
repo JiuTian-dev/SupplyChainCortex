@@ -60,3 +60,9 @@ export {
   supplierRatingSchema,
   type SupplierRating,
 } from './suppliers';
+
+// Supply-chain Python tool argument schemas
+export {
+  TOOL_SCHEMAS,
+  validateToolArgs,
+} from './supply-chain-tools';

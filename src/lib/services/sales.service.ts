@@ -59,7 +59,7 @@ export interface SalesForecastResult {
 
 /** Compute sales summary for a set of records */
 export function computeSalesSummary(
-  salesRecords: { date: string; quantity: number; revenue: number; platform: string }[],
+  salesRecords: { date: Date; quantity: number; revenue: number; platform: string }[],
   days: number,
   startDate?: string,
   endDate?: string
@@ -87,7 +87,9 @@ export function computeSalesSummary(
     ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000)
     : days;
 
-  const periodSales = salesRecords.filter(r => r.date >= (currentStartStr || cutoffStr) && r.date <= (currentEndStr || todayStr));
+  const filterStart = new Date(currentStartStr || cutoffStr);
+  const filterEnd = new Date(currentEndStr || todayStr);
+  const periodSales = salesRecords.filter(r => r.date >= filterStart && r.date <= filterEnd);
   const totalQuantity = periodSales.reduce((sum, r) => sum + r.quantity, 0);
   const totalRevenue = periodSales.reduce((sum, r) => sum + r.revenue, 0);
   const avgDailySales = Math.round((totalQuantity / effectiveDays) * 10) / 10;
@@ -109,7 +111,9 @@ export function computeSalesSummary(
     prevEndStr = new Date(new Date(cutoffStr).getTime() - 86400000).toISOString().split('T')[0];
   }
 
-  const prevPeriodSales = salesRecords.filter(r => r.date >= prevCutoffStr && r.date <= prevEndStr);
+  const prevFilterStart = new Date(prevCutoffStr);
+  const prevFilterEnd = new Date(prevEndStr);
+  const prevPeriodSales = salesRecords.filter(r => r.date >= prevFilterStart && r.date <= prevFilterEnd);
   const prevRevenue = prevPeriodSales.reduce((sum, r) => sum + r.revenue, 0);
   const momGrowth = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 1000) / 10 : 0;
   const yoyGrowth = Math.round((5 + (totalRevenue % 15)) * 10) / 10;
@@ -188,9 +192,11 @@ export async function generateSalesForecast(
   const todayDate = new Date();
   const dailyRevenue: Record<string, number> = {};
   const dailyQuantity: Record<string, number> = {};
+  const toDateKey = (d: Date) => d.toISOString().split('T')[0];
   allSales.forEach(r => {
-    dailyRevenue[r.date] = (dailyRevenue[r.date] || 0) + r.revenue;
-    dailyQuantity[r.date] = (dailyQuantity[r.date] || 0) + r.quantity;
+    const key = toDateKey(r.date);
+    dailyRevenue[key] = (dailyRevenue[key] || 0) + r.revenue;
+    dailyQuantity[key] = (dailyQuantity[key] || 0) + r.quantity;
   });
 
   // Build historical daily array (last 30 days)
@@ -303,11 +309,13 @@ export async function getSalesOverview(params: {
   }
 
   // Apply date range filter to sales records
-  if (startDate) {
-    filteredSales = filteredSales.filter(r => r.date >= startDate);
+  const startDateObj = startDate ? new Date(startDate) : undefined;
+  const endDateObj = endDate ? new Date(endDate) : undefined;
+  if (startDateObj) {
+    filteredSales = filteredSales.filter(r => r.date >= startDateObj);
   }
-  if (endDate) {
-    filteredSales = filteredSales.filter(r => r.date <= endDate);
+  if (endDateObj) {
+    filteredSales = filteredSales.filter(r => r.date <= endDateObj);
   }
 
   // Apply category filter (only products in the category)
@@ -420,18 +428,21 @@ export async function getDailySales(params: {
 
   let filteredSales = allSales;
   if (platform) filteredSales = filteredSales.filter(r => r.platform === platform);
-  if (startDate) filteredSales = filteredSales.filter(r => r.date >= startDate);
-  if (endDate) filteredSales = filteredSales.filter(r => r.date <= endDate);
+  const startDateObj = startDate ? new Date(startDate) : undefined;
+  const endDateObj = endDate ? new Date(endDate) : undefined;
+  if (startDateObj) filteredSales = filteredSales.filter(r => r.date >= startDateObj);
+  if (endDateObj) filteredSales = filteredSales.filter(r => r.date <= endDateObj);
 
   // Aggregate daily
   const dailyMap: Record<string, { date: string; revenue: number; quantity: number; orders: number }> = {};
   filteredSales.forEach(r => {
-    if (!dailyMap[r.date]) {
-      dailyMap[r.date] = { date: r.date, revenue: 0, quantity: 0, orders: 0 };
+    const dateKey = r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date);
+    if (!dailyMap[dateKey]) {
+      dailyMap[dateKey] = { date: dateKey, revenue: 0, quantity: 0, orders: 0 };
     }
-    dailyMap[r.date].revenue += r.revenue;
-    dailyMap[r.date].quantity += r.quantity;
-    dailyMap[r.date].orders += 1;
+    dailyMap[dateKey].revenue += r.revenue;
+    dailyMap[dateKey].quantity += r.quantity;
+    dailyMap[dateKey].orders += 1;
   });
 
   const dailyData = Object.values(dailyMap)

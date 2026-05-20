@@ -15,7 +15,7 @@ import {
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
   Wifi, RefreshCw, CircleDot, Loader2, Check, Square,
   MoreHorizontal, Paperclip, FileDown, FolderOpen, HardDrive, FileText, RotateCcw,
-  PanelRightClose,
+  PanelRightClose, Eye, EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS, getProviderModels, getDefaultModel } from '@/lib/services/ai-providers.service';
@@ -54,6 +54,7 @@ export function ChatPanel() {
   const [selectedProvider, setSelectedProvider] = useState<string>('deepseek');
   const [selectedModel, setSelectedModel] = useState<string>('deepseek-chat');
   const [apiKey, setApiKey] = useState<string>('');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState<boolean | undefined>(undefined);
   const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0 });
@@ -603,11 +604,19 @@ export function ChatPanel() {
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">API Key ({currentProvider?.envKeyName || 'DEEPSEEK_API_KEY'})</label>
               <div className="flex gap-2">
-                <Input type="password" value={apiKey} onChange={(e) => { setApiKey(e.target.value); saveSettings(selectedProvider, selectedModel, e.target.value); }} placeholder={`输入 ${currentProvider?.name || 'DeepSeek'} API Key...`} className="h-8 text-xs font-mono" />
+                <div className="relative flex-1">
+                  <Input type={showApiKey ? 'text' : 'password'} value={apiKey} onChange={(e) => { setApiKey(e.target.value); saveSettings(selectedProvider, selectedModel, e.target.value); }} placeholder={`输入 ${currentProvider?.name || 'DeepSeek'} API Key...`} className="h-8 text-xs font-mono pr-8" />
+                  <button type="button" onClick={() => setShowApiKey(v => !v)} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" aria-label={showApiKey ? '隐藏 API Key' : '显示 API Key'}>
+                    {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
                 <Button variant="outline" size="sm" className="h-8 text-xs shrink-0" disabled={!apiKey || testingConnection}
                   onClick={async () => { setTestingConnection(true); try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '你好', stream: false, provider: selectedProvider, model: selectedModel, apiKey }) }); const data = await res.json(); if (data.success) toast.success('连接测试成功'); else toast.error(`连接失败: ${data.error || '未知错误'}`); } catch { toast.error('连接测试失败'); } setTestingConnection(false); }}>
                   {testingConnection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}<span className="ml-1 hidden sm:inline">测试</span></Button>
               </div>
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />API Key 存储在浏览器本地，请勿在公共电脑上使用
+              </p>
             </div>
             {selectedProvider === 'local' && (
               <div className="space-y-2">

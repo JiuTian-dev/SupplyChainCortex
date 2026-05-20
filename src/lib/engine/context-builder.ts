@@ -15,6 +15,7 @@ import { episodeStore, formatEpisodeContext } from '@/lib/engine/episode-store';
 import { formatConsolidatedFactsContext } from '@/lib/engine/memory-consolidation';
 import { recommendStrategies, formatStrategyContext, type RiskContext } from '@/lib/engine/strategy-engine';
 import { getSourceHealthSummary } from '@/lib/engine/connector-health';
+import type { FeedbackLog } from '@prisma/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -189,12 +190,12 @@ export async function gatherBriefing(): Promise<AgentBriefing> {
   // ── Feedback insight ────────────────────────────────────────────────────────
   let feedbackInsight = '暂无足够的反馈数据来总结模式。';
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const recentFeedback = await (db as any).feedbackLog?.findMany({
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: { action: true, userNotes: true, engine: true },
-    });
+    }) as Pick<FeedbackLog, 'action' | 'userNotes' | 'engine'>[];
 
     const rejected = recentFeedback.filter(f => f.action === 'rejected');
     if (rejected.length > 0) {

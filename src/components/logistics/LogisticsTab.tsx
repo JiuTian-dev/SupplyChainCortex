@@ -35,6 +35,17 @@ import { ShipmentRouteMap } from '@/components/logistics/ShipmentRouteMap';
 function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentItem; onUpdateStatus: (shipment: ShipmentItem) => void }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Parse events from Prisma JsonValue into a typed array
+  const parsedEvents = useMemo(() => {
+    if (!shipment.events) return [];
+    const raw = shipment.events;
+    if (Array.isArray(raw)) return raw as Array<Record<string, unknown>>;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw) as Array<Record<string, unknown>>; } catch { return []; }
+    }
+    return [];
+  }, [shipment.events]);
+
   const statusIcon = (status: string) => {
     switch (status) {
       case 'delivered':
@@ -150,11 +161,11 @@ function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentItem; on
           </Button>
         </div>
       </div>
-      {expanded && shipment.events.length > 0 && (
+      {expanded && parsedEvents.length > 0 && (
         <div className="mt-3 pt-3 border-t">
           <p className="text-xs font-semibold text-muted-foreground mb-2">物流事件时间线</p>
           <div className="space-y-2">
-            {shipment.events.map((event, idx) => (
+            {parsedEvents.map((event, idx) => (
               <div key={idx} className="flex items-start gap-3 text-sm">
                 <div className="flex flex-col items-center">
                   <div
@@ -162,12 +173,12 @@ function ShipmentCard({ shipment, onUpdateStatus }: { shipment: ShipmentItem; on
                       idx === 0 ? 'bg-orange-400' : 'bg-muted-foreground/40'
                     } mt-1.5`}
                   />
-                  {idx < shipment.events.length - 1 && <div className="w-px h-6 bg-border" />}
+                  {idx < parsedEvents.length - 1 && <div className="w-px h-6 bg-border" />}
                 </div>
                 <div>
-                  <p className="font-medium">{event.description}</p>
+                  <p className="font-medium">{String(event.description ?? '')}</p>
                   <p className="text-xs text-muted-foreground">
-                    {event.location} &middot; {new Date(event.eventTime).toLocaleString('zh-CN')}
+                    {String(event.location ?? '')} &middot; {new Date(String(event.eventTime ?? '')).toLocaleString('zh-CN')}
                   </p>
                 </div>
               </div>

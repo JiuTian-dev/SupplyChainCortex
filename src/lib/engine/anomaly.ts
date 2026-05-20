@@ -53,7 +53,7 @@ export async function detectAnomalies(): Promise<QualityReport> {
   const byEngine = new Map<string, Map<string, { accepted: number; total: number }>>();
 
   for (const fb of feedback) {
-    const day = fb.actedAt.slice(0, 10); // YYYY-MM-DD
+    const day = (fb.actedAt instanceof Date ? fb.actedAt.toISOString() : String(fb.actedAt)).slice(0, 10); // YYYY-MM-DD
     const engineMap = byEngine.get(fb.engine) || new Map();
     const dayStats = engineMap.get(day) || { accepted: 0, total: 0 };
     dayStats.total++;

@@ -15,8 +15,8 @@ search:
     - html
     - json
   safe_search: 2
-  default_lang: "zh-CN"
-  autocomplete: "duckduckgo"
+  default_lang: "auto"
+  autocomplete: ""
 
 enabled_plugins:
   - "Hash plugin"
@@ -31,8 +31,6 @@ engines:
     disabled: false
     categories: [general]
     timeout: 7.0
-    engine_params:
-      safe_search: strict
   - name: duckduckgo
     disabled: false
     categories: [general]
@@ -49,16 +47,10 @@ engines:
     disabled: false
     categories: [it]
     timeout: 5.0
-  - name: brave
-    disabled: true
-  - name: qwant
+  - name: bing news
     disabled: false
-    categories: [general]
+    categories: [news]
     timeout: 7.0
-  - name: startpage
-    disabled: true
-  - name: reddit
-    disabled: true
 
 outgoing:
   request_timeout: 10.0

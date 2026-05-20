@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { withErrorHandler, parseDateRange, apiError } from "@/lib/api-utils";
+import { withErrorHandler, parseDateRange } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
 import {
   getDashboardMetrics,
   getInventoryDistribution,
   getSalesTrend,
-  getCriticalAlerts,
   getDashboardSummary,
 } from "@/lib/queries/dashboard.queries";
 
@@ -27,38 +26,51 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
   const warehouse = searchParams.get("warehouse") || undefined;
 
-  // Use service layer for optimized queries (avoids loading all records)
-  const [metrics, inventoryDistribution, salesTrend, shipments, costRecords, products, salesRecords] = await Promise.all([
+  // Metrics already includes inventory distribution, sales trend, shipment/cost stats
+  // from DB-level aggregation. Only fetch additional category-level data here.
+  const [metrics, inventoryDistribution, salesTrend, categoryAgg] = await Promise.all([
     getDashboardMetrics(),
     getInventoryDistribution(warehouse),
     getSalesTrend(dateRange.startDate, dateRange.endDate),
-    db.shipmentItem.findMany({ select: { status: true } }),
-    db.costRecord.findMany({ where: { grossMargin: { lt: 48 } }, select: { sku: true, productName: true, grossMargin: true } }),
-    db.product.findMany({ select: { id: true, category: true } }),
-    db.salesRecord.findMany({ select: { productId: true, revenue: true } }),
+    // Category revenue via DB-level groupBy (not loading all records)
+    db.salesRecord.groupBy({
+      by: ['productId'],
+      _sum: { revenue: true },
+      orderBy: { _sum: { revenue: 'desc' } },
+      take: 3000,
+    }),
   ]);
 
-  // Shipment status distribution
-  const shipmentStatusDist: Record<string, number> = {};
-  shipments.forEach(s => {
-    shipmentStatusDist[s.status] = (shipmentStatusDist[s.status] || 0) + 1;
+  // Map product IDs to categories
+  const productIds = [...new Set(categoryAgg.map((g: { productId: string }) => g.productId))];
+  const products = await db.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, category: true },
+  });
+  const productCategoryMap = new Map(products.map(p => [p.id, p.category]));
+
+  // Aggregate category revenue
+  const categoryRevenueMap: Record<string, number> = {};
+  (categoryAgg as Array<{ productId: string; _sum: { revenue: number | null } }>).forEach(g => {
+    const category = productCategoryMap.get(g.productId) || '其他';
+    categoryRevenueMap[category] = (categoryRevenueMap[category] || 0) + (g._sum.revenue || 0);
   });
 
-  // Cost alert products
-  const costAlerts = costRecords.map(c => ({
-    sku: c.sku,
-    productName: c.productName,
-    grossMargin: c.grossMargin,
-  }));
+  // Shipment status distribution (DB-level, not full-table load)
+  const shipmentStatusGroups = await db.shipmentItem.groupBy({
+    by: ['status'],
+    _count: true,
+  });
+  const shipmentStatusDist: Record<string, number> = {};
+  shipmentStatusGroups.forEach(g => {
+    shipmentStatusDist[g.status] = g._count;
+  });
 
-  // Category revenue
-  const categoryRevenue: Record<string, number> = {};
-  const productMap = new Map(products.map(p => [p.id, p.category]));
-  salesRecords.forEach(r => {
-    const category = productMap.get(r.productId);
-    if (category) {
-      categoryRevenue[category] = (categoryRevenue[category] || 0) + r.revenue;
-    }
+  // Top cost alerts (limited)
+  const costAlerts = await db.costRecord.findMany({
+    where: { grossMargin: { lt: 48 } },
+    select: { sku: true, productName: true, grossMargin: true },
+    take: 10,
   });
 
   return NextResponse.json({
@@ -66,8 +78,12 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
     inventoryDistribution,
     salesTrend,
     shipmentStatusDistribution: shipmentStatusDist,
-    costAlerts,
-    categoryRevenue: Object.entries(categoryRevenue).map(([category, revenue]) => ({
+    costAlerts: costAlerts.map(c => ({
+      sku: c.sku,
+      productName: c.productName,
+      grossMargin: c.grossMargin,
+    })),
+    categoryRevenue: Object.entries(categoryRevenueMap).map(([category, revenue]) => ({
       category,
       revenue: Math.round(revenue),
     })),

@@ -72,8 +72,8 @@ export interface FormattedShipment {
   destination: string;
   carrier: string;
   status: string;
-  eta: string | null;
-  actualDelivery: string | null;
+  eta: Date | null;
+  actualDelivery: Date | null;
   delayDays: number;
   riskLevel: string;
   events: unknown[];
@@ -89,8 +89,8 @@ export interface ShipmentTrackingDetail {
   carrier: string;
   route: string;
   status: string;
-  eta: string | null;
-  actualDelivery: string | null;
+  eta: Date | null;
+  actualDelivery: Date | null;
   delayDays: number;
   riskLevel: string;
   events: unknown[];
@@ -246,7 +246,7 @@ export async function updateShipmentStatus(
   statusUpdate: ShipmentStatusUpdate
 ): Promise<{
   success: boolean;
-  shipment: { trackingNumber: string; status: string; eta: string | null; actualDelivery: string | null };
+  shipment: { trackingNumber: string; status: string; eta: Date | null; actualDelivery: Date | null };
 }> {
   const shipment = await db.shipmentItem.findUnique({
     where: { trackingNumber },
@@ -264,11 +264,11 @@ export async function updateShipmentStatus(
   // Build update data
   const updateData: Record<string, unknown> = {};
   if (statusUpdate.status) updateData.status = statusUpdate.status;
-  if (statusUpdate.eta) updateData.eta = statusUpdate.eta;
+  if (statusUpdate.eta) updateData.eta = new Date(statusUpdate.eta);
 
   if (typeof statusUpdate.progress === 'number') {
     if (statusUpdate.progress >= 100 && statusUpdate.status === 'delivered') {
-      updateData.actualDelivery = new Date().toISOString().split('T')[0];
+      updateData.actualDelivery = new Date();
       updateData.delayDays = shipment.eta
         ? Math.max(0, Math.ceil((Date.now() - new Date(shipment.eta).getTime()) / 86400000))
         : 0;

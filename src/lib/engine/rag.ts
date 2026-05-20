@@ -12,7 +12,7 @@
 
 // ─── Knowledge Base ─────────────────────────────────────────────────────────────
 
-interface KnowledgeChunk {
+export interface KnowledgeChunk {
   id: string;
   domain: 'tariff' | 'logistics' | 'compliance' | 'risk' | 'general' | 'production' | 'ecommerce' | 'safety' | 'payment';
   title: string;
@@ -610,3 +610,6 @@ export function getChunksNeedingReview(): KnowledgeChunk[] {
     getScore(c) < 0.3 || (c.lastUpdated || '2020-01-01') < ninetyDaysAgo
   );
 }
+
+// ─── Test-support exports for pure functions ─────────────────────────
+export { tokenize, getSourceTags, getScore };

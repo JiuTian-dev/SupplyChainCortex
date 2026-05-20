@@ -159,7 +159,6 @@ async function main() {
   for (let dayOffset = 365; dayOffset >= 0; dayOffset--) {
     const d = new Date(now);
     d.setDate(d.getDate() - dayOffset);
-    const dateStr = d.toISOString().split('T')[0];
 
     // 5-15 sales per day across different products
     const dailySales = 5 + Math.floor(Math.random() * 10);
@@ -168,7 +167,7 @@ async function main() {
       await db.salesRecord.create({
         data: {
           productId: p.id, sku: p.sku, productName: p.name,
-          date: dateStr,
+          date: d,
           quantity: 1 + Math.floor(Math.random() * 5),
           revenue: Math.round((CATEGORIES.find(c => c.sub === products.find(pp => pp.id === p.id)?.name?.replace(' Pro', ''))?.price || 199) * (0.7 + Math.random() * 0.6)),
           platform: PLATFORMS[Math.floor(Math.random() * PLATFORMS.length)],

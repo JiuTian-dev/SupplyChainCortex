@@ -1,5 +1,7 @@
 // src/lib/services/web-search-rewriter.ts
 
+import { zhToEnRewriterMap } from './web-search-keywords';
+
 export interface ConversationTurn {
   role: 'user' | 'assistant';
   content: string;
@@ -147,17 +149,8 @@ const REWRITE_STRATEGIES = [
   {
     name: 'english',
     apply: (q: string) => {
-      const termMap: Record<string, string> = {
-        '关税': 'tariff', '贸易战': 'trade war', '供应链': 'supply chain',
-        '小家电': 'small home appliances', '铜价': 'copper price',
-        '运价': 'freight rate', '港口': 'port congestion',
-        '汇率': 'exchange rate', '合规': 'compliance', '出口': 'export',
-        '碳价': 'carbon price', '库存': 'inventory', '物流': 'logistics',
-        '政策': 'policy regulation', '供应商': 'supplier', '销售': 'sales',
-        '成本': 'cost', '风险': 'risk', '认证': 'certification',
-      };
       let result = q;
-      for (const [zh, en] of Object.entries(termMap)) {
+      for (const [zh, en] of Object.entries(zhToEnRewriterMap)) {
         if (result.includes(zh)) result += ` ${en}`;
       }
       return result === q ? q : result;

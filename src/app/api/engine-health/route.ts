@@ -14,6 +14,7 @@ import { withErrorHandler } from '@/lib/api-utils';
 import { runHealthProbe, getEngineMetrics, getFeedbackStats } from '@/lib/engine';
 import { detectAnomalies } from '@/lib/engine/anomaly';
 import { db } from '@/lib/db';
+import type { DecisionLog, FeedbackLog } from '@prisma/client';
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
@@ -34,8 +35,8 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   if (action === 'audit') {
     const [decisions, feedback] = await Promise.all([
-      db.decisionLog.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }),
-      db.feedbackLog.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }),
+      (db as any).decisionLog.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }) as Promise<DecisionLog[]>,
+      (db as any).feedbackLog.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }) as Promise<FeedbackLog[]>,
     ]);
 
     // Join decisions with their feedback by auditId

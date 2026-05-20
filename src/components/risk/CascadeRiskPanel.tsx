@@ -87,7 +87,7 @@ export function CascadeRiskPanel() {
   const { data: report, isLoading: loading, error, refetch } = useCascadeRisk(scenario);
 
   const productRisks = useMemo(() =>
-    (report?.propagation || []).filter(p => p.type === 'PRODUCT' && p.propagatedRisk > 0),
+    (report?.propagation || []).filter((p: PropagationItem) => p.type === 'PRODUCT' && p.propagatedRisk > 0),
     [report?.propagation]
   );
 
@@ -167,7 +167,7 @@ export function CascadeRiskPanel() {
         {/* Source Nodes */}
         <div className="flex flex-wrap gap-2">
           <span className="text-xs text-muted-foreground self-center">触发源:</span>
-          {sourceNodes.map(s => (
+          {sourceNodes.map((s: SourceNode) => (
             <Badge key={s.id} variant="outline" className={`text-[10px] gap-1 ${riskColor(s.riskScore)}`}>
               <AlertTriangle className="h-2.5 w-2.5" />
               {s.label}: {s.riskScore}%
@@ -223,7 +223,7 @@ export function CascadeRiskPanel() {
               受影响产品排名 (Top {summary.topAffectedProducts.length})
             </h4>
             <div className="space-y-2">
-              {summary.topAffectedProducts.map((p, i) => (
+              {summary.topAffectedProducts.map((p: TopProduct, i: number) => (
                 <div key={p.sku} className="flex items-center gap-3 bg-card rounded-md p-2.5 border">
                   <span className="text-lg font-bold text-muted-foreground/40">#{i + 1}</span>
                   <div className="flex-1 min-w-0">
@@ -257,7 +257,7 @@ export function CascadeRiskPanel() {
               反事实分析：如果采取不同措施？
             </h4>
             <div className="space-y-2">
-              {report.counterfactuals.map((cf, i) => (
+              {report.counterfactuals.map((cf: CounterfactualResult, i: number) => (
                 <div key={i} className="flex items-center gap-3 bg-card rounded-md p-2 border text-xs">
                   <span className="font-medium w-24 shrink-0">{cf.scenario}</span>
                   <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -280,9 +280,9 @@ export function CascadeRiskPanel() {
             </h4>
             <div className="overflow-x-auto">
               <div className="flex gap-2 min-w-[500px]">
-                {report.forwardProjection.map((day, i) => {
-                  const depletionCritical = day.inventoryDepletionRisk.filter(d => d.riskLevel === 'critical').length;
-                  const depletionWarning = day.inventoryDepletionRisk.filter(d => d.riskLevel === 'warning').length;
+                {report.forwardProjection.map((day: DayProjection, i: number) => {
+                  const depletionCritical = day.inventoryDepletionRisk.filter((d: { sku: string; productName: string; daysUntilDepletion: number; riskLevel: string }) => d.riskLevel === 'critical').length;
+                  const depletionWarning = day.inventoryDepletionRisk.filter((d: { sku: string; productName: string; daysUntilDepletion: number; riskLevel: string }) => d.riskLevel === 'warning').length;
                   return (
                     <div key={i} className={`flex-1 rounded-lg border p-2 text-center min-w-[70px] ${
                       depletionCritical > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20'

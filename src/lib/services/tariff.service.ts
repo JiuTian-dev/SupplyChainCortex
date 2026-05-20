@@ -17,6 +17,7 @@
 
 import { db } from '@/lib/db';
 import { fetchCarbonPrice, estimateCBAMCost } from '@/lib/sources/carbon-price';
+import type { TariffRule } from '@prisma/client';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -104,7 +105,7 @@ export async function getApplicableTariffs(
     orderBy: { priority: 'desc' },
   });
 
-  return rules.map(r => ({
+  return rules.map((r: TariffRule) => ({
     countryCode: r.countryCode,
     countryName: r.countryName,
     hsCode: r.hsCode,
@@ -168,9 +169,9 @@ export async function getTariffOverview(): Promise<{
     countries: [...countryMap.values()].sort((a, b) => b.ruleCount - a.ruleCount),
     tradeAgreements: [...agreementMap.entries()].map(([name, count]) => ({ name, ruleCount: count })),
     highRateRules: allRules
-      .filter(r => r.rate >= 20)
+      .filter((r: TariffRule) => r.rate >= 20)
       .slice(0, 10)
-      .map(r => ({
+      .map((r: TariffRule) => ({
         countryCode: r.countryCode, countryName: r.countryName,
         hsCode: r.hsCode, rate: r.rate, rateType: r.rateType,
         tradeAgreement: r.tradeAgreement || 'MFN',

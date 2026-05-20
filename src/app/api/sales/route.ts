@@ -107,11 +107,13 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
         }
 
         // Apply date range filter
-        if (startDate) {
-          filteredSales = filteredSales.filter(r => r.date >= startDate);
+        const startDt = startDate ? new Date(startDate) : undefined;
+        const endDt = endDate ? new Date(endDate) : undefined;
+        if (startDt) {
+          filteredSales = filteredSales.filter(r => r.date >= startDt);
         }
-        if (endDate) {
-          filteredSales = filteredSales.filter(r => r.date <= endDate);
+        if (endDt) {
+          filteredSales = filteredSales.filter(r => r.date <= endDt);
         }
 
         // Apply category filter
@@ -228,7 +230,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       }
 
       filteredSales.forEach(r => {
-        const month = parseInt(r.date.split('-')[1]);
+        const month = r.date.getMonth() + 1;
         if (month >= 1 && month <= 12) {
           monthlyRevenue[month].total += r.revenue;
           monthlyRevenue[month].count += 1;
@@ -291,7 +293,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       // Trend: monthly revenue by year-month for trend lines
       const yearMonthRevenue: Record<string, number> = {};
       filteredSales.forEach(r => {
-        const ym = r.date.substring(0, 7);
+        const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}`;
         yearMonthRevenue[ym] = (yearMonthRevenue[ym] || 0) + r.revenue;
       });
       const trend = Object.entries(yearMonthRevenue)

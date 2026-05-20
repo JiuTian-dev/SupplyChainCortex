@@ -293,8 +293,7 @@ export async function getInventoryTurnoverAnalytics() {
 
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split("T")[0];
-      const recentSales = salesRecords.filter(r => r.date >= ninetyDaysAgoStr);
+      const recentSales = salesRecords.filter(r => r.date >= ninetyDaysAgo);
 
       const salesByProduct: Record<string, { productId: string; sku: string; totalQuantity: number; totalRevenue: number }> = {};
       recentSales.forEach(r => {

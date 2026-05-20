@@ -22,6 +22,8 @@ interface DashboardConfigState {
   setRiskThresholds: (thresholds: DashboardConfig['riskThresholds']) => void;
   setTimeHorizon: (horizon: DashboardConfig['timeHorizon']) => void;
   togglePanel: (panel: string) => void;
+  reorderPanels: (fromIndex: number, toIndex: number) => void;
+  resetLayout: () => void;
   resetConfig: () => void;
   hydrate: () => void;
 }
@@ -67,6 +69,26 @@ export const useDashboardConfigStore = create<DashboardConfigState>((set, get) =
     };
     set({ config: next });
     saveConfig(next);
+  },
+
+  reorderPanels: (fromIndex, toIndex) => {
+    const currentOrder = [...get().config.panelOrder];
+    const [moved] = currentOrder.splice(fromIndex, 1);
+    currentOrder.splice(toIndex, 0, moved);
+    const next = { ...get().config, panelOrder: currentOrder };
+    set({ config: next });
+    saveConfig(next);
+  },
+
+  resetLayout: () => {
+    const defaults = { ...DEFAULT_CONFIG };
+    const next = {
+      ...get().config,
+      panels: { ...defaults.panels },
+      panelOrder: [...defaults.panelOrder],
+    };
+    set({ config: next as DashboardConfig });
+    saveConfig(next as DashboardConfig);
   },
 
   resetConfig: () => {

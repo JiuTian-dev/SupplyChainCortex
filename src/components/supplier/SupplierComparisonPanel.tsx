@@ -58,7 +58,7 @@ interface SupplierComparisonPanelProps {
 
 const COMPARISON_COLORS = ['#f97316', '#22c55e', '#06b6d4', '#8b5cf6'];
 
-function parseRatingDetails(raw: Record<string, unknown> | string | null | undefined): RatingDetails | null {
+function parseRatingDetails(raw: unknown): RatingDetails | null {
   if (!raw) return null;
   if (typeof raw === 'string') {
     try { return JSON.parse(raw); } catch { return null; }
