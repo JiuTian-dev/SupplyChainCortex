@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node -e \"const{exec}=require('child_process');exec('docker compose up -d searxng 2>&1',(err,stdout,stderr)=>{if(err)console.log('[predev] Docker not available — SearXNG skipped. Run Docker Desktop first.');else console.log('[predev] SearXNG:',stdout.trim()||'started')})\"",
     "dev": "next dev -p 3000",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
