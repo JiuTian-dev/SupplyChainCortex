@@ -54,6 +54,13 @@ const MAX_MESSAGES = 50;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface ThinkingStep {
+  status: string;
+  tool?: string;
+  result?: string;
+  timestamp?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -62,7 +69,13 @@ export interface ChatMessage {
   toolsUsed?: string[];
   data?: Record<string, unknown>;
   model?: string;
-  timestamp: string; // ISO string for serialization
+  timestamp: string;
+  thinkingSteps?: ThinkingStep[];
+  durationMs?: number;
+  steps?: number;
+  tier?: number;
+  mode?: string;
+  passport?: Record<string, unknown>;
 }
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
