@@ -149,7 +149,7 @@ export async function webSearch(query: string): Promise<{ results: SearchResult[
 
   const config = getConfig();
   const cacheKey = getCacheKey(q, config);
-  const cached = serverCache.get<{ results: SearchResult[]; source: string }>(cacheKey);
+  const cached = await serverCache.get<{ results: SearchResult[]; source: string }>(cacheKey);
   if (cached) return cached;
 
   const result = await tryAllSources(q, config);
@@ -386,7 +386,7 @@ export async function webSearchWithQuality(
   // Cache check
   const cacheKey = getCacheKey(primaryQuery, config,
     `${searchOptions.categories || ''}|${searchOptions.time_range || ''}|${searchOptions.engines || ''}`);
-  const cached = serverCache.get<QualitySearchResult>(cacheKey);
+  const cached = await serverCache.get<QualitySearchResult>(cacheKey);
   if (cached) return cached;
 
   const allResults: SearchResult[] = [];

@@ -14,24 +14,17 @@ import type { ICacheBackend, CacheStats } from '@/lib/cache';
 //     hit_count  INT DEFAULT 0
 //   );
 
+const TAG = '[cache-postgres]';
+
 export class PostgresCacheBackend implements ICacheBackend {
   private maxSize: number;
+  readonly backendType = 'postgres' as const;
 
   constructor(maxSize = 500) {
     this.maxSize = maxSize;
   }
 
-  get<T>(key: string): T | null {
-    // This is sync in the interface but PG is async.
-    // We use a synchronous approach: read from an in-process Map as L1,
-    // or accept that get() returns null on cache miss (async population
-    // happens via cachedFetch which calls set() after fetcher resolves).
-    //
-    // For a proper async cache, use cachedFetch() which handles this.
-    return null;
-  }
-
-  async getAsync<T>(key: string): Promise<T | null> {
+  async get<T>(key: string): Promise<T | null> {
     try {
       const row = await db.$queryRawUnsafe<Array<{ data: unknown; expires_at: Date }>>(
         `SELECT data, expires_at FROM cache_entries WHERE key = $1`, key
@@ -40,111 +33,117 @@ export class PostgresCacheBackend implements ICacheBackend {
 
       const entry = row[0];
       if (new Date() > new Date(entry.expires_at)) {
-        // Expired — clean up
-        await db.$executeRawUnsafe(`DELETE FROM cache_entries WHERE key = $1`, key);
+        // Expired — clean up asynchronously, don't block the read
+        db.$executeRawUnsafe(`DELETE FROM cache_entries WHERE key = $1`, key)
+          .catch(e => console.warn(TAG, 'expiry cleanup failed:', String(e)));
         return null;
       }
 
-      // Bump hit count
-      await db.$executeRawUnsafe(
+      // Bump hit count (fire-and-forget — not worth blocking the read)
+      db.$executeRawUnsafe(
         `UPDATE cache_entries SET hit_count = hit_count + 1 WHERE key = $1`, key
-      );
+      ).catch(e => console.warn(TAG, 'hit count update failed:', String(e)));
 
       return entry.data as T;
-    } catch {
-      // Table may not exist yet — gracefully return null
+    } catch (e) {
+      console.warn(TAG, 'get failed:', String(e));
       return null;
     }
   }
 
   set<T>(key: string, data: T, ttlSeconds: number): void {
     // Fire-and-forget: write to PG in background.
-    // Don't await — cachedFetch expects sync behavior.
-    this.setAsync(key, data, ttlSeconds).catch(() => {});
+    this.setAsync(key, data, ttlSeconds).catch(e => console.warn(TAG, 'set failed:', String(e)));
   }
 
-  async setAsync<T>(key: string, data: T, ttlSeconds: number): Promise<void> {
-    try {
-      // Enforce maxSize: if at capacity, evict oldest
-      const count = await db.$queryRawUnsafe<Array<{ cnt: bigint }>>(
-        `SELECT COUNT(*) as cnt FROM cache_entries`
-      );
-      if (count[0] && Number(count[0].cnt) >= this.maxSize) {
-        await db.$executeRawUnsafe(
-          `DELETE FROM cache_entries WHERE key IN (
-            SELECT key FROM cache_entries ORDER BY created_at ASC LIMIT $1
-          )`, Math.max(1, Number(count[0].cnt) - this.maxSize + 1)
-        );
-      }
-
+  private async setAsync<T>(key: string, data: T, ttlSeconds: number): Promise<void> {
+    // Enforce maxSize: if at capacity, evict oldest entries
+    // Use a threshold check (NOT exact COUNT) to reduce race-condition window
+    const countRow = await db.$queryRawUnsafe<Array<{ cnt: bigint }>>(
+      `SELECT COUNT(*) as cnt FROM cache_entries`
+    );
+    if (countRow[0] && Number(countRow[0].cnt) >= this.maxSize) {
+      const excess = Number(countRow[0].cnt) - this.maxSize + 10;
       await db.$executeRawUnsafe(
-        `INSERT INTO cache_entries (key, data, expires_at, created_at, hit_count)
-         VALUES ($1, $2::jsonb, $3, NOW(), 0)
-         ON CONFLICT (key) DO UPDATE SET
-           data = EXCLUDED.data,
-           expires_at = EXCLUDED.expires_at,
-           created_at = NOW()`,
-        key, JSON.stringify(data), new Date(Date.now() + ttlSeconds * 1000)
-      );
-    } catch {
-      // Table may not exist — degrade silently
+        `DELETE FROM cache_entries WHERE key IN (
+          SELECT key FROM cache_entries ORDER BY created_at ASC LIMIT $1
+        )`, Math.max(1, excess)
+      ).catch(() => {});
     }
+
+    await db.$executeRawUnsafe(
+      `INSERT INTO cache_entries (key, data, expires_at, created_at, hit_count)
+       VALUES ($1, $2::jsonb, $3, NOW(), 0)
+       ON CONFLICT (key) DO UPDATE SET
+         data = EXCLUDED.data,
+         expires_at = EXCLUDED.expires_at,
+         created_at = NOW()`,
+      key, JSON.stringify(data), new Date(Date.now() + ttlSeconds * 1000)
+    );
   }
 
   invalidate(prefix: string): number {
     let count = 0;
-    this.invalidateAsync(prefix).then(c => { count = c; }).catch(() => {});
+    this.invalidateAsync(prefix)
+      .then(c => { count = c; })
+      .catch(e => console.warn(TAG, 'invalidate failed:', String(e)));
     return count;
   }
 
-  async invalidateAsync(prefix: string): Promise<number> {
+  private async invalidateAsync(prefix: string): Promise<number> {
     try {
       const result = await db.$executeRawUnsafe(
         `DELETE FROM cache_entries WHERE key LIKE $1`, prefix + '%'
       );
       return result;
-    } catch {
+    } catch (e) {
+      console.warn(TAG, 'invalidateAsync failed:', String(e));
       return 0;
     }
   }
 
   invalidateExact(key: string): boolean {
     let removed = false;
-    this.invalidateExactAsync(key).then(r => { removed = r; }).catch(() => {});
+    this.invalidateExactAsync(key)
+      .then(r => { removed = r; })
+      .catch(e => console.warn(TAG, 'invalidateExact failed:', String(e)));
     return removed;
   }
 
-  async invalidateExactAsync(key: string): Promise<boolean> {
+  private async invalidateExactAsync(key: string): Promise<boolean> {
     try {
       const result = await db.$executeRawUnsafe(
         `DELETE FROM cache_entries WHERE key = $1`, key
       );
       return result > 0;
-    } catch {
+    } catch (e) {
+      console.warn(TAG, 'invalidateExactAsync failed:', String(e));
       return false;
     }
   }
 
   clear(): void {
-    db.$executeRawUnsafe(`DELETE FROM cache_entries`).catch(() => {});
+    db.$executeRawUnsafe(`DELETE FROM cache_entries`)
+      .catch(e => console.warn(TAG, 'clear failed:', String(e)));
   }
 
   stats(): CacheStats {
-    // Sync method — return empty stats. Call statsAsync() for real data.
+    // Sync stub — use statsAsync() for real data
     return { size: 0, keys: [], hitCounts: {} };
   }
 
   async statsAsync(): Promise<CacheStats> {
     try {
       const rows = await db.$queryRawUnsafe<Array<{ key: string; hit_count: number }>>(
-        `SELECT key, hit_count FROM cache_entries ORDER BY created_at DESC`
+        `SELECT key, hit_count FROM cache_entries ORDER BY created_at DESC LIMIT 200`
       );
       const hitCounts: Record<string, number> = {};
       for (const r of rows) {
         hitCounts[r.key] = Number(r.hit_count);
       }
       return { size: rows.length, keys: rows.map(r => r.key), hitCounts };
-    } catch {
+    } catch (e) {
+      console.warn(TAG, 'statsAsync failed:', String(e));
       return { size: 0, keys: [], hitCounts: {} };
     }
   }

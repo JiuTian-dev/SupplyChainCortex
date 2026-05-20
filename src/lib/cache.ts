@@ -20,12 +20,13 @@ export interface CacheStats {
 }
 
 export interface ICacheBackend {
-  get<T>(key: string): T | null;
+  get<T>(key: string): Promise<T | null>;
   set<T>(key: string, data: T, ttlSeconds: number): void;
   invalidate(prefix: string): number;
   invalidateExact(key: string): boolean;
   clear(): void;
   stats(): CacheStats;
+  readonly backendType: 'memory' | 'postgres' | 'redis';
 }
 
 // ─── Cache Entry Types ────────────────────────────────────────────────────────
@@ -50,12 +51,13 @@ export const CACHE_TTL = {
 class MemoryCacheBackend implements ICacheBackend {
   private cache = new Map<string, CacheEntry<unknown>>();
   private maxSize: number;
+  readonly backendType = 'memory' as const;
 
   constructor(maxSize = 500) {
     this.maxSize = maxSize;
   }
 
-  get<T>(key: string): T | null {
+  async get<T>(key: string): Promise<T | null> {
     const entry = this.cache.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
@@ -139,7 +141,7 @@ export let serverCache: ICacheBackend = new MemoryCacheBackend(500);
  */
 export async function ensureCacheBackend(): Promise<void> {
   const backend = process.env.CACHE_BACKEND || 'memory';
-  if (backend === 'postgres' && !(serverCache.constructor.name === 'PostgresCacheBackend')) {
+  if (backend === 'postgres' && serverCache.backendType !== 'postgres') {
     const { PostgresCacheBackend } = await import('./cache-postgres');
     serverCache = new PostgresCacheBackend(500);
   }
@@ -163,7 +165,7 @@ export async function cachedFetch<T>(
   ttlSeconds: number = CACHE_TTL.MEDIUM
 ): Promise<T> {
   // 1. Check cache
-  const cached = serverCache.get<T>(key);
+  const cached = await serverCache.get<T>(key);
   if (cached !== null) return cached;
 
   // 2. Check if request is already in-flight (deduplication)
