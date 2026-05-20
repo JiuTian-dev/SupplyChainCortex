@@ -131,9 +131,9 @@ Agent suggestion → User accept/reject/modify → Evidence-level feedback
 
 ---
 
-## v1.1.0 Release Notes
+## Release Notes
 
-### New in v1.1
+### v1.0.0 — Foundation
 
 | Module | Description |
 |--------|-------------|
@@ -143,20 +143,38 @@ Agent suggestion → User accept/reject/modify → Evidence-level feedback
 | **Data Consistency** | All health/risk scores unified across `/api/supply-chain-score`, `/api/brief`, and `/api/supply-chain-score?action=history` |
 | **Stress-Tested Seed** | 170 products × 365 days = 62,050 sales records, realistic inventory distribution |
 | **Smart Reorder** | Safety-gap-aware reorder recommendations with URGENT/HIGH/MEDIUM/LOW priority |
-| **Product Compare** | Multi-dimensional radar chart comparison via ProductCompareDialog |
+| **Product Compare** | Multi-dimensional radar chart comparison |
 | **Unified UI Colors** | Gold (#b8860b) utilization text, white circle indicators, consistent badges |
+| **61 MCP Tools** | 33 query + 24 math + 4 action, accessible via natural language in Chat |
 
-### Changes from v0.8.x
+### v1.1.0 — Quality & Polish (May 2026)
 
-| Area | v0.8.x | v1.1.0 |
+| Area | Description |
+|------|-------------|
+| **Database Unification** | PostgreSQL 16 only. Removed 3 SQLite/MySQL schemas (~1200 lines). 5 foreign key cascades, 5 new Prisma models (28 total) |
+| **Security Hardening** | Input sanitization on all routes, Zod validation for Python bridge, prompt injection defense (14 patterns), MARC confidence protocol |
+| **Chat + Search** | Full Anthropic Provider, 60s search cache (LRU), ReAct 64K context window, multi-source parallel search |
+| **Monolith Decomposition** | InventoryTab 70KB→571 lines, SupplierTab 60KB→608 lines, cascade-risk 66KB→6 modules, chat/route 50KB→3 files |
+| **Cost Module Upgrade** | Profit impact simulator (tornado sensitivity, 6 scenario presets, scenario comparison, waterfall bridge). Cost tracking (5 new charts: stacked area, variance waterfall, driver donut, heatmap, top N ranking) |
+| **Batch Operations** | Checkbox selection + floating toolbar for inventory/supplier tables |
+| **Drag-Drop Dashboard** | @dnd-kit powered, layout persisted to localStorage, ConfigToolbar sheet |
+| **One-Click Export** | CSV / Excel / PDF report export for dashboard and detail pages |
+| **Frontend Cleanup** | Removed 7 dead components (~1600 lines), Husky pre-commit hook, 9 audit reports |
+| **Test Coverage** | +108 tests, 356→647 total, 100% pass, 0 tsc errors on project code |
+
+### Changes from v1.0.0
+
+| Area | v1.0.0 | v1.1.0 |
 |------|--------|--------|
-| MCP Tools | 27 | **61** (+24 math + 10 query) |
-| Chat Layout | Floating draggable modal | **Right-side drawer** (resizable) |
-| Math Engines | None | **24 Python engines** (modular) |
-| Health Score Consistency | 3 different values | **Single source of truth** |
-| Seed Data | 12 products, 1K sales | **170 products, 62K sales** |
-| Reorder Logic | All qty=0 | **Safety-gap-aware** |
-| MonitorStrip | Ad-hoc scores | **Live API-driven** |
+| Tests | 356 | **647** (+82%) |
+| Database | PostgreSQL + SQLite/MySQL schemas | **PostgreSQL only** |
+| Prisma Models | 23 | **28** |
+| API Endpoints | 60+ | **62** |
+| Cost Charts | 1 basic simulator | **6 charts + KPI strip** |
+| Frontend Components | 44 | **34** (−10 dead, +12 new) |
+| Audit Score | 72 | **89** |
+| Chat Providers | DeepSeek + OpenAI + Ollama | **+ Anthropic** |
+| Search | Old 3-source (broken) | **SearXNG + multi-source parallel** |
 
 ---
 
