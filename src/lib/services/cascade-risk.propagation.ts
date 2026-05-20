@@ -117,7 +117,7 @@ export async function projectForward(
       if (!inventory) continue;
 
       const sales = await db.salesRecord.findMany({
-        where: { sku, date: { gte: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0] } },
+        where: { sku, date: { gte: new Date(Date.now() - 30 * 86400000) } },
         take: 200,
       }).catch(() => []);
 

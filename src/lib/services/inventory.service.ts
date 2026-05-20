@@ -540,12 +540,11 @@ export async function getReorderRecommendations(safetyDays = 14) {
   const productIds = inventoryRecords.map(inv => inv.productId);
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cutoffDate = thirtyDaysAgo.toISOString().split('T')[0];
 
   const allRecentSales = await db.salesRecord.findMany({
     where: {
       productId: { in: productIds },
-      date: { gte: cutoffDate },
+      date: { gte: thirtyDaysAgo },
     },
     take: 5000,
   });

@@ -363,7 +363,7 @@ export async function getCascadeRisk(options?: {
       const ninetyDaysFromNow = new Date();
       ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
       const expiringCerts = await db.complianceCert.findMany({
-        where: { expiryDate: { lte: ninetyDaysFromNow.toISOString().split('T')[0] }, status: { not: 'expired' } },
+        where: { expiryDate: { lte: ninetyDaysFromNow }, status: { not: 'expired' } },
         take: 50,
       });
       if (expiringCerts.length > 0) {
