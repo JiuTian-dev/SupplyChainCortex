@@ -4,8 +4,6 @@
  * Contains: SSE formatting, tool result formatting, DeepSeek tool call detection,
  * default tool actions, routing decision, and local-mode keyword matching.
  */
-import { classifyIntent } from '@/lib/services/information-router';
-import type { RoutingDecision } from '@/lib/services/information-router';
 import { formatToolResult, DEFAULT_TOOL_ACTIONS } from '@/lib/mcp/tool-formatters';
 
 // ─── SSE Helpers ────────────────────────────────────────────────────────────────
@@ -18,7 +16,7 @@ export function streamSSE(controller: ReadableStreamDefaultController, event: st
   controller.enqueue(new TextEncoder().encode(formatSSE(event, data)));
 }
 
-// Re-export shared tool formatters (route.ts imports these from chat.helpers)
+// Re-export shared tool formatters
 export { formatToolResult, DEFAULT_TOOL_ACTIONS };
 
 // ─── DeepSeek Tool Call Text Detection ────────────────────────────────────────────
@@ -61,12 +59,6 @@ export function extractToolCallsFromText(text: string): Array<{ id: string; func
     });
   }
   return results;
-}
-
-// ─── Intent-Aware Search Gating ───────────────────────────────────────────────────
-
-export function getRoutingDecision(query: string): RoutingDecision {
-  return classifyIntent(query);
 }
 
 // ─── Local Mode Keyword Matching ─────────────────────────────────────────────────
