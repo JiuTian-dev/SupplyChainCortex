@@ -34,6 +34,7 @@ export async function writeTrace(
 ): Promise<string | null> {
   try {
     const claims = extractClaims(finalResponse);
+    const elapsed = Date.now() - ctx.startTimeMs;
 
     const trace = await db.decisionTrace.create({
       data: {
@@ -43,12 +44,12 @@ export async function writeTrace(
         confidence: passport.confidence,
         mode: 'fsm-v2',
         tier: ctx.routing?.shouldUseTools ? 1 : ctx.routing?.shouldSearch ? 3 : 0,
-        durationMs: Date.now() - ctx.startTimeMs,
+        durationMs: elapsed,
         toolsUsed: ctx.toolsUsed,
         claimsCount: claims.length,
         passport: JSON.parse(JSON.stringify(passport)),
         steps: {
-          create: buildStepData(ctx, claims, passport, Date.now() - ctx.startTimeMs),
+          create: buildStepData(ctx, claims, passport, elapsed),
         },
       },
       include: { steps: true },
@@ -100,53 +101,58 @@ function buildStepData(
       claims: { create: [] },
     });
 
-    // Execute step
-    stepData.push({
-      stepIndex: roundBase + 1,
-      state: 'execute',
-      confidence: ctx.routing?.confidence,
-      findings: `Executed ${planTools.length} tool(s)`,
-      nextState: 'observe',
-      durationMs: 0,
-      toolCalls: {
-        create: planTools.map(tc => ({
-          toolName: tc.name,
-          params: tc.params as Record<string, unknown>,
-          result: undefined,
-          success: true,
-          latencyMs: 0,
-        })),
-      },
-      claims: { create: [] },
-    });
+    if (planTools.length > 0) {
+      // Execute step
+      stepData.push({
+        stepIndex: roundBase + 1,
+        state: 'execute',
+        confidence: ctx.routing?.confidence,
+        findings: `Executed ${planTools.length} tool(s)`,
+        nextState: 'observe',
+        durationMs: 0,
+        toolCalls: {
+          create: ctx.toolResults
+            .filter(r => planTools.some(tc => tc.name === r.tool))
+            .map(r => ({
+              toolName: r.tool,
+              params: planTools.find(tc => tc.name === r.tool)?.params as Record<string, unknown> || {},
+              result: r.success ? (r.data as Record<string, unknown> || { raw: String(r.data) }) : undefined,
+              success: r.success,
+              latencyMs: r.latencyMs,
+              error: !r.success ? r.error : undefined,
+            })),
+        },
+        claims: { create: [] },
+      });
 
-    // Observe step
-    const obs = ctx.observations[round];
-    stepData.push({
-      stepIndex: roundBase + 2,
-      state: 'observe',
-      confidence: obs?.overallConfidence,
-      findings: obs
-        ? `Valid: ${obs.validResults.length}/${ctx.toolResults.length}, Conflicts: ${obs.conflicts.length}, Missing: ${obs.missingData.join(', ') || 'none'}`
-        : 'No observations',
-      nextState: 'decide',
-      durationMs: 0,
-      toolCalls: { create: [] },
-      claims: { create: [] },
-    });
+      // Observe step
+      const obs = ctx.observations[round];
+      stepData.push({
+        stepIndex: roundBase + 2,
+        state: 'observe',
+        confidence: obs?.overallConfidence,
+        findings: obs
+          ? `Valid: ${obs.validResults.length}/${ctx.toolResults.length}, Conflicts: ${obs.conflicts.length}, Missing: ${obs.missingData.join(', ') || 'none'}`
+          : 'No observations',
+        nextState: 'decide',
+        durationMs: 0,
+        toolCalls: { create: [] },
+        claims: { create: [] },
+      });
 
-    // Decide step
-    const hasData = ctx.toolResults.some(r => r.success);
-    stepData.push({
-      stepIndex: roundBase + 3,
-      state: 'decide',
-      confidence: obs?.overallConfidence,
-      findings: hasData ? 'Sufficient data, proceeding to synthesize' : 'No data, re-planning',
-      nextState: hasData ? 'synthesize' : (round + 1 < ctx.config.maxRounds ? 'plan' : 'synthesize'),
-      durationMs: 0,
-      toolCalls: { create: [] },
-      claims: { create: [] },
-    });
+      // Decide step
+      const hasData = ctx.toolResults.some(r => r.success);
+      stepData.push({
+        stepIndex: roundBase + 3,
+        state: 'decide',
+        confidence: obs?.overallConfidence,
+        findings: hasData ? 'Sufficient data, proceeding to synthesize' : 'No data, re-planning',
+        nextState: hasData ? 'synthesize' : (round + 1 < ctx.config.maxRounds ? 'plan' : 'synthesize'),
+        durationMs: 0,
+        toolCalls: { create: [] },
+        claims: { create: [] },
+      });
+    }
   }
 
   // Synthesize step
