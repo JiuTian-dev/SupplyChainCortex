@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { CausalGraph } from './CausalGraph';
+import { ReplayPanel } from './ReplayPanel';
+import { ComplianceReport } from './ComplianceReport';
 
 interface TraceDetailData {
   id: string;
@@ -152,6 +154,16 @@ export function TraceDetail({ traceId }: { traceId: string }) {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Replay */}
+      <div className="mt-6 border rounded-lg p-4">
+        <ReplayPanel traceId={traceId} steps={trace.steps} />
+      </div>
+
+      {/* Compliance Report */}
+      <div className="mt-4 border rounded-lg p-4">
+        <ComplianceReport />
       </div>
     </div>
   );
