@@ -1,8 +1,8 @@
 # SupplyChain Cortex — 项目交接文档
 
 > 最后更新: 2026-05-21  
-> 当前版本: v1.1.0  
-> 状态: 零 tsc 错误, 32 测试文件 647 测试 100% 通过
+> 当前版本: v2.0.0 (Agent Engine v2)  
+> 状态: 5 tsc 预存错误, 31 测试文件 530 测试通过, 1 DB 依赖失败
 
 ---
 
@@ -10,9 +10,14 @@
 
 | 指标 | 数值 |
 |------|------|
-| 源文件 (TS/TSX) | 387 |
+| 源文件 (TS/TSX) | 385 |
 | 测试文件 | 32 |
-| 测试通过 | 647 |
+| 测试通过 | 530 |
+| Agent 引擎 | FSM v2 (6 状态) |
+| Provider 适配器 | DeepSeek V4 Pro / OpenAI / Anthropic |
+| TypeScript 预存错误 | 5（非 v2 引入） |
+| Prisma 模型 | 28 |
+| MCP 工具 | 65 |
 | TypeScript 错误 | 0 |
 | Prisma 模型 | 28 |
 | Prisma 版本 | 6.19.3 |
@@ -24,6 +29,37 @@
 ---
 
 ## 最近会话完成的工作（2026-05-21）
+
+### Agent Engine v2 (Phase 10): FSM 状态机 + 语义路由 + Provider 适配器
+
+**架构升级**：ReAct 自由循环 → 6 状态显式 FSM + LLM 语义路由 + Provider 适配器层
+
+**新增模块** `src/lib/agent/`:
+- `fsm-types.ts`: FSM 状态、Context、Config、SSE 事件类型定义
+- `fsm.ts`: 6 状态机核心 (classify→plan→execute→observe→decide→synthesize) + runAgent 生成器
+- `router.ts`: LLM-based 语义路由（替换关键词匹配）
+- `adapter.ts`: ProviderAdapter 接口（10 方法）
+- `adapter-factory.ts`: 适配器工厂
+- `adapters/deepseek.adapter.ts`: DeepSeek V4 Pro（strict mode + 文本回退解析，兜底 11% 泄漏）
+- `adapters/openai.adapter.ts`: OpenAI（原生 function calling）
+- `adapters/anthropic.adapter.ts`: Anthropic（原生 tool_use + extended thinking）
+- `deepseek.adapter.test.ts` (11 tests), `router.test.ts` (7 tests), `fsm.test.ts` (12 tests)
+
+**删除文件**:
+- `src/lib/engine/react-agent.ts`（被 FSM 替代）
+- `src/lib/services/information-router.ts`（被语义路由替代）
+- 相关测试文件
+
+**chat/route.ts**：从 862 行缩减为 130 行，薄 HTTP 层转发到 FSM
+
+**关键设计决策**:
+- FSM 模型无关 — 所有 provider 差异在 Adapter 层
+- DeepSeek strict mode: `base_url=https://api.deepseek.com/beta`，自动注入 `"strict": true`
+- 双重解析器：优先 `tool_calls` 字段，fallback 正则解析文本（兜底 ~11% 泄漏）
+- SSE 事件协议保持兼容 — ChatPanel 前端无需改动
+- MCP 工具层零改动
+
+**待验证**: FSM v2 在生产环境中对 DeepSeek V4 Pro 的工具调用成功率提升幅度
 
 ### Phase 1: 文件拆分 + 硬编码清理
 
