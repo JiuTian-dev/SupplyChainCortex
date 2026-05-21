@@ -47,6 +47,7 @@ export function getNextState(current: FSMState, ctx: FSMContext): FSMState | nul
     case 'plan':
       if (ctx.round >= ctx.config.maxRounds) return 'synthesize';
       if (ctx.routing && !ctx.routing.shouldUseTools) return 'synthesize';
+      if (!ctx.plan || ctx.plan.length === 0) return 'synthesize';
       return 'execute';
 
     case 'execute':
@@ -110,11 +111,13 @@ async function* handlePlan(
   const toolSchemas = getToolSchemas();
   const toolDescriptions = toolSchemas.map(t => `- **${t.name}**: ${t.description}`).join('\n');
 
-  // Build a tool-call-only prompt without role-playing language (DeepSeek V4 role-play suppresses tool calls)
+  // Round 1: force tool calls. Round 2+: let LLM decide if more data is needed.
+  const isFirstRound = ctx.round === 1;
   const planMessages: ChatMessage[] = [
     {
       role: 'system',
-      content: `You are a tool-calling function. Your ONLY job is to output function calls.
+      content: isFirstRound
+        ? `You are a tool-calling function. Your ONLY job is to output function calls.
 
 Available functions:
 ${toolDescriptions}
@@ -123,9 +126,16 @@ CRITICAL RULES:
 1. You MUST call at least one function. Not calling any function is a FAILURE.
 2. Call all independent functions in parallel.
 3. Maximum ${ctx.config.maxToolsPerRound} function calls.
-4. Output ONLY function calls. No explanations, no greetings, no markdown.`,
+4. Output ONLY function calls. No explanations, no greetings, no markdown.`
+        : `Available functions:
+${toolDescriptions}
+
+You have already executed some functions. Decide if you need MORE data:
+- If existing data is sufficient to answer the user's question → output NO text, call NO functions
+- If you still need more data → call the specific functions needed
+Maximum ${ctx.config.maxToolsPerRound} function calls.`,
     },
-    { role: 'user', content: `Task: ${ctx.query}\nIntent: ${routing.intent}\n\nCall the right functions to answer this query.` },
+    { role: 'user', content: `Task: ${ctx.query}\nIntent: ${routing.intent}\n\n${isFirstRound ? 'Call the right functions to answer this query.' : 'Do you need more data? If not, respond with nothing.'}` },
   ];
 
   // Call adapter to get tool execution plan
@@ -134,6 +144,7 @@ CRITICAL RULES:
     const result = await adapter.callWithTools(
       planMessages,
       toolSchemas as import('@/lib/mcp/tools').MCPTool[],
+      { toolChoice: isFirstRound ? 'required' : 'auto' },
     );
     toolCalls = result.toolCalls;
   } catch (err) {

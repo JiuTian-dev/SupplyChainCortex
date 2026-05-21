@@ -42,6 +42,8 @@ export interface StreamOpts {
   maxTokens?: number;
   temperature?: number;
   apiKey?: string;
+  /** Force or allow tool calls. 'required' = must call at least one tool, 'auto' = model decides. Default: 'auto' */
+  toolChoice?: 'auto' | 'required';
 }
 
 export interface ToolStreamOpts extends StreamOpts {

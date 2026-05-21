@@ -204,7 +204,7 @@ export class DeepSeekAdapter implements ProviderAdapter {
         model: this.model,
         messages: this.normalizeMessages(messages),
         tools: this.normalizeTools(tools),
-        tool_choice: 'required',
+        tool_choice: opts?.toolChoice || 'required',
         thinking: { type: 'disabled' },
         max_tokens: 2000,
         temperature: 0.3,
