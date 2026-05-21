@@ -10,7 +10,7 @@
  */
 
 import type { ChatMessage } from '@/lib/services/ai-providers.service';
-import type { MCPTool, MCPToolParameter } from '@/lib/mcp/tools';
+import type { MCPTool } from '@/lib/mcp/tools';
 import type { ToolCall, Intent } from './fsm-types';
 
 // ─── Stream Chunk Types ──────────────────────────────────────────────────
