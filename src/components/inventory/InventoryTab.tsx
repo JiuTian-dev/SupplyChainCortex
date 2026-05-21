@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
-  CheckCircle2, AlertTriangle, XCircle, Layers, Zap,
+  CheckCircle2, AlertTriangle, XCircle, Layers,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,7 +52,6 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 
 import { CHART_TOOLTIP_STYLE } from './InventoryTab.helpers';
-import { InventorySlowMovingAlert } from './InventorySlowMovingAlert';
 import { InventoryWarehouseCapacity } from './InventoryWarehouseCapacity';
 import { InventoryDetailDialog } from './InventoryDetailDialog';
 import { InventoryProcurementSection } from './InventoryProcurementSection';
@@ -131,9 +130,6 @@ export function InventoryTab() {
     }
     return [];
   }, [agingResponse]);
-
-  // Slow-moving products (turnover > 90 days)
-  const slowMoving = useMemo(() => inventory.filter((i: Inventory) => i.turnoverDays > 90), [inventory]);
 
   // Filtered inventory for search/filter
   const filteredInventory = useMemo(() => {
@@ -319,8 +315,6 @@ export function InventoryTab() {
         </div>
       </div>
 
-      <InventorySlowMovingAlert slowMoving={slowMoving} />
-
       {/* 库存库龄分布 */}
       <Card className="card-dashboard chart-container border-l-[4px] border-l-emerald-400">
         <CardHeader className="pb-2">
@@ -352,27 +346,6 @@ export function InventoryTab() {
                 <span className="text-muted-foreground">{label}</span>
               </div>
             ))}
-          </div>
-          {/* 库存周转建议 */}
-          <div className="mt-4 p-3 rounded-lg border bg-emerald-50 dark:bg-emerald-950/20">
-            <h4 className="text-sm font-semibold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-              <Zap className="h-3.5 w-3.5" />
-              库存周转建议
-            </h4>
-            <div className="mt-2 space-y-1.5">
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <span className="text-red-500 shrink-0">●</span>
-                榨汁机库存超过 90 天达 180 件，建议促销清仓或捆绑销售
-              </p>
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <span className="text-yellow-500 shrink-0">●</span>
-                咖啡机 90+天库存 130 件且 61-90天 110 件，积压风险高，建议限时折扣
-              </p>
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <span className="text-green-500 shrink-0">●</span>
-                电吹风 0-30天库存 410 件充足，建议维持当前补货节奏
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>
