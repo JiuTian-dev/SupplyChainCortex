@@ -659,4 +659,135 @@ export const crudTools: MCPTool[] = [
       }
     },
   },
+
+  // ─── 10. query_supplier_location ──────────────────────────────────────
+  {
+    name: 'query_supplier_location',
+    description: 'Find suppliers by geographic region or category. Returns suppliers grouped by region with counts and details.',
+    parameters: {
+      type: 'object',
+      properties: {
+        region: {
+          type: 'string',
+          description: '地区筛选: 华东/华南/华北/华中/海外',
+        },
+        category: {
+          type: 'string',
+          description: '品类筛选: 电子元器件/塑料五金件/成品代工/物流运输/清关服务/包装材料',
+        },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { region, category } = params;
+      const { db } = await import('@/lib/db');
+
+      const where: Record<string, unknown> = {};
+      if (region) where.region = region;
+      if (category) where.category = category;
+
+      const suppliers = await db.supplier.findMany({
+        where,
+        orderBy: [{ region: 'asc' }, { code: 'asc' }],
+      });
+
+      // Group by region
+      const regionMap: Record<string, Array<{
+        code: string; name: string; category: string; leadTime: number; rating: number;
+      }>> = {};
+
+      for (const s of suppliers) {
+        if (!regionMap[s.region]) regionMap[s.region] = [];
+        regionMap[s.region].push({
+          code: s.code,
+          name: s.name,
+          category: s.category,
+          leadTime: s.leadTime,
+          rating: s.rating,
+        });
+      }
+
+      const byRegion = Object.entries(regionMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([regionName, supplierList]) => ({
+          region: regionName,
+          count: supplierList.length,
+          suppliers: supplierList,
+        }));
+
+      return {
+        byRegion,
+        totalSuppliers: suppliers.length,
+        generatedAt: new Date().toISOString(),
+      };
+    },
+  },
+
+  // ─── 11. query_warehouse_capacity ─────────────────────────────────────
+  {
+    name: 'query_warehouse_capacity',
+    description: 'Query warehouse capacity and utilization across all warehouses. Groups inventory by warehouse and computes total quantity, SKU count, and stock health.',
+    parameters: {
+      type: 'object',
+      properties: {
+        warehouse: {
+          type: 'string',
+          description: '仓库名称（可选），如: 深圳仓, 义乌仓。不传则返回所有仓库',
+        },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { warehouse } = params;
+      const { db } = await import('@/lib/db');
+
+      const where = warehouse ? { warehouse: warehouse as string } : {};
+      const inventory = await db.inventory.findMany({ where });
+
+      // Group by warehouse
+      const warehouseMap: Record<string, {
+        totalQuantity: number;
+        skuCount: number;
+        statusBreakdown: Record<string, number>;
+      }> = {};
+
+      for (const inv of inventory) {
+        if (!warehouseMap[inv.warehouse]) {
+          warehouseMap[inv.warehouse] = {
+            totalQuantity: 0,
+            skuCount: 0,
+            statusBreakdown: {},
+          };
+        }
+        warehouseMap[inv.warehouse].totalQuantity += inv.quantity;
+        warehouseMap[inv.warehouse].skuCount += 1;
+        const status = inv.stockStatus;
+        warehouseMap[inv.warehouse].statusBreakdown[status] =
+          (warehouseMap[inv.warehouse].statusBreakdown[status] || 0) + 1;
+      }
+
+      // Compute utilization as ratio vs a reference capacity derived from max observed
+      const allQtys = Object.values(warehouseMap).map(w => w.totalQuantity);
+      const maxQty = allQtys.length > 0 ? Math.max(...allQtys) : 1;
+
+      const warehouses = Object.entries(warehouseMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, data]) => ({
+          name,
+          totalQuantity: data.totalQuantity,
+          skuCount: data.skuCount,
+          utilization: Math.round((data.totalQuantity / maxQty) * 100),
+          statusBreakdown: data.statusBreakdown,
+        }));
+
+      return {
+        warehouses,
+        summary: {
+          totalWarehouses: warehouses.length,
+          totalQuantity: allQtys.reduce((s, q) => s + q, 0),
+        },
+        generatedAt: new Date().toISOString(),
+      };
+    },
+  },
 ];

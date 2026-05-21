@@ -183,4 +183,10 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   generate_chart: '图表生成',
   analyze_and_chart: '自动分析出图',
   generate_report: '报告生成',
+  update_supplier_status: '供应商状态管理',
+  create_supplier: '新增供应商',
+  update_supplier: '更新供应商',
+  query_supplier_location: '供应商地理分布',
+  query_warehouse_capacity: '仓库容量',
+  batch_create_reorder: '批量补货',
 };
