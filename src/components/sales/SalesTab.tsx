@@ -6,7 +6,7 @@ import { useMemo, useState, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ShoppingCart, DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight,
-  BarChart3, Calendar, Activity, Download, GitCompare,
+  BarChart3, Calendar, Download, GitCompare,
   AlertTriangle, CheckCircle2, LayoutList, Rows3,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,11 +38,6 @@ const SalesPlatformAnalytics = dynamic(
 );
 import { SalesForecastEnhanced } from '@/components/sales/SalesForecastEnhanced';
 
-// Seeded pseudo-random number generator for deterministic daily variation
-function seededRandom(seed: number): number {
-  const x = Math.sin(seed * 9301 + 49297) * 233280;
-  return x - Math.floor(x);
-}
 
 // ==================== Tooltip style shared across charts ====================
 const CHART_TOOLTIP_STYLE = {
@@ -343,10 +338,6 @@ export function SalesTab() {
       categories.forEach((cat, catIdx) => {
         // Base revenue for this category on this day = mean * day scale
         let catDayRevenue = categoryMean[cat] * dayScaleFactor;
-        // Add deterministic per-category variance (±20% based on seeded random)
-        const varianceSeed = dayIdx * 100 + catIdx * 37 + date.charCodeAt(5) * 7 + date.charCodeAt(8);
-        const variance = 1 + (seededRandom(varianceSeed) - 0.5) * 0.4;
-        catDayRevenue *= variance;
         // Ensure minimum floor so chart doesn't go to zero
         catDayRevenue = Math.max(catDayRevenue, categoryMean[cat] * 0.3);
         point[cat] = Math.round(catDayRevenue);
@@ -579,13 +570,6 @@ export function SalesTab() {
               <span className="text-muted-foreground">
                 日均: <span className="font-semibold text-foreground">{avgSales.toLocaleString()}</span>
               </span>
-            </div>
-            {/* 销售洞察 */}
-            <div className="mt-3 p-2.5 rounded-lg border bg-orange-50 dark:bg-orange-950/20">
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Activity className="h-3 w-3 text-orange-500 shrink-0" />
-                <span>本周三销量最高(1,420)，周末销售下降 23%</span>
-              </p>
             </div>
           </div>
         </CardContent>

@@ -146,7 +146,6 @@ export function DecisionPanel() {
                 AI 决策引擎
               </Badge>
             </CardTitle>
-            <CardDescription>{summary.executiveSummary}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Select value={domain} onValueChange={(v) => { setDomain(v); fetchDecisions(v); }}>

@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import {
-  ShoppingBag, ChevronDown, ChevronUp, BarChart3, TrendingUp, TrendingDown,
-  Package, DollarSign, ArrowUpRight, ArrowDownRight,
+  ShoppingBag, ChevronDown, ChevronUp, BarChart3,
+  Package, DollarSign,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +70,7 @@ export function SalesPlatformAnalytics({
       const quantity = Number(p.quantity) || Math.round(revenue / 50); // estimate from revenue
       const orderCount = Number(p.orderCount) || Math.round(quantity * 0.8);
       const avgOrderValue = orderCount > 0 ? Math.round(revenue / orderCount) : 0;
-      const growthRate = Number(p.growthRate) || ((revenue % 20) - 5); // deterministic pseudo-growth
+      const growthRate = Number(p.growthRate) || 0;
       const revenueShare = totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 1000) / 10 : 0;
 
       // Top products for this platform (use topPlatform match or fallback)
@@ -213,16 +213,6 @@ export function SalesPlatformAnalytics({
                       <Package className="h-3 w-3" />
                       {p.quantity}
                     </span>
-                    <span className={`flex items-center gap-0.5 font-medium ${
-                      p.growthRate >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {p.growthRate >= 0 ? (
-                        <ArrowUpRight className="h-3 w-3" />
-                      ) : (
-                        <ArrowDownRight className="h-3 w-3" />
-                      )}
-                      {Math.abs(p.growthRate)}%
-                    </span>
                   </div>
                 </div>
 
@@ -251,19 +241,6 @@ export function SalesPlatformAnalytics({
                               <ShoppingBag className="h-3 w-3" />均价
                             </span>
                             <span className="font-medium">${p.avgOrderValue}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground flex items-center gap-1.5">
-                              {p.growthRate >= 0 ? (
-                                <TrendingUp className="h-3 w-3 text-green-500" />
-                              ) : (
-                                <TrendingDown className="h-3 w-3 text-red-500" />
-                              )}
-                              增长率
-                            </span>
-                            <span className={`font-medium ${p.growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {p.growthRate >= 0 ? '+' : ''}{p.growthRate}%
-                            </span>
                           </div>
                         </div>
                       </div>
