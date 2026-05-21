@@ -94,20 +94,25 @@ export class DeepSeekAdapter implements ProviderAdapter {
     let buffer = '';
 
     while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') { yield { type: 'done' }; return; }
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta;
-          if (delta?.content) yield { type: 'token', content: delta.content };
-        } catch { /* skip */ }
+      try {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') { yield { type: 'done' }; return; }
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta;
+            if (delta?.content) yield { type: 'token', content: delta.content };
+          } catch { /* skip */ }
+        }
+      } catch (err) {
+        yield { type: 'error', error: `Stream read error: ${(err as Error).message}` };
+        return;
       }
     }
     yield { type: 'done' };
@@ -150,33 +155,38 @@ export class DeepSeekAdapter implements ProviderAdapter {
     const accumulatedToolCalls: Array<{ index: number; id: string; function: { name: string; arguments: string } }> = [];
 
     while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta;
-          if (delta?.content) {
-            accumulatedContent += delta.content;
-            yield { type: 'token', content: delta.content };
-          }
-          if (delta?.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              const index = tc.index ?? accumulatedToolCalls.length;
-              if (!accumulatedToolCalls[index]) {
-                accumulatedToolCalls[index] = { index, id: tc.id || `call_${index}`, function: { name: '', arguments: '' } };
-              }
-              if (tc.function?.name) accumulatedToolCalls[index].function.name += tc.function.name;
-              if (tc.function?.arguments) accumulatedToolCalls[index].function.arguments += tc.function.arguments;
+      try {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') { yield { type: 'done' }; return; }
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta;
+            if (delta?.content) {
+              accumulatedContent += delta.content;
+              yield { type: 'token', content: delta.content };
             }
-          }
-        } catch { /* skip */ }
+            if (delta?.tool_calls) {
+              for (const tc of delta.tool_calls) {
+                const index = tc.index ?? accumulatedToolCalls.length;
+                if (!accumulatedToolCalls[index]) {
+                  accumulatedToolCalls[index] = { index, id: tc.id || `call_${index}`, function: { name: '', arguments: '' } };
+                }
+                if (tc.function?.name) accumulatedToolCalls[index].function.name += tc.function.name;
+                if (tc.function?.arguments) accumulatedToolCalls[index].function.arguments += tc.function.arguments;
+              }
+            }
+          } catch { /* skip */ }
+        }
+      } catch (err) {
+        yield { type: 'error', error: `Stream read error: ${(err as Error).message}` };
+        return;
       }
     }
 
@@ -250,6 +260,9 @@ export class DeepSeekAdapter implements ProviderAdapter {
     }
     if (['新闻', '最新', '趋势', '走势', '最近', '预测'].some(w => q.includes(w))) {
       return { intent: 'news_event', confidence: 0.6, reason: 'keyword fallback' };
+    }
+    if (['什么是', '是什么', '为什么', '定义', '含义', '解释', '如何'].some(w => q.includes(w))) {
+      return { intent: 'general_knowledge', confidence: 0.5, reason: 'keyword fallback' };
     }
     if (['库存', '成本', '供应商', '关税', '汇率', '铜价'].some(w => q.includes(w))) {
       return { intent: 'supply_chain_data', confidence: 0.6, reason: 'keyword fallback' };
