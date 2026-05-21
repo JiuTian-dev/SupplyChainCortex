@@ -12,6 +12,7 @@ import { classifyIntent } from './router';
 import { getToolSchemas } from '@/lib/mcp/tools';
 import { executeWithPolicy } from '@/lib/engine/autonomy-policy';
 import { createPassport, provenanceEntry } from '@/lib/engine/passport';
+import type { DecisionPassport } from '@/lib/engine/passport';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
 import { buildGraphContext, formatGraphContext } from '@/lib/engine/graph-rag';
 import { webSearchWithQuality, formatSearchContext } from '@/lib/services/web-search.service';
@@ -327,6 +328,13 @@ ${ctx.dynamicContext || ''}
     },
   });
 
+  // Persist trace for audit
+  let traceId: string | null = null;
+  try {
+    const { writeTrace } = await import('@/lib/audit/trace-writer');
+    traceId = await writeTrace(ctx, fullResponse, passport as DecisionPassport);
+  } catch { /* trace persistence is best-effort, never blocks response */ }
+
   yield {
     type: 'done',
     toolsUsed: ctx.toolsUsed,
@@ -343,6 +351,7 @@ ${ctx.dynamicContext || ''}
       warnings: passport.warnings,
     },
     claimsExtracted,
+    traceId,
   };
 }
 

@@ -111,7 +111,7 @@ export type AgentEvent =
   | { type: 'tool_result'; tool: string; result?: string; error?: string }
   | { type: 'token'; content: string }
   | { type: 'confirm_required'; confirmationCard: Record<string, unknown> }
-  | { type: 'done'; toolsUsed: string[]; steps: number; durationMs: number; mode: string; tier?: number; passport?: Record<string, unknown>; claimsExtracted?: number }
+  | { type: 'done'; toolsUsed: string[]; steps: number; durationMs: number; mode: string; tier?: number; passport?: Record<string, unknown>; claimsExtracted?: number; traceId?: string | null }
   | { type: 'error'; message: string };
 
 // ─── Tool Display Names ──────────────────────────────────────────────────
