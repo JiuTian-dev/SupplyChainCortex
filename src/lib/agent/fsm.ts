@@ -9,6 +9,7 @@ import type { ProviderAdapter } from './adapter';
 import type { FSMContext, FSMState, FSMConfig, AgentEvent, ToolCall, ToolResult, Observation } from './fsm-types';
 import { DEFAULT_FSM_CONFIG, TOOL_DISPLAY_NAMES } from './fsm-types';
 import { classifyIntent } from './router';
+import { filterToolsByIntent } from './tool-filter';
 import { getToolSchemas } from '@/lib/mcp/tools';
 import { executeWithPolicy } from '@/lib/engine/autonomy-policy';
 import { createPassport, provenanceEntry } from '@/lib/engine/passport';
@@ -120,7 +121,18 @@ async function* handlePlan(
     return;
   }
 
-  const toolSchemas = getToolSchemas();
+  const allTools = getToolSchemas();
+  const toolSchemas = filterToolsByIntent(allTools, routing.intent);
+
+  // Log reduction for observability
+  if (toolSchemas.length < allTools.length) {
+    console.log(
+      `[Plan] Progressive loading: ${toolSchemas.length}/${allTools.length} tools ` +
+      `(${Math.round((1 - toolSchemas.length / allTools.length) * 100)}% reduction) ` +
+      `for intent: ${routing.intent}`,
+    );
+  }
+
   const toolDescriptions = toolSchemas.map(t => `- **${t.name}**: ${t.description}`).join('\n');
 
   // Round 1: force tool calls. Round 2+: let LLM decide if more data is needed.
