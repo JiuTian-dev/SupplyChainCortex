@@ -191,6 +191,61 @@ export class AnthropicAdapter implements ProviderAdapter {
     yield { type: 'done' };
   }
 
+  async callWithTools(
+    messages: ChatMessage[],
+    tools: MCPTool[],
+    opts?: StreamOpts,
+  ): Promise<{ toolCalls: ToolCall[]; content: string }> {
+    const apiKey = opts?.apiKey || process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { toolCalls: [], content: '' };
+
+    const normalized = this.normalizeMessages(messages) as unknown as {
+      system?: string;
+      messages: Array<{ role: string; content: unknown[] }>;
+    };
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        system: normalized.system,
+        messages: normalized.messages,
+        tools: this.normalizeTools(tools),
+        max_tokens: 2000,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Anthropic API error ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json() as {
+      content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>;
+      stop_reason?: string;
+    };
+
+    const textBlock = (data.content || []).find(c => c.type === 'text');
+    const toolBlocks = (data.content || []).filter(c => c.type === 'tool_use');
+
+    const content = textBlock?.text || '';
+
+    return {
+      toolCalls: toolBlocks.map(tu => ({
+        name: tu.name || '',
+        params: (tu.input || {}) as Record<string, unknown>,
+        displayName: TOOL_DISPLAY_NAMES[tu.name || ''] || tu.name || '',
+      })),
+      content,
+    };
+  }
+
   async classify(query: string, systemPrompt: string, opts?: StreamOpts): Promise<Classification> {
     const apiKey = opts?.apiKey || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { intent: 'supply_chain_knowledge', confidence: 0.4, reason: 'no API key' };

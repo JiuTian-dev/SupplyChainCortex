@@ -9,7 +9,7 @@ import type { ProviderAdapter } from './adapter';
 import type { FSMContext, FSMState, FSMConfig, AgentEvent, ToolCall, ToolResult, Observation } from './fsm-types';
 import { DEFAULT_FSM_CONFIG, TOOL_DISPLAY_NAMES } from './fsm-types';
 import { classifyIntent } from './router';
-import { executeTool, getToolSchemas } from '@/lib/mcp/tools';
+import { getToolSchemas } from '@/lib/mcp/tools';
 import { executeWithPolicy } from '@/lib/engine/autonomy-policy';
 import { createPassport, provenanceEntry } from '@/lib/engine/passport';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
@@ -128,48 +128,16 @@ CRITICAL RULES:
     { role: 'user', content: `Task: ${ctx.query}\nIntent: ${routing.intent}\n\nCall the right functions to answer this query.` },
   ];
 
-  // Non-streaming call for plan phase — DeepSeek V4 Flash + tool_choice:required is reliable
+  // Call adapter to get tool execution plan
   let toolCalls: ToolCall[] = [];
-  const apiKey = adapter.resolveApiKey();
-  if (apiKey) {
-    try {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: adapter.resolveModel(),
-          messages: adapter.normalizeMessages(planMessages),
-          tools: adapter.normalizeTools(toolSchemas as import('@/lib/mcp/tools').MCPTool[]),
-          tool_choice: 'required',
-          thinking: { type: 'disabled' },
-          max_tokens: 2000,
-          temperature: 0.3,
-          stream: false,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json() as { choices?: Array<{ message?: { tool_calls?: Array<{ function?: { name?: string; arguments?: string } }>; content?: string } }> };
-        const msg = data.choices?.[0]?.message;
-        if (msg?.tool_calls && msg.tool_calls.length > 0) {
-          const rawCalls = msg.tool_calls as unknown[];
-          toolCalls = adapter.parseToolCalls(msg.content || '', rawCalls);
-        } else if (msg?.content) {
-          // Text fallback
-          toolCalls = adapter.parseToolCalls(msg.content, []);
-        }
-      } else {
-        const errText = await response.text().catch(() => '');
-        console.error('[Plan] API error:', response.status, errText.slice(0, 200));
-      }
-    } catch (err) {
-      console.error('[Plan] Fetch error:', (err as Error).message);
-    }
-  }
-
-  // Remove debug line
-  if (toolCalls.length === 0) {
-    console.error('[Plan] No tool calls generated for query:', ctx.query);
+  try {
+    const result = await adapter.callWithTools(
+      planMessages,
+      toolSchemas as import('@/lib/mcp/tools').MCPTool[],
+    );
+    toolCalls = result.toolCalls;
+  } catch (err) {
+    console.error('[Plan] callWithTools error:', (err as Error).message);
   }
 
   if (toolCalls.length > ctx.config.maxToolsPerRound) {

@@ -153,6 +153,44 @@ export class OpenAIAdapter implements ProviderAdapter {
     yield { type: 'done' };
   }
 
+  async callWithTools(
+    messages: ChatMessage[],
+    tools: MCPTool[],
+    opts?: StreamOpts,
+  ): Promise<{ toolCalls: ToolCall[]; content: string }> {
+    const apiKey = opts?.apiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) return { toolCalls: [], content: '' };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: this.model,
+        messages: this.normalizeMessages(messages),
+        tools: this.normalizeTools(tools),
+        tool_choice: 'auto',
+        max_tokens: 2000,
+        temperature: 0.3,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`OpenAI API error ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json() as { choices?: Array<{ message?: { tool_calls?: unknown[]; content?: string } }> };
+    const msg = data.choices?.[0]?.message;
+    const content = msg?.content || '';
+    const rawCalls = (msg?.tool_calls as unknown[]) || [];
+
+    return {
+      toolCalls: this.parseToolCalls(content, rawCalls),
+      content,
+    };
+  }
+
   async classify(query: string, systemPrompt: string, opts?: StreamOpts): Promise<Classification> {
     const apiKey = opts?.apiKey || process.env.OPENAI_API_KEY;
     if (!apiKey) return { intent: 'supply_chain_knowledge', confidence: 0.4, reason: 'no API key' };

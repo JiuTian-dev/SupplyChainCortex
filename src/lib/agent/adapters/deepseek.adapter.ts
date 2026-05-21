@@ -187,6 +187,47 @@ export class DeepSeekAdapter implements ProviderAdapter {
     yield { type: 'done' };
   }
 
+  // ─── Non-streaming Tool Call ─────────────────────────────────────────
+
+  async callWithTools(
+    messages: ChatMessage[],
+    tools: MCPTool[],
+    opts?: StreamOpts,
+  ): Promise<{ toolCalls: ToolCall[]; content: string }> {
+    const apiKey = this.resolveApiKey(opts?.apiKey);
+    if (!apiKey) return { toolCalls: [], content: '' };
+
+    const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: this.model,
+        messages: this.normalizeMessages(messages),
+        tools: this.normalizeTools(tools),
+        tool_choice: 'required',
+        thinking: { type: 'disabled' },
+        max_tokens: 2000,
+        temperature: 0.3,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`DeepSeek API error ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json() as { choices?: Array<{ message?: { tool_calls?: unknown[]; content?: string } }> };
+    const msg = data.choices?.[0]?.message;
+    const content = msg?.content || '';
+    const rawCalls = (msg?.tool_calls as unknown[]) || [];
+    const toolCalls = rawCalls.length > 0
+      ? this.parseToolCalls(content, rawCalls)
+      : this.parseToolCalls(content, []);
+
+    return { toolCalls, content };
+  }
+
   // ─── Classification ──────────────────────────────────────────────────
 
   async classify(

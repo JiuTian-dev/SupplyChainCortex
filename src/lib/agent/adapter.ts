@@ -72,6 +72,13 @@ export interface ProviderAdapter {
     opts: ToolStreamOpts,
   ): AsyncGenerator<ToolCallChunk>;
 
+  /** Non-streaming tool call — returns tool calls + optional text content. Used by PLAN state. */
+  callWithTools(
+    messages: ChatMessage[],
+    tools: MCPTool[],
+    opts?: StreamOpts,
+  ): Promise<{ toolCalls: ToolCall[]; content: string }>;
+
   /** Lightweight non-streaming classification. Used by CLASSIFY state. */
   classify(
     query: string,
