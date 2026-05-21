@@ -50,9 +50,19 @@ const STATE_COLORS: Record<string, string> = {
   observe: '#f59e0b', decide: '#ef4444', synthesize: '#06b6d4',
 };
 
+interface CausalGraphNode {
+  stepIndex: number;
+  state: string;
+  nextState: string | null;
+  findings: string | null;
+  toolCalls: Array<{ toolName: string; params: Record<string, unknown>; success: boolean }>;
+  claims: Array<{ claimIndex: number; text: string; confidence: string }>;
+}
+
 export function TraceDetail({ traceId }: { traceId: string }) {
   const [trace, setTrace] = useState<TraceDetailData | null>(null);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [replayNode, setReplayNode] = useState<CausalGraphNode | null>(null);
 
   useEffect(() => {
     fetch(`/api/audit/traces/${traceId}`)
@@ -79,7 +89,13 @@ export function TraceDetail({ traceId }: { traceId: string }) {
       {/* Causal Graph */}
       <div className="mb-6 border rounded-lg p-4 bg-muted/30">
         <h3 className="text-sm font-semibold mb-3">因果链路图</h3>
-        <CausalGraph steps={trace.steps} expandedStep={expandedStep} onExpand={setExpandedStep} />
+        <CausalGraph
+          steps={trace.steps}
+          expandedStep={expandedStep}
+          onExpand={setExpandedStep}
+          onReplayNode={(node) => setReplayNode(node)}
+          activeReplayNode={replayNode?.stepIndex ?? null}
+        />
       </div>
 
       {/* Step list */}
@@ -158,7 +174,12 @@ export function TraceDetail({ traceId }: { traceId: string }) {
 
       {/* Replay */}
       <div className="mt-6 border rounded-lg p-4">
-        <ReplayPanel traceId={traceId} steps={trace.steps} />
+        <ReplayPanel
+          traceId={traceId}
+          steps={trace.steps}
+          prefillNode={replayNode}
+          onClearPrefill={() => setReplayNode(null)}
+        />
       </div>
 
       {/* Compliance Report */}

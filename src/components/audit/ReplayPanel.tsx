@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Loader2 } from 'lucide-react';
 
@@ -21,11 +21,27 @@ interface ReplayDiff {
   replayedConfidence: number;
 }
 
-export function ReplayPanel({ traceId, steps }: { traceId: string; steps: TraceStep[] }) {
+export function ReplayPanel({ traceId, steps, prefillNode, onClearPrefill }: {
+  traceId: string;
+  steps: TraceStep[];
+  prefillNode?: { stepIndex: number; state: string; findings: string | null; toolCalls: Array<{ toolName: string; params: Record<string, unknown>; success: boolean }> } | null;
+  onClearPrefill?: () => void;
+}) {
   const [modifications, setModifications] = useState<Array<{ toolName: string; paramsStr: string }>>([]);
   const [running, setRunning] = useState(false);
   const [diff, setDiff] = useState<ReplayDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill from CausalGraph node selection
+  useEffect(() => {
+    if (prefillNode && prefillNode.toolCalls.length > 0) {
+      const newMods = prefillNode.toolCalls.map(tc => ({
+        toolName: tc.toolName,
+        paramsStr: JSON.stringify(tc.params, null, 2),
+      }));
+      setModifications(newMods);
+    }
+  }, [prefillNode]);
 
   const executeSteps = steps.filter(s => s.toolCalls.length > 0);
 
@@ -66,6 +82,15 @@ export function ReplayPanel({ traceId, steps }: { traceId: string; steps: TraceS
 
   return (
     <div className="space-y-4">
+      {prefillNode && (
+        <div className="flex items-center justify-between bg-blue-50 rounded-lg p-2 mb-2">
+          <span className="text-xs text-blue-700">
+            回放源: Step {prefillNode.stepIndex} — {prefillNode.state}
+            {prefillNode.findings && ` (${prefillNode.findings.slice(0, 60)})`}
+          </span>
+          <Button variant="ghost" size="sm" className="h-5 text-xs" onClick={onClearPrefill}>清除</Button>
+        </div>
+      )}
       <h3 className="text-sm font-semibold">反事实回放</h3>
       <p className="text-xs text-muted-foreground">
         修改工具参数，重新执行并对比结果差异，评估决策敏感性。
