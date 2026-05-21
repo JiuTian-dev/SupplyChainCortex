@@ -121,7 +121,7 @@ export async function getInventorySummary(): Promise<InventorySummaryResult> {
       const overstockItems = inventory
         .filter(i => i.safetyStock > 0)
         .map(i => ({
-          sku: i.sku, productName: i.productName, category: i.product?.category || '未分类',
+          sku: i.sku, productName: i.productName, category: products.find(p => p.sku === i.sku)?.category || '未分类',
           quantity: i.quantity, safetyStock: i.safetyStock,
           ratio: roundTo(i.quantity / i.safetyStock, 1), warehouse: i.warehouse,
         }))
@@ -130,7 +130,7 @@ export async function getInventorySummary(): Promise<InventorySummaryResult> {
       const criticalItems = inventory
         .filter(i => i.safetyStock > 0 && i.stockStatus !== 'overstock')
         .map(i => ({
-          sku: i.sku, productName: i.productName, category: i.product?.category || '未分类',
+          sku: i.sku, productName: i.productName, category: products.find(p => p.sku === i.sku)?.category || '未分类',
           quantity: i.quantity, safetyStock: i.safetyStock, reorderPoint: i.reorderPoint,
           deficit: Math.max(0, i.safetyStock - i.quantity), warehouse: i.warehouse,
         }))
@@ -143,7 +143,7 @@ export async function getInventorySummary(): Promise<InventorySummaryResult> {
 
       const abcDistribution: Record<string, number> = {};
       inventory.forEach(inv => {
-        const abc = inv.product?.abcClass || '未分类';
+        const abc = products.find(p => p.sku === inv.sku)?.abcClass || '未分类';
         abcDistribution[abc] = (abcDistribution[abc] || 0) + 1;
       });
 
@@ -258,7 +258,7 @@ export async function getInventoryReportEnhanced(): Promise<InventoryReportEnhan
 
       const abcAnalysis: Record<string, { class: string; count: number; totalValue: number; avgMargin: number }> = {};
       inventory.forEach(inv => {
-        const abc = inv.product?.abcClass || 'C';
+        const abc = products.find(p => p.sku === inv.sku)?.abcClass || 'C';
         if (!abcAnalysis[abc]) abcAnalysis[abc] = { class: abc, count: 0, totalValue: 0, avgMargin: 0 };
         abcAnalysis[abc].count++;
         const cost = costRecords.find(c => c.sku === inv.sku);

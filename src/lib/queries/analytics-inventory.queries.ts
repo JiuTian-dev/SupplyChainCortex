@@ -17,10 +17,14 @@ export async function getInventoryForecastAnalytics(
   return cachedFetch(
     cacheKey('analytics', 'inventory-forecast', forecastDays, alpha, beta),
     async () => {
-      const inventory = await db.inventory.findMany();
+      const [inventory, products] = await Promise.all([
+        db.inventory.findMany(),
+        db.product.findMany(),
+      ]);
 
       const forecasts = await Promise.all(
         inventory.map(async (inv) => {
+          const invProduct = products.find(p => p.id === inv.productId);
           const salesRecords = await db.salesRecord.findMany({
             where: { productId: inv.productId },
             orderBy: { date: "asc" },
@@ -30,7 +34,7 @@ export async function getInventoryForecastAnalytics(
             return {
               sku: inv.sku,
               productName: inv.productName,
-              category: inv.product?.category,
+              category: invProduct?.category,
               currentStock: inv.quantity,
               dailyVelocity: 0,
               forecast: [],
@@ -111,7 +115,7 @@ export async function getInventoryForecastAnalytics(
           return {
             sku: inv.sku,
             productName: inv.productName,
-            category: inv.product?.category,
+            category: invProduct?.category,
             currentStock: inv.quantity,
             dailyVelocity: Math.round(dailyVelocity * 10) / 10,
             daysOfStock,
@@ -305,7 +309,7 @@ export async function getInventoryTurnoverAnalytics() {
       const turnoverAnalysis = inventory.map(inv => {
         const sales = salesByProduct[inv.productId];
         const cost = costRecords.find(c => c.sku === inv.sku);
-        const product = inv.product || products.find(p => p.id === inv.productId);
+        const product = products.find(p => p.id === inv.productId);
 
         const dailySalesVelocity = sales ? sales.totalQuantity / 90 : 0;
         const annualizedSales = dailySalesVelocity * 365;

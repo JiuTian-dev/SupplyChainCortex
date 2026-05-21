@@ -60,6 +60,7 @@ server.log
 /upload/
 /download/
 /screenshots/
+/public/charts/
 /backups/
 /db/custom.db
 *.tar

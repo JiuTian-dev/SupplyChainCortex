@@ -19,6 +19,7 @@ export async function getSupplyChainRiskAnalytics() {
       const inventory = await db.inventory.findMany();
       const costRecords = await db.costRecord.findMany();
       const shipments = await db.shipmentItem.findMany();
+      const products = await db.product.findMany();
 
       const categorySupplierCount: Record<string, string[]> = {};
       suppliers.forEach((s) => {
@@ -32,7 +33,7 @@ export async function getSupplyChainRiskAnalytics() {
         ([category, supplierCodes]) => {
           const isSingleSource = supplierCodes.length === 1;
           const productCount = costRecords.filter(
-            (c) => c.product?.category === category
+            (c) => products.find(p => p.sku === c.sku)?.category === category
           ).length;
 
           return {
@@ -81,10 +82,11 @@ export async function getSupplyChainRiskAnalytics() {
       );
 
       const leadTimeRisk = inventory
-        .filter((inv) => inv.product)
         .map((inv) => {
+          const invProduct = products.find(p => p.id === inv.productId);
+          if (!invProduct) return null;
           const categorySupplier = suppliers.find(
-            (s) => s.category === inv.product?.category
+            (s) => s.category === invProduct?.category
           );
           const leadTime = categorySupplier?.leadTime || 14;
           const bufferDays =
@@ -100,7 +102,7 @@ export async function getSupplyChainRiskAnalytics() {
           return {
             sku: inv.sku,
             productName: inv.productName,
-            category: inv.product?.category,
+            category: invProduct?.category,
             currentStock: inv.quantity,
             safetyStock: inv.safetyStock,
             leadTime,
@@ -114,7 +116,7 @@ export async function getSupplyChainRiskAnalytics() {
                 : "库存水平健康",
           };
         })
-        .filter((item) => item.riskLevel !== "low");
+        .filter((item): item is NonNullable<typeof item> => item !== null && item.riskLevel !== "low");
 
       const riskMatrix = {
         concentration: {

@@ -51,10 +51,11 @@ export async function getSupplierSummary(): Promise<SupplierSummaryResult> {
   return cachedFetch(
     cacheKey('reports', 'supplier-summary'),
     async () => {
-      const [suppliers, shipments, costRecords] = await Promise.all([
+      const [suppliers, shipments, costRecords, products] = await Promise.all([
         db.supplier.findMany(),
         db.shipmentItem.findMany(),
-        db.costRecord.findMany()
+        db.costRecord.findMany(),
+        db.product.findMany(),
       ]);
 
       const totalSuppliers = suppliers.length;
@@ -77,7 +78,7 @@ export async function getSupplierSummary(): Promise<SupplierSummaryResult> {
           ? Math.round(relatedShipments.filter(s => s.delayDays === 0).length / relatedShipments.length * 100)
           : 85 + Math.round(supplier.rating * 3);
 
-        const categoryProducts = costRecords.filter(c => c.product?.category === supplier.category);
+        const categoryProducts = costRecords.filter(c => products.find(p => p.sku === c.sku)?.category === supplier.category);
         const avgMargin = categoryProducts.length > 0
           ? categoryProducts.reduce((sum, c) => sum + c.grossMargin, 0) / categoryProducts.length
           : 50;
