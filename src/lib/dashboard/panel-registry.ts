@@ -112,6 +112,12 @@ export const PANEL_REGISTRY: PanelDef[] = [
     category: 'ops', tags: ['all', 'risk', 'executive'],
     defaultEnabled: true, loaderType: 'chart',
   },
+  {
+    id: 'audit', label: '审计', icon: Shield,
+    path: '@/components/audit/AuditTab',
+    category: 'decision', tags: ['all', 'executive'],
+    defaultEnabled: true, loaderType: 'tab',
+  },
 ];
 
 // ─── View Presets ────────────────────────────────────────────────────────────────
