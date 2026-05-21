@@ -110,34 +110,66 @@ async function* handlePlan(
   const toolSchemas = getToolSchemas();
   const toolDescriptions = toolSchemas.map(t => `- **${t.name}**: ${t.description}`).join('\n');
 
+  // Build a tool-call-only prompt without role-playing language (DeepSeek V4 role-play suppresses tool calls)
   const planMessages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${SYSTEM_PROMPT}\n\n## 当前任务\n用户查询: ${ctx.query}\n意图: ${routing.intent}\n\n可用MCP工具:\n${toolDescriptions}\n\n规则：\n1. 只选解决问题必需的工具\n2. 独立工具并行调用\n3. 每轮最多${ctx.config.maxToolsPerRound}个\n4. 不需要工具则不调用`,
+      content: `You are a tool-calling function. Your ONLY job is to output function calls.
+
+Available functions:
+${toolDescriptions}
+
+CRITICAL RULES:
+1. You MUST call at least one function. Not calling any function is a FAILURE.
+2. Call all independent functions in parallel.
+3. Maximum ${ctx.config.maxToolsPerRound} function calls.
+4. Output ONLY function calls. No explanations, no greetings, no markdown.`,
     },
-    { role: 'user', content: ctx.query },
+    { role: 'user', content: `Task: ${ctx.query}\nIntent: ${routing.intent}\n\nCall the right functions to answer this query.` },
   ];
 
+  // Non-streaming call for plan phase — DeepSeek V4 Flash + tool_choice:required is reliable
   let toolCalls: ToolCall[] = [];
-  for await (const chunk of adapter.streamWithTools(planMessages, {
-    tools: toolSchemas as import('@/lib/mcp/tools').MCPTool[],
-    maxTokens: 2000,
-    temperature: 0.3,
-  })) {
-    if (chunk.type === 'tool_call' && chunk.toolCall) {
-      try {
-        const params = JSON.parse(chunk.toolCall.arguments || '{}');
-        toolCalls.push({
-          name: chunk.toolCall.name,
-          params,
-          displayName: TOOL_DISPLAY_NAMES[chunk.toolCall.name] || chunk.toolCall.name,
-        });
-      } catch { /* skip malformed */ }
+  const apiKey = adapter.resolveApiKey();
+  if (apiKey) {
+    try {
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: adapter.resolveModel(),
+          messages: adapter.normalizeMessages(planMessages),
+          tools: adapter.normalizeTools(toolSchemas as import('@/lib/mcp/tools').MCPTool[]),
+          tool_choice: 'required',
+          thinking: { type: 'disabled' },
+          max_tokens: 2000,
+          temperature: 0.3,
+          stream: false,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json() as { choices?: Array<{ message?: { tool_calls?: Array<{ function?: { name?: string; arguments?: string } }>; content?: string } }> };
+        const msg = data.choices?.[0]?.message;
+        if (msg?.tool_calls && msg.tool_calls.length > 0) {
+          const rawCalls = msg.tool_calls as unknown[];
+          toolCalls = adapter.parseToolCalls(msg.content || '', rawCalls);
+        } else if (msg?.content) {
+          // Text fallback
+          toolCalls = adapter.parseToolCalls(msg.content, []);
+        }
+      } else {
+        const errText = await response.text().catch(() => '');
+        console.error('[Plan] API error:', response.status, errText.slice(0, 200));
+      }
+    } catch (err) {
+      console.error('[Plan] Fetch error:', (err as Error).message);
     }
-    if (chunk.type === 'error') {
-      yield { type: 'error', message: chunk.error || 'Plan phase error' };
-      return;
-    }
+  }
+
+  // Remove debug line
+  if (toolCalls.length === 0) {
+    console.error('[Plan] No tool calls generated for query:', ctx.query);
   }
 
   if (toolCalls.length > ctx.config.maxToolsPerRound) {

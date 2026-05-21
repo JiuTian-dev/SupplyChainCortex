@@ -4,11 +4,11 @@ import type { MCPTool, MCPToolParameter } from '@/lib/mcp/tools';
 import type { ToolCall } from '../fsm-types';
 import { TOOL_DISPLAY_NAMES } from '../fsm-types';
 
-const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/beta';
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1';
 
 export class DeepSeekAdapter implements ProviderAdapter {
   readonly providerId = 'deepseek';
-  readonly defaultModel = 'deepseek-v4-pro';
+  readonly defaultModel = 'deepseek-v4-flash';
 
   private model: string;
 
@@ -35,30 +35,9 @@ export class DeepSeekAdapter implements ProviderAdapter {
       function: {
         name: t.name,
         description: t.description,
-        strict: true,
-        parameters: {
-          type: 'object' as const,
-          properties: this.makeStrictProperties(t.parameters.properties),
-          required: t.parameters.required || Object.keys(t.parameters.properties),
-          additionalProperties: false,
-        },
+        parameters: t.parameters,
       },
     }));
-  }
-
-  private makeStrictProperties(
-    props: Record<string, MCPToolParameter>,
-  ): Record<string, { type: string; description: string; enum?: string[] }> {
-    return Object.fromEntries(
-      Object.entries(props).map(([key, param]) => [
-        key,
-        {
-          type: param.type,
-          description: param.description,
-          ...(param.enum ? { enum: param.enum } : {}),
-        },
-      ]),
-    );
   }
 
   // ─── Streaming (text only) ───────────────────────────────────────────
@@ -134,7 +113,8 @@ export class DeepSeekAdapter implements ProviderAdapter {
         model: this.model,
         messages: this.normalizeMessages(messages),
         tools: this.normalizeTools(opts.tools),
-        tool_choice: 'auto',
+        tool_choice: 'required',
+        thinking: { type: 'disabled' },
         max_tokens: opts.maxTokens || 4000,
         temperature: opts.temperature ?? 0.7,
         stream: true,
