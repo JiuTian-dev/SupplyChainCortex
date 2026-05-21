@@ -29,6 +29,18 @@ import {
 
 import { getSuppliersList, getSupplierPerformance } from '@/lib/services/suppliers.service';
 
+// ─── Region-based supplier-shipment matching ─────────────────────────
+// Maps supplier region keywords to shipment origin keywords.
+// Used by query_supplier_trend to correlate shipments with suppliers.
+const SUPPLIER_REGION_MATCH: Record<string, string[]> = {
+  '华南': ['深圳', '东莞', '佛山', '广州', '中山'],
+  '华东': ['上海', '义乌', '宁波', '杭州', '苏州', '昆山'],
+  '华北': ['天津', '北京', '青岛', '石家庄'],
+  '华中': ['武汉', '长沙', '郑州', '合肥'],
+  '西南': ['成都', '重庆', '西安'],
+  '东北': ['大连', '沈阳', '哈尔滨'],
+};
+
 import {
   getDashboardMetrics, getDashboardSummary, getInventoryDistribution,
   getSalesTrend, getCriticalAlerts,
@@ -376,6 +388,242 @@ export const crudTools: MCPTool[] = [
           return await getCriticalAlerts();
         default:
           throw new Error(`未知的仪表盘查询类型: ${action}`);
+      }
+    },
+  },
+
+  // ─── 8. query_supplier_trend ────────────────────────────────────────────
+  {
+    name: 'query_supplier_trend',
+    description: '获取供应商历史绩效趋势（月度及时交货率、平均延误天数、货运量）。可按供应商编码筛选，或查看全部供应商趋势。数据来源：货运记录月度聚合，用于评估供应商长期表现变化。',
+    parameters: {
+      type: 'object',
+      properties: {
+        supplierCode: {
+          type: 'string',
+          description: '供应商编码（可选），不传则返回所有活跃供应商的趋势数据',
+        },
+        months: {
+          type: 'number',
+          description: '回溯月数，默认6',
+        },
+      },
+      required: [],
+    },
+    handler: async (params) => {
+      const { supplierCode, months } = params;
+      const monthsBack = Math.max(1, (months as number) || 6);
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - monthsBack);
+
+      const { db } = await import('@/lib/db');
+
+      const [suppliers, shipments] = await Promise.all([
+        db.supplier.findMany({
+          where: supplierCode ? { code: supplierCode as string } : { status: 'active' },
+        }),
+        db.shipmentItem.findMany({
+          where: { createdAt: { gte: startDate } },
+          orderBy: { createdAt: 'asc' },
+        }),
+      ]);
+
+      if (suppliers.length === 0) {
+        throw new Error(supplierCode ? `未找到供应商编码: ${supplierCode}` : '未找到活跃供应商');
+      }
+
+      // Match shipments to suppliers using region/category heuristics
+      function getRelatedShipments(supplier: typeof suppliers[0]): typeof shipments {
+        return shipments.filter(s => {
+          // Check region-based match
+          const regionKeywords = SUPPLIER_REGION_MATCH[supplier.region];
+          if (regionKeywords) {
+            const originMatch = regionKeywords.some(kw => s.origin.includes(kw));
+            if (originMatch) return true;
+          }
+          // Logistics carrier match
+          if (supplier.category === '物流运输') {
+            return s.carrier.includes(supplier.name.slice(0, 2)) || s.carrier.includes('物流');
+          }
+          // Customs clearance match
+          if (supplier.category === '清关服务') {
+            return s.status === 'customs';
+          }
+          return false;
+        });
+      }
+
+      const result: Array<{
+        supplierCode: string;
+        name: string;
+        region: string;
+        category: string;
+        trend: Array<{ month: string; onTimeRate: number; avgDelay: number; shipmentCount: number }>;
+      }> = [];
+
+      for (const supplier of suppliers) {
+        const relatedShipments = getRelatedShipments(supplier);
+
+        // Group by month (YYYY-MM)
+        const monthGroups: Record<string, Array<{ delayDays: number }>> = {};
+        for (const s of relatedShipments) {
+          const monthKey = `${s.createdAt.getFullYear()}-${String(s.createdAt.getMonth() + 1).padStart(2, '0')}`;
+          if (!monthGroups[monthKey]) monthGroups[monthKey] = [];
+          monthGroups[monthKey].push(s);
+        }
+
+        const trend = Object.entries(monthGroups)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([month, items]) => {
+            const onTimeCount = items.filter(i => i.delayDays === 0).length;
+            return {
+              month,
+              onTimeRate: items.length > 0 ? Math.round((onTimeCount / items.length) * 100) : 0,
+              avgDelay: items.length > 0
+                ? Math.round((items.reduce((s, i) => s + i.delayDays, 0) / items.length) * 10) / 10
+                : 0,
+              shipmentCount: items.length,
+            };
+          });
+
+        result.push({
+          supplierCode: supplier.code,
+          name: supplier.name,
+          region: supplier.region,
+          category: supplier.category,
+          trend,
+        });
+      }
+
+      // Sort by supplier code for deterministic output
+      result.sort((a, b) => a.supplierCode.localeCompare(b.supplierCode));
+
+      return summarize({ suppliers: result, months: monthsBack, generatedAt: new Date().toISOString() });
+    },
+  },
+
+  // ─── 9. query_procurement ──────────────────────────────────────────────
+  {
+    name: 'query_procurement',
+    description: '查询采购计划与补货订单。支持三种模式：plan(待处理采购计划，按优先级排序)、detail(指定SKU的订单详情)、summary(汇总统计包括总订单数、按优先级/状态分布、预估总成本)。',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          description: '查询类型: plan(采购计划), detail(单品详情), summary(汇总统计)',
+          enum: ['plan', 'detail', 'summary'],
+        },
+        sku: {
+          type: 'string',
+          description: '产品SKU，用于detail模式查询指定SKU的订单历史',
+        },
+      },
+      required: ['action'],
+    },
+    handler: async (params) => {
+      const { action, sku } = params;
+      const { db } = await import('@/lib/db');
+
+      switch (action) {
+        case 'plan': {
+          // All non-delivered orders, sorted by priority then creation date
+          const orders = await db.reorderOrder.findMany({
+            where: { status: { not: 'delivered' } },
+            orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+          });
+
+          // Enrich with cost estimates from cost records
+          const costRecords = await db.costRecord.findMany();
+          const costMap = new Map(costRecords.map(c => [c.sku, c]));
+
+          const items = orders.map(o => {
+            const costRec = costMap.get(o.sku);
+            return {
+              id: o.id,
+              sku: o.sku,
+              productName: o.productName,
+              quantity: o.quantity,
+              warehouse: o.warehouse,
+              priority: o.priority,
+              status: o.status,
+              estimatedCost: costRec ? Math.round(costRec.totalLanded * o.quantity * 100) / 100 : null,
+              estimatedUnitCost: costRec?.totalLanded ?? null,
+              createdAt: o.createdAt,
+            };
+          });
+
+          return summarize({
+            plan: items,
+            totalOutstanding: items.length,
+            note: '预估成本基于当前成本记录中的到岸成本 × 数量计算',
+          });
+        }
+
+        case 'detail': {
+          if (!sku) throw new Error('查询采购详情需要提供 sku 参数');
+          const orders = await db.reorderOrder.findMany({
+            where: { sku: sku as string },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          const costRec = await db.costRecord.findFirst({ where: { sku: sku as string } });
+
+          return summarize({
+            sku,
+            productName: orders[0]?.productName ?? null,
+            totalOrders: orders.length,
+            currentUnitCost: costRec?.totalLanded ?? null,
+            orders: orders.map(o => ({
+              id: o.id,
+              quantity: o.quantity,
+              warehouse: o.warehouse,
+              priority: o.priority,
+              status: o.status,
+              notes: o.notes,
+              createdAt: o.createdAt,
+              updatedAt: o.updatedAt,
+            })),
+          });
+        }
+
+        case 'summary': {
+          const orders = await db.reorderOrder.findMany();
+
+          const byPriority: Record<string, number> = {};
+          const byStatus: Record<string, number> = {};
+          let totalEstimatedCost = 0;
+          let totalQuantity = 0;
+
+          const costRecords = await db.costRecord.findMany();
+          const costMap = new Map(costRecords.map(c => [c.sku, c]));
+
+          for (const o of orders) {
+            byPriority[o.priority] = (byPriority[o.priority] || 0) + 1;
+            byStatus[o.status] = (byStatus[o.status] || 0) + 1;
+            totalQuantity += o.quantity;
+            if (costMap.has(o.sku)) {
+              totalEstimatedCost += costMap.get(o.sku)!.totalLanded * o.quantity;
+            }
+          }
+
+          return {
+            totalOrders: orders.length,
+            totalQuantity,
+            totalEstimatedCost: Math.round(totalEstimatedCost * 100) / 100,
+            currency: 'CNY',
+            byPriority: Object.entries(byPriority)
+              .map(([priority, count]) => ({ priority, count }))
+              .sort((a, b) => b.count - a.count),
+            byStatus: Object.entries(byStatus)
+              .map(([status, count]) => ({ status, count }))
+              .sort((a, b) => b.count - a.count),
+            generatedAt: new Date().toISOString(),
+          };
+        }
+
+        default:
+          throw new Error(`未知的采购查询类型: ${action}`);
       }
     },
   },
