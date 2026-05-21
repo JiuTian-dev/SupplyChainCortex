@@ -47,7 +47,7 @@ export function getNextState(current: FSMState, ctx: FSMContext): FSMState | nul
     case 'plan':
       if (ctx.round >= ctx.config.maxRounds) return 'synthesize';
       if (ctx.routing && !ctx.routing.shouldUseTools) return 'synthesize';
-      if (!ctx.plan || ctx.plan.length === 0) return 'synthesize';
+      if (ctx.plan !== undefined && ctx.plan.length === 0) return 'synthesize';
       return 'execute';
 
     case 'execute':
@@ -58,6 +58,8 @@ export function getNextState(current: FSMState, ctx: FSMContext): FSMState | nul
 
     case 'decide':
       if (ctx.round >= ctx.config.maxRounds) return 'synthesize';
+      // Got data? Done. No successful results? Try again with different tools.
+      if (ctx.toolResults.some(r => r.success)) return 'synthesize';
       return 'plan';
 
     case 'synthesize':

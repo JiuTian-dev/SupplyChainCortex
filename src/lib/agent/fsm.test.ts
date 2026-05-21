@@ -38,11 +38,20 @@ describe('FSM transition table', () => {
     expect(getNextState('plan', ctx)).toBe('synthesize');
   });
 
-  it('plan → execute when tools needed', () => {
+  it('plan → execute when tools needed and plan has items', () => {
     const ctx = mockCtx({
+      plan: [{ name: 'query_inventory', params: {} }],
       routing: { intent: 'supply_chain_data', confidence: 0.9, shouldUseTools: true, shouldSearch: false, reason: 'data' },
     });
     expect(getNextState('plan', ctx)).toBe('execute');
+  });
+
+  it('plan → synthesize when tools planned but empty', () => {
+    const ctx = mockCtx({
+      plan: [],
+      routing: { intent: 'supply_chain_data', confidence: 0.9, shouldUseTools: true, shouldSearch: false, reason: 'data' },
+    });
+    expect(getNextState('plan', ctx)).toBe('synthesize');
   });
 
   it('execute → observe (always)', () => {
@@ -57,12 +66,22 @@ describe('FSM transition table', () => {
     expect(getNextState('decide', mockCtx({ round: 3, config: { ...DEFAULT_FSM_CONFIG, maxRounds: 3 } }))).toBe('synthesize');
   });
 
-  it('decide → plan when more rounds available', () => {
+  it('decide → plan when no successful results and rounds remain', () => {
     const ctx = mockCtx({
       round: 1,
+      toolResults: [{ tool: 'test', success: false, error: 'failed', latencyMs: 100 }],
       routing: { intent: 'supply_chain_data', confidence: 0.9, shouldUseTools: true, shouldSearch: false, reason: 'data' },
     });
     expect(getNextState('decide', ctx)).toBe('plan');
+  });
+
+  it('decide → synthesize when successful tool results exist', () => {
+    const ctx = mockCtx({
+      round: 1,
+      toolResults: [{ tool: 'test', success: true, data: {}, latencyMs: 100 }],
+      routing: { intent: 'supply_chain_data', confidence: 0.9, shouldUseTools: true, shouldSearch: false, reason: 'data' },
+    });
+    expect(getNextState('decide', ctx)).toBe('synthesize');
   });
 
   it('plan → synthesize when max rounds reached (guard)', () => {
