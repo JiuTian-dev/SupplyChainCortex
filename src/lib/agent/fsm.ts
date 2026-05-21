@@ -13,6 +13,7 @@ import { getToolSchemas } from '@/lib/mcp/tools';
 import { executeWithPolicy } from '@/lib/engine/autonomy-policy';
 import { createPassport, provenanceEntry } from '@/lib/engine/passport';
 import { retrieveKnowledge, augmentPrompt } from '@/lib/engine/rag';
+import { buildGraphContext, formatGraphContext } from '@/lib/engine/graph-rag';
 import { webSearchWithQuality, formatSearchContext } from '@/lib/services/web-search.service';
 import { SYSTEM_PROMPT } from '@/app/api/chat/chat.prompt';
 import type { ChatMessage } from '@/lib/services/ai-providers.service';
@@ -94,9 +95,17 @@ async function* handlePlan(
 
   const routing = ctx.routing!;
 
+  // Knowledge injection: graph RAG enriches all paths (tools + no-tools)
+  let graphContextBlock = '';
+  try {
+    const graphCtx = await buildGraphContext(ctx.query);
+    graphContextBlock = formatGraphContext(graphCtx);
+    ctx.dynamicContext = (ctx.dynamicContext || '') + graphContextBlock;
+  } catch { /* graph RAG is best-effort */ }
+
   if (!routing.shouldUseTools) {
     const ragResults = retrieveKnowledge(ctx.query, 3);
-    ctx.dynamicContext = augmentPrompt(ctx.query, ragResults);
+    ctx.dynamicContext = (ctx.dynamicContext || '') + '\n' + augmentPrompt(ctx.query, ragResults);
 
     if (routing.shouldSearch) {
       try {
@@ -121,14 +130,18 @@ async function* handlePlan(
       content: isFirstRound
         ? `You are a tool-calling function. Your ONLY job is to output function calls.
 
+## Supply Chain Context
+${graphContextBlock}
+
 Available functions:
 ${toolDescriptions}
 
 CRITICAL RULES:
 1. You MUST call at least one function. Not calling any function is a FAILURE.
-2. Call all independent functions in parallel.
-3. Maximum ${ctx.config.maxToolsPerRound} function calls.
-4. Output ONLY function calls. No explanations, no greetings, no markdown.`
+2. Use the Supply Chain Context above to choose the most relevant functions.
+3. Call all independent functions in parallel.
+4. Maximum ${ctx.config.maxToolsPerRound} function calls.
+5. Output ONLY function calls. No explanations, no greetings, no markdown.`
         : `Available functions:
 ${toolDescriptions}
 
@@ -137,7 +150,10 @@ You have already executed some functions. Decide if you need MORE data:
 - If you still need more data → call the specific functions needed
 Maximum ${ctx.config.maxToolsPerRound} function calls.`,
     },
-    { role: 'user', content: `Task: ${ctx.query}\nIntent: ${routing.intent}\n\n${isFirstRound ? 'Call the right functions to answer this query.' : 'Do you need more data? If not, respond with nothing.'}` },
+    {
+      role: 'user',
+      content: `Task: ${ctx.query}\nIntent: ${routing.intent}\n\n## Supply Chain Knowledge Graph\n${graphContextBlock}\n\n${isFirstRound ? 'Call the right functions to answer this query.' : 'Do you need more data? If not, respond with nothing.'}`,
+    },
   ];
 
   // Call adapter to get tool execution plan

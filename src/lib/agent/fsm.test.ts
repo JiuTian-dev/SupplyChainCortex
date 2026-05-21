@@ -9,6 +9,7 @@ vi.mock('@/lib/mcp/tools', () => ({ getToolSchemas: vi.fn(), executeTool: vi.fn(
 vi.mock('@/lib/engine/autonomy-policy', () => ({ executeWithPolicy: vi.fn() }));
 vi.mock('@/lib/engine/passport', () => ({ createPassport: vi.fn(), provenanceEntry: vi.fn() }));
 vi.mock('@/lib/engine/rag', () => ({ retrieveKnowledge: vi.fn(), augmentPrompt: vi.fn() }));
+vi.mock('@/lib/engine/graph-rag', () => ({ buildGraphContext: vi.fn(() => ({ summary: '', relevantSubgraph: '' })), formatGraphContext: vi.fn(() => '') }));
 vi.mock('@/lib/services/web-search.service', () => ({ webSearchWithQuality: vi.fn(), formatSearchContext: vi.fn() }));
 vi.mock('@/app/api/chat/chat.prompt', () => ({ SYSTEM_PROMPT: '' }));
 
