@@ -301,7 +301,6 @@ export function SupplierTab() {
       {/* ==================== 供应商分析面板 ==================== */}
       <SupplierAnalyticsPanel
         suppliers={suppliers}
-        supplierPerformance={supplierPerformance}
       />
 
       {/* ==================== 筛选 + 操作 ==================== */}

@@ -128,7 +128,6 @@ export function SupplierPerformancePanel({ supplierPerformance, suppliers }: Sup
                     <TableHead className="text-xs uppercase tracking-wider">质量分</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider">交货期</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider">风险</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider">建议</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -146,7 +145,6 @@ export function SupplierPerformancePanel({ supplierPerformance, suppliers }: Sup
                             {s.riskLevel === 'high' ? '高风险' : s.riskLevel === 'medium' ? '中风险' : '低风险'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{String(s.recommendation || '')}</TableCell>
                       </TableRow>
                     );
                   })}
