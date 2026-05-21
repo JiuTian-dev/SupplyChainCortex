@@ -67,3 +67,4 @@ server.log
 mcp-card-*.png.idea/
 .idea/
 .chat-history/
+.worktrees/
