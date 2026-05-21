@@ -29,13 +29,9 @@ export interface ToolCall {
   displayName?: string;
 }
 
-export interface ToolResult {
-  tool: string;
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  latencyMs: number;
-}
+export type ToolResult =
+  | { tool: string; success: true; data: unknown; latencyMs: number }
+  | { tool: string; success: false; error: string; latencyMs: number };
 
 export interface Observation {
   validResults: ToolResult[];
@@ -93,6 +89,8 @@ export interface FSMContext {
   routing?: RoutingDecision;
 
   round: number;
+  /** Tool execution plan from the 'plan' state — persists across execute/observe/decide */
+  plan?: ToolCall[];
   toolResults: ToolResult[];
   observations: Observation[];
 
