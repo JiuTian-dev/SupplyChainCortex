@@ -8,18 +8,20 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   Send, Package, DollarSign, Ship, Shield, BarChart3,
   Loader2, X, ArrowRight, RotateCcw,
   ChevronDown, Globe, Brain, Clock, Copy, Download,
-  Settings, Eye, EyeOff,
+  Settings, Eye, EyeOff, Paperclip,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadMessages, saveMessages,
   renderMarkdown, CopyButton, TypingIndicator,
+  fetchOllamaModels, fmtBytes,
 } from './ChatPanel.helpers';
 import type { ChatMessage } from './ChatPanel.helpers';
 import { ClaimLabel, parseClaimsFromText, type ClaimData, type ClaimVerdict, type FeedbackClaimsMap } from './ClaimLabel';
@@ -205,6 +207,14 @@ function DataPanel({ tools, onClose }: { tools: ToolEvent[]; onClose: () => void
   );
 }
 
+// ─── Token estimation ──────────────────────────────────────────────────
+
+function estimateTokens(text: string): number {
+  const cjk = (text.match(/[一-鿿]/g) || []).length;
+  const other = text.length - cjk;
+  return Math.ceil(cjk / 3 + other / 4);
+}
+
 // ─── Main ChatPanel ──────────────────────────────────────────────────
 
 export function ChatPanel() {
@@ -238,6 +248,18 @@ export function ChatPanel() {
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // ─── Feature 8: Token Usage ──────────────────────────────────────────
+  const [tokenUsage, setTokenUsage] = useState<Record<string, { input: number; output: number }>>({});
+
+  // ─── Feature 9: File Upload ──────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+
+  // ─── Feature 10: Ollama Scanner ──────────────────────────────────────
+  const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: string }>>([]);
+  const [scanningOllama, setScanningOllama] = useState(false);
+  const [ollamaStatus, setOllamaStatus] = useState<'idle' | 'scanning' | 'found' | 'error'>('idle');
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -438,10 +460,17 @@ export function ChatPanel() {
         }
       }
 
+      const assistantId = (Date.now() + 1).toString();
+
+      // Estimate token usage from response content
+      if (fullContent) {
+        setTokenUsage(prev => ({ ...prev, [assistantId]: { input: estimateTokens(query), output: estimateTokens(fullContent) } }));
+      }
+
       const assistantMsg: ChatMessage = {
         role: 'assistant',
         content: fullContent,
-        id: (Date.now() + 1).toString(),
+        id: assistantId,
         timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, assistantMsg]);
@@ -578,6 +607,19 @@ export function ChatPanel() {
                         <RotateCcw className="h-3 w-3" /> 重新生成
                       </button>
                     )}
+
+                    {/* Token usage whisper */}
+                    {(() => {
+                      const usage = tokenUsage[msg.id];
+                      const display = usage
+                        ? `↑${usage.output >= 1000 ? (usage.output / 1000).toFixed(1) + 'k' : usage.output} ↓${usage.input >= 1000 ? (usage.input / 1000).toFixed(1) + 'k' : usage.input}`
+                        : `↑${estimateTokens(msg.content) >= 1000 ? (estimateTokens(msg.content) / 1000).toFixed(1) + 'k' : estimateTokens(msg.content)}`;
+                      return (
+                        <div className="flex items-center justify-end mt-1">
+                          <span className="text-[10px] text-zinc-400 font-mono tabular-nums">{display}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -672,6 +714,10 @@ export function ChatPanel() {
                   <DropdownMenuItem onClick={() => { setSelectedProvider('anthropic'); setSelectedModel('claude-sonnet-4-6'); }} className="text-xs">
                     Anthropic Claude Sonnet 4.6
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => { setSelectedProvider('ollama'); setShowSettings(true); }} className="text-xs">
+                    本地模型 (Ollama)...
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -688,6 +734,34 @@ export function ChatPanel() {
                 title={webSearchEnabled === true ? '已启用联网搜索' : webSearchEnabled === false ? '已禁用联网搜索' : '自动决定是否搜索'}
               >
                 <Globe className="h-4 w-4" />
+              </button>
+
+              {/* File upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.csv,.md,.json,.log"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadedFileName(file.name);
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const text = reader.result as string;
+                    setInput(prev => prev + (prev ? '\n\n--- ' + file.name + ' ---\n' : '') + text.slice(0, 3000));
+                    setUploadedFileName(null);
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 w-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="上传文件 (txt, csv, md, json)"
+              >
+                <Paperclip className="h-4 w-4" />
               </button>
 
               <div className="flex-1 relative">
@@ -741,6 +815,54 @@ export function ChatPanel() {
                         </button>
                       </div>
                       <p className="text-[10px] text-zinc-400 mt-1">留空使用环境变量</p>
+                    </div>
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-3">
+                      <label className="text-[10px] text-zinc-500 mb-2 block">本地模型 (Ollama)</label>
+                      {ollamaStatus === 'found' && ollamaModels.length > 0 ? (
+                        <div className="space-y-1 mb-2">
+                          {ollamaModels.map(m => (
+                            <button
+                              key={m.name}
+                              onClick={() => { setSelectedProvider('ollama'); setSelectedModel(m.name); setOllamaStatus('idle'); }}
+                              className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between"
+                            >
+                              <span className="font-mono text-[11px]">{m.name}</span>
+                              <span className="text-[10px] text-zinc-400">{m.size}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : ollamaStatus === 'scanning' ? (
+                        <p className="text-xs text-zinc-400 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          扫描中...
+                        </p>
+                      ) : ollamaStatus === 'error' ? (
+                        <p className="text-xs text-red-500">未检测到 Ollama 服务</p>
+                      ) : null}
+                      <button
+                        onClick={async () => {
+                          setScanningOllama(true);
+                          setOllamaStatus('scanning');
+                          try {
+                            const models = await fetchOllamaModels('http://localhost:11434');
+                            const formatted = models.map(m => ({
+                              name: m.name,
+                              size: fmtBytes(m.size),
+                            }));
+                            setOllamaModels(formatted);
+                            setOllamaStatus(formatted.length > 0 ? 'found' : 'error');
+                          } catch {
+                            setOllamaStatus('error');
+                          } finally {
+                            setScanningOllama(false);
+                          }
+                        }}
+                        disabled={scanningOllama}
+                        className="w-full text-xs py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                      >
+                        {ollamaStatus === 'found' ? '重新扫描' : '扫描本地 Ollama'}
+                      </button>
+                      <p className="text-[10px] text-zinc-400 mt-1">需要安装 Ollama 并在本地运行</p>
                     </div>
                   </div>
                 </div>
