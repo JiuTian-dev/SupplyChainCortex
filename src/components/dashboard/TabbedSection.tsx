@@ -65,19 +65,11 @@ export function TabbedSection({ panels, activeTab, onTabChange }: TabbedSectionP
     );
   }
 
-  const n = panels.length;
-  const gridClass = n <= 2 ? 'grid-cols-2'
-    : n <= 3 ? 'grid-cols-3'
-    : n <= 4 ? 'grid-cols-4'
-    : n <= 5 ? 'grid-cols-5'
-    : n <= 6 ? 'grid-cols-3 sm:grid-cols-6'
-    : 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-7';
-
   const effectiveTab = panels.some(p => p.id === activeTab) ? activeTab : panels[0].id;
 
   return (
     <Tabs value={effectiveTab} onValueChange={onTabChange}>
-      <TabsList className={`grid ${gridClass} mb-4 h-auto`}>
+      <TabsList className="mb-4 h-auto" style={{ display: 'grid', gridTemplateColumns: `repeat(${panels.length}, minmax(0, 1fr))` }}>
         {panels.map(panel => (
           <TabsTrigger key={panel.id} value={panel.id} className="flex items-center gap-1.5 text-xs h-8 px-2">
             <panel.icon className="h-3.5 w-3.5 shrink-0" />

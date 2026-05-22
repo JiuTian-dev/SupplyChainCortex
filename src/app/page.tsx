@@ -16,7 +16,6 @@ import { ChatPanel } from '@/components/shared/ChatPanel';
 
 // Stores & hooks
 import { useAuthStore } from '@/stores/auth-store';
-import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { useConnectionStore } from '@/stores/connection-store';
 import { useSSE } from '@/hooks/use-sse';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
@@ -57,9 +56,7 @@ function HomePageContent() {
 
   // View modes: 'chat' (default) | 'audit' | 'legacy'
   const [viewMode, setViewMode] = useState<'chat' | 'audit' | 'legacy'>('chat');
-
-  const setSelectedInventorySku = useInventoryUIStore(s => s.setSelectedInventorySku);
-  const setInventoryDetail = useInventoryUIStore(s => s.setInventoryDetail);
+  const [legacyTab, setLegacyTab] = useState('inventory');
 
   const [productDetailSku, setProductDetailSku] = useState<string | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
@@ -133,8 +130,8 @@ function HomePageContent() {
             <div className="flex-1 overflow-auto p-6 max-w-[1600px] mx-auto w-full">
               <LegacyPanels
                 panels={legacyPanels}
-                activeTab="inventory"
-                onTabChange={() => {}}
+                activeTab={legacyTab}
+                onTabChange={setLegacyTab}
               />
             </div>
           )}
