@@ -255,6 +255,24 @@ export function ChatPanel() {
     if (hydrated && messages.length > 0) saveMessages(messages);
   }, [messages, hydrated]);
 
+  // If no messages loaded from main storage, try loading from conversation history
+  useEffect(() => {
+    if (hydrated && messages.length === 0) {
+      try {
+        const convs = JSON.parse(localStorage.getItem('chat-conversations') || '[]');
+        if (convs.length > 0) {
+          const latest = convs[0];
+          const raw = localStorage.getItem(`chat-msgs-${latest.id}`);
+          if (raw) {
+            const msgs = JSON.parse(raw);
+            setMessages(msgs);
+            saveMessages(msgs);
+          }
+        }
+      } catch {}
+    }
+  }, [hydrated, messages.length]);
+
   // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
@@ -280,18 +298,40 @@ export function ChatPanel() {
     } catch {}
   }, []);
 
-  // Save conversation list on message change
-  useEffect(() => {
-    if (messages.length > 0) {
-      try {
-        const convs = JSON.parse(localStorage.getItem('chat-conversations') || '[]');
-        const existing = convs.findIndex((c: { id: string }) => c.id === 'current');
-        const entry = { id: 'current', title: messages[0]?.content?.slice(0, 40) || '新对话', messageCount: messages.length, updatedAt: new Date().toISOString() };
-        if (existing >= 0) convs[existing] = entry; else convs.unshift(entry);
-        localStorage.setItem('chat-conversations', JSON.stringify(convs.slice(0, 20)));
-      } catch {}
-    }
+  // Save current conversation to localStorage (append, not overwrite)
+  const saveCurrentConversation = useCallback(() => {
+    if (messages.length === 0) return;
+    const firstUserMsg = messages.find(m => m.role === 'user');
+    const title = firstUserMsg?.content?.slice(0, 40) || '新对话';
+    const convs = JSON.parse(localStorage.getItem('chat-conversations') || '[]');
+    const entry = {
+      id: Date.now().toString(),
+      title,
+      messageCount: messages.length,
+      updatedAt: new Date().toISOString()
+    };
+    convs.unshift(entry);
+    localStorage.setItem('chat-conversations', JSON.stringify(convs.slice(0, 50)));
+    // Also save messages under this conversation ID
+    localStorage.setItem(`chat-msgs-${entry.id}`, JSON.stringify(messages.slice(-50)));
+    return entry.id;
   }, [messages]);
+
+  const loadConversation = (convId: string) => {
+    // Save current first
+    saveCurrentConversation();
+    // Load the selected one
+    try {
+      const raw = localStorage.getItem(`chat-msgs-${convId}`);
+      if (raw) {
+        const msgs = JSON.parse(raw);
+        setMessages(msgs);
+        // Also restore to main storage so loadMessages works on next mount
+        saveMessages(msgs);
+      }
+    } catch {}
+    setShowConvList(false);
+  };
 
   const handleClaimVerdict = useCallback(async (_msgId: string, _claims: ClaimData[], claimId: string, verdict: ClaimVerdict) => {
     setFeedbackMap(prev => ({ ...prev, [claimId]: verdict }));
@@ -726,19 +766,68 @@ export function ChatPanel() {
             <button onClick={() => setShowConvList(false)}><X className="h-4 w-4" /></button>
           </div>
           <button
-            onClick={() => { setMessages([]); setShowConvList(false); }}
+            onClick={() => {
+              saveCurrentConversation();
+              setMessages([]);
+              setStreamingContent('');
+              setStreamingToolCalls([]);
+              setThinkingSteps([]);
+              setShowConvList(false);
+              // Reload convList from localStorage
+              try {
+                const stored = localStorage.getItem('chat-conversations');
+                if (stored) setConvList(JSON.parse(stored));
+              } catch {}
+            }}
             className="w-full text-left text-xs px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 mb-2 border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500"
           >
             + 新对话
           </button>
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+            {convList.length === 0 && (
+              <p className="text-xs text-zinc-400 text-center py-4">暂无历史对话</p>
+            )}
             {convList.map(c => (
-              <div key={c.id} className="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-xs">
-                <p className="truncate font-medium">{c.title}</p>
-                <p className="text-zinc-400">{c.messageCount} 条消息</p>
+              <div key={c.id} className="group flex items-center px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-xs">
+                <div className="flex-1 min-w-0" onClick={() => loadConversation(c.id)}>
+                  <p className="truncate font-medium">{c.title}</p>
+                  <p className="text-zinc-400">{c.messageCount} 条消息</p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const convs = convList.filter(item => item.id !== c.id);
+                    setConvList(convs);
+                    localStorage.setItem('chat-conversations', JSON.stringify(convs));
+                    localStorage.removeItem(`chat-msgs-${c.id}`);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-500 transition-all"
+                  title="删除"
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
             ))}
           </div>
+          {convList.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm('清除全部对话历史？此操作不可撤销。')) {
+                  setConvList([]);
+                  localStorage.removeItem('chat-conversations');
+                  // Clear all chat-msgs-* keys
+                  for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key?.startsWith('chat-msgs-')) localStorage.removeItem(key);
+                  }
+                  setMessages([]);
+                }
+              }}
+              className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg mt-2 transition-colors"
+            >
+              清除全部历史
+            </button>
+          )}
         </div>
       )}
     </div>
