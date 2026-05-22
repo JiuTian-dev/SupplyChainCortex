@@ -65,9 +65,9 @@ export const DEFAULT_CONFIG: DashboardConfig = {
   riskThresholds: { low: 15, medium: 40, high: 70 },
   timeHorizon: '30d',
   aggregation: 'daily',
-  panelOrder: ['monitor', 'cascade-risk', 'decision-center', 'sandbox', 'calibration',
-    'inventory', 'cost', 'logistics', 'sales', 'supplier', 'risk'],
-  panels: { monitor: true, analysis: true, decision: true, simulation: true },
+  panelOrder: ['monitor', 'cascade-risk', 'decision-center', 'sandbox',
+    'inventory', 'cost', 'logistics', 'sales', 'supplier', 'risk', 'audit'],
+  panels: { monitor: true, audit: true },
   showCounterfactual: true,
   enableFeedbackTracking: true,
 };

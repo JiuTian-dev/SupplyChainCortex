@@ -106,6 +106,12 @@ export const useDashboardConfigStore = create<DashboardConfigState>((set, get) =
       if ('analysis' in p) { p['cascade-risk'] = p.analysis; delete p.analysis; }
       if ('decision' in p) { p['decision-center'] = p.decision; delete p.decision; }
       if ('simulation' in p) { p.sandbox = p.simulation; delete p.simulation; }
+      // Ensure audit tab is visible (added in v2.0.0)
+      if (!('audit' in p)) { p.audit = true; }
+    }
+    // Ensure audit is in panelOrder
+    if (stored.panelOrder && !stored.panelOrder.includes('audit')) {
+      stored.panelOrder.push('audit');
     }
     set({ config: stored, hydrated: true });
   },

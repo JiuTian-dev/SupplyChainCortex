@@ -1,8 +1,74 @@
 # SupplyChain Cortex — 项目交接文档
 
-> 最后更新: 2026-05-21  
-> 当前版本: v2.0.0 (Agent Engine v2)  
-> 状态: 5 tsc 预存错误, 31 测试文件 530 测试通过, 1 DB 依赖失败
+> 最后更新: 2026-05-22  
+> 当前版本: v2.0.0 (Agent Engine v2 + Audit + Skills)  
+> 状态: 2 tsc 预存错误, 32 测试文件 583 测试通过, 1 DB 依赖失败
+
+---
+
+## ⏭️ 下一步任务：前端重设计（Chat 中心 + 数据滑出）
+
+### 当前状态
+- 两个设计 Skill 已安排安装（ui-ux-pro-max + frontend-design）
+- 用户刚重启 Claude Code，Skill 已加载
+- 代码在 main 分支，最新
+
+### 设计方案（已确认）
+
+**布局：A 为主（Chat 中心），B 为辅（数据滑出）**
+
+```
+┌──────────────────────────────────────┐
+│  SupplyChain Cortex       📋审计    │
+├──────────────────────────────────────┤
+│                                      │
+│    💬 需要了解什么？                  │
+│    ┌───────────────────────────┐     │
+│    │ 输入问题...                │     │
+│    └───────────────────────────┘     │
+│                                      │
+│    快捷：📦库存 💰成本 🚢供应商 ⚠️风险 │
+│                                      │
+│    ─── Agent 回复区 ───              │
+│    (流式token + MARC徽章 + 工具链)   │
+│                                      │
+│                      ┌─数据面板(滑出) │
+│                      │ 实时数据      │
+└──────────────────────────────────────┘
+```
+
+**核心体验：**
+- 页面 = Chat，其他全部退让
+- Agent 调工具时，右侧自动滑出数据面板（工具名 + 参数 + 实时结果）
+- 数据面板里的数字可以点，跳回 Chat 里的引用行
+- MARC 标签 `[T1-MCP][高]` 变成彩色小徽章
+- 工具调用链可视化："查了库存 → 发现21个危机品 → 推荐补货"
+- 3 个快捷按钮代替旧搜索框（"库存检查" "成本分析" "供应商评估"）
+- 空态：3 个示例问题
+- 加载态：流式 token 骨架
+- 错误态：API 故障时显示恢复建议
+- 审计入口：右上角图标 → 独立历史页面
+- 旧面板（inventory/cost/supplier）保留但通过数据面板链接跳转
+
+### 技术要点
+- 现有 ChatPanel.tsx 需要完全重写（目前是右侧抽屉，要改成主界面）
+- SSE 事件协议保持不变
+- page.tsx 布局要从 DragDropDashboard + TabbedSection 改成单页面 Chat + 滑出面板
+- 审计 Tab 已注册但不可见（DEFAULT_CONFIG 迁移代码未提交）
+- `src/lib/dashboard/config.ts` 和 `src/stores/dashboard-config-store.ts` 有未提交的 audit 修复
+
+### 未提交改动
+```
+M src/lib/dashboard/config.ts              — audit 加入 DEFAULT_CONFIG
+M src/stores/dashboard-config-store.ts     — localStorage 迁移 audit
+```
+
+### 启动命令
+```bash
+docker start supply-chain-postgres
+cd D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3
+bun run dev
+```
 
 ---
 
