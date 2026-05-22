@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from 'next-themes';
 import {
-  Radio,
   Search,
   RefreshCw,
   Timer,
@@ -374,25 +373,12 @@ export function Header({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center">
-              <Radio className="h-4 w-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center">
+              <span className="text-white dark:text-zinc-900 text-xs font-bold tracking-tight">SC</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold tracking-tight">
-                  SupplyChain Cortex
-                </h1>
-                <Badge
-                  variant="outline"
-                  className="text-[9px] px-1.5 py-0 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400"
-                >
-                  数据看板
-                </Badge>
-              </div>
-              <p className="text-[10px] text-muted-foreground -mt-0.5">
-                SupplyChain Cortex
-              </p>
-            </div>
+            <h1 className="text-sm font-semibold tracking-tight">
+              SupplyChain Cortex
+            </h1>
           </div>
           <div className="flex items-center gap-3">
             {/* Notes center */}

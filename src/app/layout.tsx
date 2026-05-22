@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SupplyChain Cortex · 跨境小家电供应链决策智能引擎",
+  title: "SupplyChain Cortex",
   description: "SupplyChain Cortex — 集成实时汇率/天气/关税数据融合、级联风险传播、决策形式化推理、MCP Agent 编排的供应链决策智能引擎",
   keywords: ["供应链", "AI决策", "MCP", "小家电", "风险传播", "关税引擎", "实时汇率", "港口天气", "Agent编排"],
   authors: [{ name: "SupplyChain Cortex Team" }],
