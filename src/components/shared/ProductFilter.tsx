@@ -73,7 +73,7 @@ export function ProductFilter({ selected, onChange, onLabelsLoad }: ProductFilte
       <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => setOpen(!open)}>
         筛选产品
         {hasFilter && <Badge variant="secondary" className="h-4 text-[9px] px-1">{selected.length}</Badge>}
-        {selected.length === 0 && <span className="text-muted-foreground">全部({allSkus.length})</span>}
+        {selected.length === 0 && <span className="text-muted-foreground">全部产品</span>}
         <ChevronDown className="h-3 w-3" />
       </Button>
       {hasFilter && (

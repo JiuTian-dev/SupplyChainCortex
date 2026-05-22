@@ -328,7 +328,7 @@ export function InventoryTab() {
           <ResponsiveContainer width="100%" height={300} minHeight={200}>
             <BarChart data={inventoryAgingData} style={{ cursor: 'pointer' }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}`} />
               <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
               <Legend />
