@@ -105,6 +105,15 @@ async function* handlePlan(
     ctx.dynamicContext = (ctx.dynamicContext || '') + graphContextBlock;
   } catch { /* graph RAG is best-effort */ }
 
+  // Agent Skills: load matching SOPs (progressive disclosure)
+  try {
+    const { getSkillContext } = await import('./skill-loader');
+    const skillContext = getSkillContext(ctx.query);
+    if (skillContext) {
+      ctx.dynamicContext = (ctx.dynamicContext || '') + skillContext;
+    }
+  } catch { /* skills are best-effort */ }
+
   if (!routing.shouldUseTools) {
     const ragResults = retrieveKnowledge(ctx.query, 3);
     ctx.dynamicContext = (ctx.dynamicContext || '') + '\n' + augmentPrompt(ctx.query, ragResults);
@@ -145,6 +154,9 @@ async function* handlePlan(
 
 ## Supply Chain Context
 ${graphContextBlock}
+
+## Agent SOPs (Standard Operating Procedures)
+${ctx.dynamicContext || '(none)'}
 
 Available functions:
 ${toolDescriptions}
