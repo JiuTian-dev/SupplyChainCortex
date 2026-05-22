@@ -503,7 +503,7 @@ export function ChatPanel() {
           {/* Feature 4: Conversation history toggle */}
           <button
             onClick={() => setShowConvList(!showConvList)}
-            className="absolute top-4 left-6 h-7 w-7 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors z-10"
+            className="fixed top-[7.5rem] left-6 h-7 w-7 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors z-20"
             title="对话历史"
           >
             <Clock className="h-3.5 w-3.5" />
