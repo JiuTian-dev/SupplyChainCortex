@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  loadMessages, saveMessages,
+  loadMessages, saveMessages, clearStoredMessages,
   renderMarkdown, CopyButton, TypingIndicator,
   fetchOllamaModels, fmtBytes,
 } from './ChatPanel.helpers';
@@ -890,6 +890,7 @@ export function ChatPanel() {
           <button
             onClick={() => {
               saveCurrentConversation();
+              clearStoredMessages();
               setMessages([]);
               setStreamingContent('');
               setStreamingToolCalls([]);
