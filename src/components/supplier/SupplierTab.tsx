@@ -24,7 +24,7 @@ import { SUPPLIER_CATEGORIES, SUPPLIER_REGIONS, CHART_COLORS } from '@/lib/const
 import { cn } from '@/lib/utils';
 import type { Supplier } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { BatchActionsToolbar } from '@/components/shared/BatchActionsToolbar';
 import { useBatchSelection } from '@/hooks/use-batch-selection';

@@ -27,7 +27,7 @@ import { CURRENCY_SYMBOLS } from '@/lib/dashboard/config';
 // CHART_COLORS moved to CostTab.helpers.tsx
 import type { CostRecord } from '@prisma/client';
 import { ExportMenu } from '@/components/shared/ExportMenu';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 import dynamic from 'next/dynamic';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 

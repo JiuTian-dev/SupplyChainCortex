@@ -22,7 +22,7 @@ import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_COLORS } from '@/lib/constants'
 import { exportToCSV } from '@/lib/utils';
 import type { ShipmentItem } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 import dynamic from 'next/dynamic';
 
 const ShipmentStatusUpdateDialog = dynamic(

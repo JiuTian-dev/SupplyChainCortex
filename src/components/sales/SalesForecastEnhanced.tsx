@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, Line, ComposedChart,
 } from 'recharts';
 import { useSalesForecast, useSales } from '@/hooks/use-supply-chain-data';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 
 const CHART_TOOLTIP_STYLE = {
   borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',

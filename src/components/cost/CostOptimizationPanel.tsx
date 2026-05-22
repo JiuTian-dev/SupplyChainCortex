@@ -15,7 +15,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { useCostOptimization } from '@/hooks/use-supply-chain-data';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 
 // ==================== Type Icon Mapping ====================
 const TYPE_ICON_MAP: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {

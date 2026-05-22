@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { MetricCard } from '@/components/shared/MetricCard';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 import { RiskMatrixHeatmap } from '@/components/risk/RiskMatrixHeatmap';
 import { WeatherRiskWidget } from '@/components/risk/WeatherRiskWidget';
 import { DecisionPanel } from '@/components/risk/DecisionPanel';

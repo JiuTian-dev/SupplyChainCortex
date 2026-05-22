@@ -31,18 +31,12 @@ import {
   fetchReorderRecommendations,
   searchProducts,
   fetchProductDetail,
-  fetchSalesSeasonalIndex,
   fetchInventoryCapitalAnalysis,
   fetchRiskMatrix,
   fetchInventoryAlertTimeline,
   fetchSalesForecast,
-  fetchSalesForecastForSku,
   fetchCostOptimization,
   fetchSupplyChainWeather,
-  fetchSupplyChainScoreHistory,
-  fetchPerformanceMetrics,
-  fetchQuality,
-  fetchCompliance,
 } from '@/lib/api-client';
 
 // Mutation API functions (not query-related)
@@ -53,16 +47,6 @@ import {
   createProduct as createProductApi,
   createSupplier as createSupplierApi,
   updateSupplier as updateSupplierApi,
-  createReturnRecord as createReturnRecordApi,
-  createDefectRecord as createDefectRecordApi,
-  createWarrantyCost as createWarrantyCostApi,
-  updateReturnRecord as updateReturnRecordApi,
-  updateDefectRecord as updateDefectRecordApi,
-  updateWarrantyCost as updateWarrantyCostApi,
-  createComplianceCert as createComplianceCertApi,
-  createRegulationChange as createRegulationChangeApi,
-  updateComplianceCert as updateComplianceCertApi,
-  updateRegulationChange as updateRegulationChangeApi,
 } from '@/lib/api-client';
 
 // ─── Stale time constants (aligned with server-side CACHE_TTL) ────────────────
@@ -289,15 +273,6 @@ export function useProductDetail(idOrSku: string | null, by: 'id' | 'sku' = 'sku
   });
 }
 
-/** Sales seasonal index (ratio-to-moving-average method) */
-export function useSalesSeasonalIndex(params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['sales', 'seasonal_index', params],
-    queryFn: () => fetchSalesSeasonalIndex(params),
-    staleTime: STALE_LONG,
-  });
-}
-
 /** Inventory capital occupation analysis */
 export function useInventoryCapitalAnalysis() {
   return useQuery({
@@ -321,16 +296,6 @@ export function useSalesForecast() {
   return useQuery({
     queryKey: ['sales', 'forecast-overall'],
     queryFn: fetchSalesForecast,
-    staleTime: STALE_LONG,
-  });
-}
-
-/** Sales forecast for a specific SKU with alpha parameter */
-export function useSalesForecastForSku(sku: string | null, horizon = 14, alpha = 0.3) {
-  return useQuery({
-    queryKey: ['sales', 'forecast-sku', sku, horizon, alpha],
-    queryFn: () => fetchSalesForecastForSku(sku!, horizon, alpha),
-    enabled: !!sku,
     staleTime: STALE_LONG,
   });
 }
@@ -360,25 +325,6 @@ export function useSupplyChainWeather() {
     queryKey: ['supply-chain-score', 'weather'],
     queryFn: fetchSupplyChainWeather,
     staleTime: STALE_SHORT,
-  });
-}
-
-/** Supply chain score history (30-day trend) */
-export function useSupplyChainScoreHistory() {
-  return useQuery({
-    queryKey: ['supply-chain-score', 'history'],
-    queryFn: fetchSupplyChainScoreHistory,
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Performance monitoring metrics (API response times, cache stats, system health) */
-export function usePerformanceMetrics() {
-  return useQuery({
-    queryKey: ['performance'],
-    queryFn: fetchPerformanceMetrics,
-    staleTime: STALE_SHORT,
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 }
 
@@ -475,212 +421,3 @@ export function useRateSupplier() {
   });
 }
 
-// ==================== Quality Data Hooks ====================
-
-/** Quality data with action and optional params */
-export function useQuality(action: string, params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['quality', action, params],
-    queryFn: () => fetchQuality(action, params),
-    enabled: !!action,
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Quality overview dashboard */
-export function useQualityOverview() {
-  return useQuery({
-    queryKey: ['quality', 'overview'],
-    queryFn: () => fetchQuality('overview'),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Return records with Pareto analysis */
-export function useReturnRecords(params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['quality', 'returns', params],
-    queryFn: () => fetchQuality('returns', params),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Defect records with statistics */
-export function useDefectRecords(params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['quality', 'defects', params],
-    queryFn: () => fetchQuality('defects', params),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Warranty cost records with totals */
-export function useWarrantyCosts(params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['quality', 'warranty', params],
-    queryFn: () => fetchQuality('warranty', params),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-// ==================== Compliance Data Hooks ====================
-
-/** Compliance data with action and optional params */
-export function useCompliance(action: string, params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['compliance', action, params],
-    queryFn: () => fetchCompliance(action, params),
-    enabled: !!action,
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Compliance overview dashboard */
-export function useComplianceOverview() {
-  return useQuery({
-    queryKey: ['compliance', 'overview'],
-    queryFn: () => fetchCompliance('overview'),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Compliance certificates list */
-export function useComplianceCerts(params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['compliance', 'certs', params],
-    queryFn: () => fetchCompliance('certs', params),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Regulation changes list */
-export function useRegulationChanges(params?: Record<string, string | number>) {
-  return useQuery({
-    queryKey: ['compliance', 'regulations', params],
-    queryFn: () => fetchCompliance('regulations', params),
-    staleTime: STALE_MEDIUM,
-  });
-}
-
-/** Expiring certificates within N days */
-export function useExpiringCerts(days = 90) {
-  return useQuery({
-    queryKey: ['compliance', 'expiring', days],
-    queryFn: () => fetchCompliance('expiring', { days }),
-    staleTime: STALE_SHORT,
-  });
-}
-
-// ==================== Quality Mutation Hooks ====================
-
-/** Create a return record */
-export function useCreateReturnRecord() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => createReturnRecordApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quality'] });
-    },
-  });
-}
-
-/** Create a defect record */
-export function useCreateDefectRecord() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => createDefectRecordApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quality'] });
-    },
-  });
-}
-
-/** Create a warranty cost record */
-export function useCreateWarrantyCost() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => createWarrantyCostApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quality'] });
-    },
-  });
-}
-
-/** Update a return record status */
-export function useUpdateReturnRecord() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { id: string; status: string }) => updateReturnRecordApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quality'] });
-    },
-  });
-}
-
-/** Update a defect record */
-export function useUpdateDefectRecord() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { id: string; status?: string; rootCause?: string; correctiveAction?: string }) => updateDefectRecordApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quality'] });
-    },
-  });
-}
-
-/** Update a warranty cost record */
-export function useUpdateWarrantyCost() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { id: string; status?: string; resolvedDate?: string }) => updateWarrantyCostApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quality'] });
-    },
-  });
-}
-
-// ==================== Compliance Mutation Hooks ====================
-
-/** Create a compliance certificate */
-export function useCreateComplianceCert() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => createComplianceCertApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['compliance'] });
-    },
-  });
-}
-
-/** Create a regulation change */
-export function useCreateRegulationChange() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => createRegulationChangeApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['compliance'] });
-    },
-  });
-}
-
-/** Update a compliance certificate */
-export function useUpdateComplianceCert() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => updateComplianceCertApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['compliance'] });
-    },
-  });
-}
-
-/** Update a regulation change */
-export function useUpdateRegulationChange() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { id: string; status?: string; reviewedBy?: string; actionRequired?: string }) => updateRegulationChangeApi(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['compliance'] });
-    },
-  });
-}

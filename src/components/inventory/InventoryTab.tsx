@@ -49,7 +49,7 @@ import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { STATUS_COLORS, STATUS_LABELS, AGING_COLORS, CHART_COLORS } from '@/lib/constants';
 import type { Inventory } from '@prisma/client';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 
 import { CHART_TOOLTIP_STYLE } from './InventoryTab.helpers';
 import { InventoryWarehouseCapacity } from './InventoryWarehouseCapacity';

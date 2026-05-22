@@ -28,7 +28,7 @@ import { CHART_COLORS } from '@/lib/constants';
 import { exportToCSV } from '@/lib/utils';
 import type { SalesSummary } from '@/lib/types';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
+import { DashboardSkeleton } from '@/components/shared/Skeleton';
 import dynamic from 'next/dynamic';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 
