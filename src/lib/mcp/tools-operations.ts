@@ -452,7 +452,10 @@ export const operationsTools: MCPTool[] = [
         throw new Error('至少需要提供一个要更新的成本字段');
       }
 
-      // Recalculate totalLanded and grossMargin
+      // Cost components are split by currency:
+      // CNY: rawMaterial, labor (domestic procurement/production costs)
+      // USD: logistics, tariff, platformFee (international freight, duties, platform charges)
+      // exchangeRate is used to convert USD components to CNY for totalLanded calculation
       const newRawMaterial = (updateData.rawMaterial as number) ?? costRecord.rawMaterial;
       const newLabor = (updateData.labor as number) ?? costRecord.labor;
       const newLogistics = (updateData.logistics as number) ?? costRecord.logistics;
@@ -742,7 +745,18 @@ export const operationsTools: MCPTool[] = [
 
       serverCache.invalidate('suppliers');
 
-      return supplier;
+      return {
+        code: supplier.code,
+        name: supplier.name,
+        region: supplier.region,
+        category: supplier.category,
+        leadTime: supplier.leadTime,
+        rating: supplier.rating,
+        status: supplier.status,
+        contact: supplier.contact,
+        email: supplier.email,
+        phone: supplier.phone,
+      };
     },
   },
 

@@ -69,11 +69,18 @@ export async function replayTrace(
 
   // 4. Call LLM for re-synthesis
   let replayedResponse = '';
-  const adapter = getAdapter(providerId);
-  for await (const chunk of adapter.streamText(synthesisMessages, { maxTokens: 4000, temperature: 0.7 })) {
-    if (chunk.type === 'token' && chunk.content) {
-      replayedResponse += chunk.content;
+  try {
+    const adapter = getAdapter(providerId);
+    for await (const chunk of adapter.streamText(synthesisMessages, { maxTokens: 4000, temperature: 0.7 })) {
+      if (chunk.type === 'token' && chunk.content) replayedResponse += chunk.content;
+      if (chunk.type === 'error') {
+        console.error('[Replay] LLM synthesis error:', chunk.error);
+        break;
+      }
     }
+  } catch (err) {
+    console.error('[Replay] Failed to call LLM for re-synthesis:', (err as Error).message);
+    replayedResponse = `[Replay synthesis failed: ${(err as Error).message}] Original analysis may still be valid.`;
   }
 
   // 5. Extract claims from replayed response
@@ -103,14 +110,14 @@ export async function replayTrace(
       durationMs: 0,
       toolsUsed: modifications.map(m => m.toolName),
       claimsCount: replayedClaims.length,
-      passport: JSON.parse(JSON.stringify({ replayOf: original.auditId, modifications })),
+      passport: JSON.parse(JSON.stringify({ replayOf: original.auditId })),
       summary: `Counterfactual replay of ${original.auditId}. Modified tools: ${modifications.map(m => m.toolName).join(', ')}. Note: replay compresses all execution into one synthesize step.`,
       steps: {
         create: [{
           stepIndex: 0,
           state: 'synthesize',
           confidence: replayedConfidence,
-          findings: `Replay with modified params: ${JSON.stringify(modifications)}`,
+          findings: `Replayed with ${modifications.length} modification(s): ${modifications.map(m => m.toolName).join(', ')}`,
           durationMs: 0,
           toolCalls: {
             create: modifiedResults.map(r => ({

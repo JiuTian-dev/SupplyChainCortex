@@ -50,6 +50,10 @@ export async function writeTrace(
     const claims = extractClaims(finalResponse);
     const elapsed = Date.now() - ctx.startTimeMs;
 
+    const historySummary = ctx.history?.length > 0
+      ? ctx.history.slice(-4).map(m => `${m.role}: ${m.content?.slice(0, 80)}`).join(' | ')
+      : null;
+
     const trace = await db.decisionTrace.create({
       data: {
         auditId: passport.auditId,
@@ -57,11 +61,22 @@ export async function writeTrace(
         intent: ctx.routing?.intent || 'unknown',
         confidence: passport.confidence,
         mode: 'fsm-v2',
-        tier: ctx.routing?.shouldUseTools ? 1 : ctx.routing?.shouldSearch ? 3 : 0,
+        tier: ctx.routing ? (ctx.routing.shouldUseTools ? 1 : ctx.routing.shouldSearch ? 3 : 0) : 0,
         durationMs: elapsed,
         toolsUsed: [...new Set(ctx.toolsUsed)],
         claimsCount: claims.length,
-        passport: JSON.parse(JSON.stringify(passport)),
+        summary: historySummary || undefined,
+        passport: JSON.parse(JSON.stringify({
+          auditId: passport.auditId,
+          generatedAt: passport.generatedAt,
+          engine: passport.engine,
+          confidence: passport.confidence,
+          ruleVersion: passport.ruleVersion,
+          dataProvenance: passport.dataProvenance,
+          alternatives: passport.alternatives,
+          trace: passport.trace,
+          warnings: passport.warnings,
+        })),
         steps: {
           create: buildStepData(ctx, claims, passport, elapsed),
         },
@@ -71,7 +86,11 @@ export async function writeTrace(
 
     return trace.id;
   } catch (err) {
-    console.error('[TraceWriter] Failed to write trace:', (err as Error).message);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[TraceWriter] Failed to write trace for auditId=${passport.auditId}: ${msg}`);
+    if (err instanceof Error && err.stack) {
+      console.error('[TraceWriter] Stack:', err.stack.split('\n').slice(0, 3).join('\n'));
+    }
     return null;
   }
 }
@@ -83,6 +102,9 @@ function buildStepData(
   totalDurationMs: number,
 ) {
   const stepData: any[] = [];
+  // `any[]` is acceptable here because stepData is constructed for Prisma create,
+  // and Prisma's specific create types vary per schema. Using a narrower type would
+  // require importing Prisma types and would not add meaningful safety.
   let resultCursor = 0;
 
   // Classify step

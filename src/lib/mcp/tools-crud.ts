@@ -1,6 +1,6 @@
 /**
- * MCP Tools: CRUD operations (inventory, cost, sales, logistics, suppliers, dashboard, risk).
- * Extracted from tools.ts.
+ * CRUD Query Tools — inventory, cost, sales, logistics, suppliers, dashboard, risk.
+ * New tools added in v2.0: query_supplier_trend, query_procurement, query_warehouse_capacity, query_supplier_location
  */
 
 import type { MCPTool } from './tools';
