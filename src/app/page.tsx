@@ -1,48 +1,41 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
 import { QueryProvider } from '@/lib/query-provider';
-import { Separator } from '@/components/ui/separator';
-import { LazyLoader } from '@/components/shared/LazyLoader';
 
-// ── TabbedSection (lightweight, always needed) ──────────────────────────────
-import { TabbedSection } from '@/components/dashboard/TabbedSection';
-import { DragDropDashboard } from '@/components/dashboard/DragDropDashboard';
-
-// ── Panel registry + config ─────────────────────────────────────────────────
-import { PANEL_REGISTRY } from '@/lib/dashboard/panel-registry';
-import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
-
-// ── Layout (always visible, lightweight) ────────────────────────────────────
+// Layout
 import { Header } from '@/components/layout/Header';
-import { SectionErrorBoundary, OfflineBanner, ErrorReportProvider } from '@/components/error';
+import { OfflineBanner, ErrorReportProvider } from '@/components/error';
 import { UserMenu } from '@/components/auth/UserMenu';
-import { GlobalSearch } from '@/components/shared/GlobalSearch';
 import { ScrollToTop } from '@/components/shared/ScrollToTop';
-import { MCPConnectorCard } from '@/components/dashboard/MCPConnectorCard';
 
-// ── Stores & hooks ──────────────────────────────────────────────────────────
+// Core — Chat is the main interface
+import { ChatPanel } from '@/components/shared/ChatPanel';
+
+// Stores & hooks
 import { useAuthStore } from '@/stores/auth-store';
-import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { useConnectionStore } from '@/stores/connection-store';
 import { useSSE } from '@/hooks/use-sse';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { useWebVitals } from '@/hooks/use-web-vitals';
 
-// ── Dynamic dialogs & overlays ──────────────────────────────────────────────
+// Dynamic overlays (keep these)
 const NotificationCenter = dynamic(() => import('@/components/shared/NotificationCenter').then(m => ({ default: m.NotificationCenter })), { ssr: false });
 const ProductDetailSheet = dynamic(() => import('@/components/shared/ProductDetailSheet').then(m => ({ default: m.ProductDetailSheet })), { ssr: false });
 const NotesPanel = dynamic(() => import('@/components/shared/NotesPanel').then(m => ({ default: m.NotesPanel })), { ssr: false });
 const CSVImportDialog = dynamic(() => import('@/components/shared/CSVImportDialog').then(m => ({ default: m.CSVImportDialog })), { ssr: false });
-const ChatPanel = dynamic(() => import('@/components/shared/ChatPanel').then(m => ({ default: m.ChatPanel })), { ssr: false });
 const LoginDialog = dynamic(() => import('@/components/auth/LoginDialog').then(m => ({ default: m.LoginDialog })), { ssr: false });
 const PasswordChangeDialog = dynamic(() => import('@/components/auth/PasswordChangeDialog').then(m => ({ default: m.PasswordChangeDialog })), { ssr: false });
 const UserManagementPanel = dynamic(() => import('@/components/admin/UserManagementPanel').then(m => ({ default: m.UserManagementPanel })), { ssr: false });
+const AuditTab = dynamic(() => import('@/components/audit/AuditTab').then(m => ({ default: m.AuditTab })), { ssr: false });
 
-// Lazy engine persistence init
+// Legacy panel access (kept but hidden — accessible from data panel links)
+const LegacyPanels = dynamic(() => import('@/components/dashboard/TabbedSection').then(m => ({ default: m.TabbedSection })), { ssr: false });
+import { PANEL_REGISTRY } from '@/lib/dashboard/panel-registry';
+
 let engineInitPromise: Promise<void> | null = null;
 function initEngine() {
   if (!engineInitPromise) {
@@ -51,44 +44,23 @@ function initEngine() {
   return engineInitPromise;
 }
 
-// ── Main Page ───────────────────────────────────────────────────────────────
-
 function HomePageContent() {
-  // Engine + auth
   useEffect(() => { initEngine(); }, []);
   const { checkAuth } = useAuthStore();
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
-  // SSE + auto-refresh + web vitals
   useSSE();
   const { refreshAll } = useAutoRefresh();
   useWebVitals();
   const refreshHealth = useConnectionStore((s) => s.refreshHealth);
   useEffect(() => { refreshHealth(); }, [refreshHealth]);
 
-  // ── Tab state ────────────────────────────────────────────────────────────
-  const activeTab = useDashboardUIStore(s => s.activeTab);
-  const setActiveTab = useDashboardUIStore(s => s.setActiveTab);
-  const setShowScrollTop = useDashboardUIStore(s => s.setShowScrollTop);
-  const setScrollProgress = useDashboardUIStore(s => s.setScrollProgress);
+  // View modes: 'chat' (default) | 'audit' | 'legacy'
+  const [viewMode, setViewMode] = useState<'chat' | 'audit' | 'legacy'>('chat');
+
   const setSelectedInventorySku = useInventoryUIStore(s => s.setSelectedInventorySku);
   const setInventoryDetail = useInventoryUIStore(s => s.setInventoryDetail);
 
-  // ── Panel visibility from config ─────────────────────────────────────────
-  const panels = useDashboardConfigStore(s => s.config.panels);
-  const panelOrder = useDashboardConfigStore(s => s.config.panelOrder);
-
-  const opsPanels = useMemo(() => {
-    const panelMap = new Map(PANEL_REGISTRY.map(p => [p.id, p]));
-    return panelOrder
-      .filter(id => {
-        const def = panelMap.get(id);
-        return def && def.category === 'ops' && panels[id] !== false;
-      })
-      .map(id => panelMap.get(id)!);
-  }, [panelOrder, panels]);
-
-  // ── Dialog states ────────────────────────────────────────────────────────
   const [productDetailSku, setProductDetailSku] = useState<string | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -97,47 +69,15 @@ function HomePageContent() {
   const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
 
-  // ── Scroll ───────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      setShowScrollTop(scrollTop > 200);
-      setScrollProgress(docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [setShowScrollTop, setScrollProgress]);
+  const legacyPanels = PANEL_REGISTRY.filter(p => p.category === 'ops');
 
-  // ── Navigation callbacks ─────────────────────────────────────────────────
-  const handleNavigate = useCallback((tab: string) => { setActiveTab(tab); }, [setActiveTab]);
-  const handleViewProductDetail = useCallback((sku: string) => {
-    setProductDetailSku(sku); setProductDetailOpen(true);
-  }, []);
-  const handleOpenNotes = useCallback((sku?: string) => {
-    setNotesSku(sku); setNotesOpen(true);
-  }, []);
-  const handleViewInventoryDetail = useCallback(async (sku: string) => {
-    setSelectedInventorySku(sku);
-    try {
-      const [healthRes, safetyRes, reorderRes] = await Promise.all([
-        fetch(`/api/inventory?action=health&sku=${sku}`),
-        fetch(`/api/inventory?action=safety_stock&sku=${sku}&serviceLevel=0.95`),
-        fetch(`/api/inventory?action=reorder&sku=${sku}`),
-      ]);
-      const [health, safety, reorder] = await Promise.all([healthRes.json(), safetyRes.json(), reorderRes.json()]);
-      setInventoryDetail({ health, safety, reorder });
-    } catch { /* silent */ }
-  }, [setSelectedInventorySku, setInventoryDetail]);
-
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <ErrorReportProvider>
-      <div className="min-h-screen flex flex-col overflow-x-hidden">
+      <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
         <OfflineBanner />
         <Header
           onRefresh={refreshAll}
-          onOpenNotes={() => handleOpenNotes()}
+          onOpenNotes={() => { setNotesSku(undefined); setNotesOpen(true); }}
           onOpenCSVImport={() => setCSVImportOpen(true)}
           userMenu={
             <UserMenu
@@ -147,54 +87,72 @@ function HomePageContent() {
           }
         />
 
-        <ConfigToolbarLazy />
+        {/* Minimal nav bar */}
+        <div className="border-b bg-white dark:bg-zinc-900 px-6 py-2 flex items-center gap-4">
+          <button
+            onClick={() => setViewMode('chat')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              viewMode === 'chat'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => setViewMode('audit')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              viewMode === 'audit'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            审计
+          </button>
+          <button
+            onClick={() => setViewMode('legacy')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              viewMode === 'legacy'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            数据面板
+          </button>
+        </div>
 
-        <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-          {/* ── Decision Flow — drag-and-drop dashboard ── */}
-          <DragDropDashboard />
-
-          {/* ── MCP Connector Health — live status cards ── */}
-          <div className="bg-card border rounded-lg p-4">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <span className="w-1.5 h-4 rounded bg-orange-500 inline-block" />
-              MCP 连接器状态
-            </h3>
-            <MCPConnectorCard />
-          </div>
-
-          <Separator />
-
-          {/* ── Operational Drill-down ── */}
-          <TabbedSection
-            panels={opsPanels}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+        {/* Main content */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {viewMode === 'chat' && <ChatPanel />}
+          {viewMode === 'audit' && (
+            <div className="flex-1 overflow-auto">
+              <AuditTab />
+            </div>
+          )}
+          {viewMode === 'legacy' && (
+            <div className="flex-1 overflow-auto p-6 max-w-[1600px] mx-auto w-full">
+              <LegacyPanels
+                panels={legacyPanels}
+                activeTab="inventory"
+                onTabChange={() => {}}
+              />
+            </div>
+          )}
         </main>
 
-        {/* ── Shared dialogs & overlays ── */}
-        <NotificationCenter onNavigate={handleNavigate} onViewInventoryDetail={handleViewInventoryDetail} />
+        {/* Overlays */}
+        <NotificationCenter onNavigate={() => {}} onViewInventoryDetail={async () => {}} />
         <ProductDetailSheet sku={productDetailSku || ''} open={productDetailOpen} onOpenChange={setProductDetailOpen} />
         <NotesPanel open={notesOpen} onOpenChange={setNotesOpen} initialSku={notesSku} />
         <CSVImportDialog open={csvImportOpen} onOpenChange={setCSVImportOpen} />
-        <ChatPanel />
         <LoginDialog />
         <PasswordChangeDialog open={passwordChangeOpen} onOpenChange={setPasswordChangeOpen} />
         <UserManagementPanel open={userManagementOpen} onOpenChange={setUserManagementOpen} />
-        <GlobalSearch />
         <ScrollToTop />
       </div>
     </ErrorReportProvider>
   );
 }
-
-// ── Lazy ConfigToolbar (imports panel registry → moderate weight) ────────────
-const ConfigToolbarLazy = dynamic(
-  () => import('@/components/dashboard/ConfigToolbar').then(m => ({ default: m.ConfigToolbar })),
-  { ssr: false, loading: () => <div className="h-8 bg-muted/30 border-b" /> },
-);
-
-// ── Root export ─────────────────────────────────────────────────────────────
 
 export default function Home() {
   return (
