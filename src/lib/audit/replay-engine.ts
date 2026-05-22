@@ -29,28 +29,35 @@ export async function replayTrace(
   modifications: ReplayModification[],
   providerId: ProviderId = 'deepseek',
 ): Promise<{ newTraceId: string; diff: ReplayDiff }> {
-  // 1. Fetch original trace
+  // 1. Fetch original trace (steps fetched separately to avoid heavy includes)
   const original = await db.decisionTrace.findUnique({
     where: { id: originalTraceId },
-    include: { steps: { include: { toolCalls: true, claims: true } } },
   });
   if (!original) throw new Error('Original trace not found');
 
-  // 2. Re-execute modified tools
-  const modifiedResults: Array<{ toolName: string; success: boolean; data: unknown; error?: string }> = [];
+  // 2. Re-execute modified tools with latency tracking
+  const modifiedResults: Array<{ toolName: string; success: boolean; data: unknown; error?: string; latencyMs: number }> = [];
   for (const mod of modifications) {
+    const t0 = Date.now();
     try {
       const result = await executeTool(mod.toolName, mod.newParams);
-      modifiedResults.push({ toolName: mod.toolName, success: true, data: result });
+      modifiedResults.push({ toolName: mod.toolName, success: true, data: result, latencyMs: Date.now() - t0 });
     } catch (err) {
-      modifiedResults.push({ toolName: mod.toolName, success: false, data: null, error: (err as Error).message });
+      modifiedResults.push({ toolName: mod.toolName, success: false, data: null, error: (err as Error).message, latencyMs: Date.now() - t0 });
     }
   }
 
   // 3. Build re-synthesis prompt
-  const toolResultsText = modifiedResults.map(r =>
-    `[${r.toolName}] ${r.success ? JSON.stringify(r.data).slice(0, 2000) : `Error: ${r.error}`}`
-  ).join('\n\n');
+  // Note: replay only includes the original user query and modified tool results.
+  // The original conversation history and previous tool results are not included,
+  // which means the re-synthesis LLM lacks context from the original multi-round execution.
+  const toolResultsText = modifiedResults.map(r => {
+    const dataStr = JSON.stringify(r.data);
+    const truncated = dataStr.length > 2000
+      ? dataStr.slice(0, 1997) + '...'
+      : dataStr;
+    return `[${r.toolName}] ${r.success ? truncated : `Error: ${r.error}`}`;
+  }).join('\n\n');
 
   const synthesisMessages: ChatMessage[] = [
     {
@@ -111,7 +118,7 @@ export async function replayTrace(
               params: JSON.parse(JSON.stringify(modifications.find(m => m.toolName === r.toolName)?.newParams || {})),
               result: r.data ? JSON.parse(JSON.stringify(r.data)) : undefined,
               success: r.success,
-              latencyMs: 0,
+              latencyMs: r.latencyMs,
               error: r.error,
             })),
           },

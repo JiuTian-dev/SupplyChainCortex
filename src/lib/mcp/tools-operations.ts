@@ -104,6 +104,12 @@ export const operationsTools: MCPTool[] = [
       required: ['trackingNumber'],
     },
     handler: async (params) => {
+      const VALID_STATUSES = ['pending', 'in_transit', 'customs', 'delivered', 'delayed', 'exception', 'cancelled'];
+      const status = params.status as string;
+      if (status && !VALID_STATUSES.includes(status)) {
+        return { success: false, error: `Invalid status "${status}". Valid: ${VALID_STATUSES.join(', ')}` };
+      }
+
       const update: ShipmentStatusUpdate = {};
       if (params.status) update.status = params.status as ShipmentStatusUpdate['status'];
       if (params.eta) update.eta = params.eta as string;
@@ -186,8 +192,8 @@ export const operationsTools: MCPTool[] = [
           type: '库存调整',
           title: `库存${adjustmentType}: ${inventory.productName}`,
           description: `${adjustmentType} ${absQuantity} 件，原因: ${reason}. 库存从 ${inventory.quantity} 变为 ${newQuantity}`,
-          icon: quantity > 0 ? '📥' : '📤',
-          color: quantity > 0 ? '#22c55e' : '#f59e0b',
+          icon: quantity > 0 ? 'inbound' : 'outbound',
+          color: quantity > 0 ? 'green' : 'red',
           severity: newStatus === 'critical' ? 'critical' : newStatus === 'warning' ? 'warning' : 'info',
           sku: sku as string,
         },
@@ -325,8 +331,8 @@ export const operationsTools: MCPTool[] = [
           type: '库存调整',
           title: `库存调拨: ${sourceInventory.productName}`,
           description: `从 ${sourceWarehouse} 调拨 ${qty} 件至 ${targetWarehouse}，原因: ${transferReason}. 来源仓从 ${sourceInventory.quantity} 变为 ${sourceNewQty}，目标仓从 ${targetInventory?.quantity ?? 0} 变为 ${targetNewQty}`,
-          icon: '🔄',
-          color: '#8b5cf6',
+          icon: 'transfer',
+          color: 'purple',
           severity: 'info',
           sku: sku as string,
         },
@@ -629,8 +635,8 @@ export const operationsTools: MCPTool[] = [
             type: '供应商状态变更',
             title: `供应商${status === 'active' ? '激活' : '暂停'}: ${updated.name}`,
             description: `供应商 ${updated.code} (${updated.name}) 状态从 ${supplier.status} 变更为 ${status}。原因: ${reason}`,
-            icon: status === 'active' ? '✅' : '⏸️',
-            color: status === 'active' ? '#22c55e' : '#f59e0b',
+            icon: status === 'active' ? 'active' : 'paused',
+            color: status === 'active' ? 'green' : 'orange',
             severity: status === 'active' ? 'info' : 'warning',
           },
         });
@@ -728,8 +734,8 @@ export const operationsTools: MCPTool[] = [
           type: '供应商新增',
           title: `新供应商: ${supplier.name}`,
           description: `新增供应商 ${supplier.code} (${supplier.name})，地区: ${supplier.region}，品类: ${supplier.category}`,
-          icon: '🏭',
-          color: '#22c55e',
+          icon: 'factory',
+          color: 'green',
           severity: 'info',
         },
       });
@@ -886,73 +892,54 @@ export const operationsTools: MCPTool[] = [
       const { db } = await import('@/lib/db');
       const { serverCache } = await import('@/lib/cache');
 
-      const orders: Array<Record<string, unknown>> = [];
-      const errors: Array<{ sku: string; error: string }> = [];
       const defaultPriority = (priority as string) || '常规';
 
-      for (const item of items) {
-        const sku = item.sku as string;
-        const productName = item.productName as string;
-        const quantity = item.quantity as number;
-        const warehouse = item.warehouse as string;
-        const itemPriority = (item.priority as string) || defaultPriority;
+      try {
+        await db.$transaction(async (tx) => {
+          for (const item of items) {
+            const sku = item.sku as string;
+            const productName = item.productName as string;
+            const quantity = item.quantity as number;
+            const warehouse = item.warehouse as string;
+            const itemPriority = (item.priority as string) || defaultPriority;
 
-        try {
-          if (!sku || !productName || !quantity || !warehouse) {
-            throw new Error('补货项目缺少必填字段: sku, productName, quantity, warehouse');
+            if (!sku || !productName || !quantity || !warehouse) {
+              throw new Error('补货项目缺少必填字段: sku, productName, quantity, warehouse');
+            }
+            if (typeof quantity !== 'number' || quantity <= 0) {
+              throw new Error(`SKU ${sku}: quantity 必须为正整数`);
+            }
+
+            const order = await tx.reorderOrder.create({
+              data: {
+                sku,
+                productName,
+                quantity,
+                warehouse,
+                priority: itemPriority,
+                status: 'pending',
+              },
+            });
+
+            await tx.supplyChainEvent.create({
+              data: {
+                type: '补货订单',
+                title: `批量补货: ${productName}`,
+                description: `批量创建补货订单: SKU ${sku}, 数量 ${quantity}, 仓库 ${warehouse}, 优先级 ${itemPriority}`,
+                icon: 'package',
+                color: 'orange',
+                severity: itemPriority === '紧急' ? 'warning' : 'info',
+                sku,
+              },
+            });
           }
-          if (typeof quantity !== 'number' || quantity <= 0) {
-            throw new Error(`SKU ${sku}: quantity 必须为正整数`);
-          }
+        });
 
-          const order = await db.reorderOrder.create({
-            data: {
-              sku,
-              productName,
-              quantity,
-              warehouse,
-              priority: itemPriority,
-              status: 'pending',
-            },
-          });
-
-          await db.supplyChainEvent.create({
-            data: {
-              type: '补货订单',
-              title: `批量补货: ${productName}`,
-              description: `批量创建补货订单: SKU ${sku}, 数量 ${quantity}, 仓库 ${warehouse}, 优先级 ${itemPriority}`,
-              icon: '📦',
-              color: '#f97316',
-              severity: itemPriority === '紧急' ? 'warning' : 'info',
-              sku,
-            },
-          });
-
-          orders.push({
-            id: order.id,
-            sku: order.sku,
-            productName: order.productName,
-            quantity: order.quantity,
-            warehouse: order.warehouse,
-            priority: order.priority,
-            status: order.status,
-          });
-        } catch (err) {
-          errors.push({
-            sku: sku || 'unknown',
-            error: err instanceof Error ? err.message : '未知错误',
-          });
-        }
+        serverCache.invalidate('reorder');
+        return { success: true, created: items.length };
+      } catch (err) {
+        return { success: false, error: `Batch reorder failed: ${(err as Error).message}`, created: 0 };
       }
-
-      serverCache.invalidate('reorder');
-
-      return {
-        created: orders.length,
-        failed: errors.length,
-        orders,
-        errors: errors.length > 0 ? errors : undefined,
-      };
     },
   },
 ];

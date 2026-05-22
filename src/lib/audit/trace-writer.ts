@@ -59,7 +59,7 @@ export async function writeTrace(
         mode: 'fsm-v2',
         tier: ctx.routing?.shouldUseTools ? 1 : ctx.routing?.shouldSearch ? 3 : 0,
         durationMs: elapsed,
-        toolsUsed: ctx.toolsUsed,
+        toolsUsed: [...new Set(ctx.toolsUsed)],
         claimsCount: claims.length,
         passport: JSON.parse(JSON.stringify(passport)),
         steps: {
@@ -141,7 +141,7 @@ function buildStepData(
           create: roundResults.map(r => ({
               toolName: r.tool,
               params: planTools.find(tc => tc.name === r.tool)?.params as Record<string, unknown> || {},
-              result: r.success ? (r.data as Record<string, unknown> || { raw: String(r.data) }) : undefined,
+              result: r.success ? (r.data as Record<string, unknown> ?? { raw: String(r.data) }) : undefined,
               success: r.success,
               latencyMs: r.latencyMs,
               error: !r.success ? r.error : undefined,

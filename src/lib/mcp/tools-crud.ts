@@ -101,7 +101,7 @@ export const crudTools: MCPTool[] = [
           } as InventoryListFilters));
         case 'forecast':
           return summarize(await getInventoryForecast(
-            (forecastDays as number) || 14,
+            (forecastDays as number) ?? 14,
             warehouse as string | undefined
           ));
         case 'risk':
@@ -111,7 +111,7 @@ export const crudTools: MCPTool[] = [
           return await getInventoryHealth(sku as string, warehouse as string | undefined);
         case 'slow_moving':
           return summarize(await getSlowMovingItems(
-            (days as number) || 90,
+            (days as number) ?? 90,
             warehouse as string | undefined,
             category as string | undefined
           ));
@@ -169,7 +169,7 @@ export const crudTools: MCPTool[] = [
         case 'optimization':
           return summarize(await getCostOptimization(category as string | undefined));
         case 'trend':
-          return summarize(await getCostTrend(category as string | undefined, (months as number) || 6));
+          return summarize(await getCostTrend(category as string | undefined, (months as number) ?? 6));
         default:
           throw new Error(`未知的成本查询类型: ${action}`);
       }
@@ -216,25 +216,25 @@ export const crudTools: MCPTool[] = [
       switch (action) {
         case 'overview':
           return summarize(await getSalesOverview({
-            days: (days as number) || 30,
+            days: (days as number) ?? 30,
             platform: platform as string | undefined,
             category: category as string | undefined,
           }));
         case 'daily':
           return summarize(await getDailySales({
-            days: (days as number) || 30,
+            days: (days as number) ?? 30,
             platform: platform as string | undefined,
           }));
         case 'detail':
           if (!sku) throw new Error('查询单品销售需要提供 sku 参数');
           return await getSalesSummaryForSku({
             sku: sku as string,
-            days: (days as number) || 30,
+            days: (days as number) ?? 30,
             platform: platform as string | undefined,
           });
         case 'forecast':
           return summarize(await generateSalesForecast(
-            (horizon as number) || 14,
+            (horizon as number) ?? 14,
             category as string | undefined
           ));
         default:
@@ -410,7 +410,7 @@ export const crudTools: MCPTool[] = [
     },
     handler: async (params) => {
       const { supplierCode, months } = params;
-      const monthsBack = Math.max(1, (months as number) || 6);
+      const monthsBack = Math.min(24, Math.max(1, (months as number) ?? 6));
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - monthsBack);
 
