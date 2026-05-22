@@ -137,23 +137,31 @@ export const operationsTools: MCPTool[] = [
           description: '仓库筛选(可选)，如: 深圳仓, 义乌仓',
         },
       },
-      required: ['sku', 'quantity', 'reason'],
+      required: ['sku', 'quantity', 'reason', 'warehouse'],
     },
     handler: async (params) => {
       const { sku, quantity, reason, warehouse } = params;
       if (!sku) throw new Error('缺少必填参数: sku');
       if (typeof quantity !== 'number') throw new Error('缺少必填参数: quantity');
       if (!reason) throw new Error('缺少必填参数: reason');
+      if (!warehouse) throw new Error('缺少必填参数: warehouse');
+
+      // Numeric validation
+      if (quantity === 0) {
+        return { success: false, error: 'adjustment must be a non-zero number' };
+      }
+      if (!Number.isInteger(quantity)) {
+        return { success: false, error: 'adjustment must be an integer (whole units only)' };
+      }
 
       // Import db directly for the adjustment operation
       const { db } = await import('@/lib/db');
       const { serverCache } = await import('@/lib/cache');
 
-      const where: Record<string, unknown> = { sku };
-      if (warehouse) where.warehouse = warehouse;
+      const where: Record<string, unknown> = { sku, warehouse };
 
       const inventory = await db.inventory.findFirst({ where });
-      if (!inventory) throw new Error(`未找到 SKU: ${sku}${warehouse ? ` 在仓库 ${warehouse}` : ''} 的库存记录`);
+      if (!inventory) throw new Error(`未找到 SKU: ${sku} 在仓库 ${warehouse} 的库存记录`);
 
       const newQuantity = inventory.quantity + quantity;
       if (newQuantity < 0) throw new Error(`调整后库存不能为负数。当前库存: ${inventory.quantity}，调整量: ${quantity > 0 ? '+' : ''}${quantity}`);

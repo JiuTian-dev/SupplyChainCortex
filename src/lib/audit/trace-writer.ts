@@ -1,6 +1,6 @@
 // src/lib/audit/trace-writer.ts
 import { db } from '@/lib/db';
-import type { FSMContext } from '@/lib/agent/fsm-types';
+import type { FSMContext, ToolResult } from '@/lib/agent/fsm-types';
 import type { DecisionPassport } from '@/lib/engine/passport';
 
 export function extractClaims(
@@ -24,6 +24,20 @@ export function extractClaims(
 
     results.push({ text: claimText.slice(0, 500), source, confidence });
   }
+
+  // Fallback: if no [claim-N] found and text is long, look for MARC-tagged statements
+  if (results.length === 0 && text.length > 500) {
+    const marcRegex = /(.+?)\[T\d-(MCP|KB|Search|LLM)\]\[(高|中|低|high|medium|low)\]/g;
+    let marcMatch;
+    while ((marcMatch = marcRegex.exec(text)) !== null) {
+      results.push({
+        text: marcMatch[1].trim().slice(0, 500),
+        source: marcMatch[2],
+        confidence: ['高', 'high'].includes(marcMatch[3]) ? 'high' : ['中', 'medium'].includes(marcMatch[3]) ? 'medium' : 'low',
+      });
+    }
+  }
+
   return results;
 }
 
@@ -69,6 +83,7 @@ function buildStepData(
   totalDurationMs: number,
 ) {
   const stepData: any[] = [];
+  let resultCursor = 0;
 
   // Classify step
   stepData.push({
@@ -102,6 +117,18 @@ function buildStepData(
     });
 
     if (planTools.length > 0) {
+      // Find matching tool results for this round using sequential cursor
+      const roundResults: ToolResult[] = [];
+      for (const tc of planTools) {
+        for (let i = resultCursor; i < ctx.toolResults.length; i++) {
+          if (ctx.toolResults[i].tool === tc.name) {
+            roundResults.push(ctx.toolResults[i]);
+            resultCursor = i + 1;
+            break;
+          }
+        }
+      }
+
       // Execute step
       stepData.push({
         stepIndex: roundBase + 1,
@@ -111,9 +138,7 @@ function buildStepData(
         nextState: 'observe',
         durationMs: 0,
         toolCalls: {
-          create: ctx.toolResults
-            .filter(r => planTools.some(tc => tc.name === r.tool))
-            .map(r => ({
+          create: roundResults.map(r => ({
               toolName: r.tool,
               params: planTools.find(tc => tc.name === r.tool)?.params as Record<string, unknown> || {},
               result: r.success ? (r.data as Record<string, unknown> || { raw: String(r.data) }) : undefined,
@@ -173,6 +198,13 @@ function buildStepData(
       })),
     },
   });
+
+  // Spread total duration across non-synthesize steps so they are not all zero
+  const nonSynthSteps = stepData.filter(s => s.state !== 'synthesize' && s.durationMs === 0);
+  const avgMs = nonSynthSteps.length > 0 ? Math.round(totalDurationMs / (nonSynthSteps.length + 1)) : 0;
+  for (const step of nonSynthSteps) {
+    step.durationMs = avgMs;
+  }
 
   return stepData;
 }

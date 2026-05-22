@@ -33,12 +33,10 @@ import { getSuppliersList, getSupplierPerformance } from '@/lib/services/supplie
 // Maps supplier region keywords to shipment origin keywords.
 // Used by query_supplier_trend to correlate shipments with suppliers.
 const SUPPLIER_REGION_MATCH: Record<string, string[]> = {
-  '华南': ['深圳', '东莞', '佛山', '广州', '中山'],
-  '华东': ['上海', '义乌', '宁波', '杭州', '苏州', '昆山'],
-  '华北': ['天津', '北京', '青岛', '石家庄'],
-  '华中': ['武汉', '长沙', '郑州', '合肥'],
-  '西南': ['成都', '重庆', '西安'],
-  '东北': ['大连', '沈阳', '哈尔滨'],
+  '华东': ['上海', '义乌', '宁波', '杭州', '苏州', '南京', '合肥'],
+  '华南': ['深圳', '东莞', '佛山', '广州', '珠海', '中山'],
+  '华北': ['北京', '天津', '青岛', '大连', '石家庄'],
+  '华中': ['武汉', '郑州', '长沙', '南昌'],
 };
 
 import {
@@ -498,7 +496,12 @@ export const crudTools: MCPTool[] = [
       // Sort by supplier code for deterministic output
       result.sort((a, b) => a.supplierCode.localeCompare(b.supplierCode));
 
-      return summarize({ suppliers: result, months: monthsBack, generatedAt: new Date().toISOString() });
+      return summarize({
+        _disclaimer: '供应商-货运匹配基于区域/承运商启发式匹配，指标为近似值。',
+        suppliers: result,
+        months: monthsBack,
+        generatedAt: new Date().toISOString(),
+      });
     },
   },
 
@@ -571,7 +574,7 @@ export const crudTools: MCPTool[] = [
 
           return summarize({
             sku,
-            productName: orders[0]?.productName ?? null,
+            productName: orders[0]?.productName || costRec?.productName || '未知',
             totalOrders: orders.length,
             currentUnitCost: costRec?.totalLanded ?? null,
             orders: orders.map(o => ({
@@ -766,9 +769,8 @@ export const crudTools: MCPTool[] = [
           (warehouseMap[inv.warehouse].statusBreakdown[status] || 0) + 1;
       }
 
-      // Compute utilization as ratio vs a reference capacity derived from max observed
       const allQtys = Object.values(warehouseMap).map(w => w.totalQuantity);
-      const maxQty = allQtys.length > 0 ? Math.max(...allQtys) : 1;
+      const totalInventory = allQtys.reduce((s, q) => s + q, 0);
 
       const warehouses = Object.entries(warehouseMap)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -776,7 +778,7 @@ export const crudTools: MCPTool[] = [
           name,
           totalQuantity: data.totalQuantity,
           skuCount: data.skuCount,
-          utilization: Math.round((data.totalQuantity / maxQty) * 100),
+          shareOfTotal: totalInventory > 0 ? Math.round((data.totalQuantity / totalInventory) * 100) : 0,
           statusBreakdown: data.statusBreakdown,
         }));
 
@@ -785,6 +787,7 @@ export const crudTools: MCPTool[] = [
         summary: {
           totalWarehouses: warehouses.length,
           totalQuantity: allQtys.reduce((s, q) => s + q, 0),
+          note: 'shareOfTotal = 该仓库库存占全部库存的百分比，非物理容量利用率',
         },
         generatedAt: new Date().toISOString(),
       };

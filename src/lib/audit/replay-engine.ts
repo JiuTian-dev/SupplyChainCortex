@@ -14,6 +14,8 @@ export interface ReplayModification {
 
 export interface ReplayDiff {
   claimsChanged: number;
+  claimsAddressed: number;
+  claimsTotal: number;
   confidenceDelta: number;
   newToolsUsed: string[];
   originalClaims: number;
@@ -74,6 +76,14 @@ export async function replayTrace(
     ? replayedClaims.filter(c => c.confidence === 'high').length / replayedClaims.length
     : 0.5;
 
+  // 5b. Fetch original claims for text-level comparison
+  const origClaims = await db.tracedClaim.findMany({
+    where: { step: { traceId: original.id, state: 'synthesize' } },
+  });
+  const addressedClaims = origClaims.filter(oc =>
+    replayedResponse.includes(oc.text.slice(0, 50))
+  );
+
   // 6. Persist as new trace
   const newTrace = await db.decisionTrace.create({
     data: {
@@ -87,7 +97,7 @@ export async function replayTrace(
       toolsUsed: modifications.map(m => m.toolName),
       claimsCount: replayedClaims.length,
       passport: JSON.parse(JSON.stringify({ replayOf: original.auditId, modifications })),
-      summary: replayedResponse.slice(0, 500),
+      summary: `Counterfactual replay of ${original.auditId}. Modified tools: ${modifications.map(m => m.toolName).join(', ')}. Note: replay compresses all execution into one synthesize step.`,
       steps: {
         create: [{
           stepIndex: 0,
@@ -121,6 +131,8 @@ export async function replayTrace(
   // 7. Compute diff
   const diff: ReplayDiff = {
     claimsChanged: Math.abs(originalClaims - replayedClaims.length),
+    claimsAddressed: addressedClaims.length,
+    claimsTotal: origClaims.length,
     confidenceDelta: Math.round((replayedConfidence - original.confidence) * 100) / 100,
     newToolsUsed: modifications.map(m => m.toolName),
     originalClaims,
