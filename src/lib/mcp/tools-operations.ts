@@ -204,7 +204,175 @@ export const operationsTools: MCPTool[] = [
     },
   },
 
-  // ─── 11. update_cost_record ─────────────────────────────────────────────
+  // ─── 11. create_transfer ────────────────────────────────────────────────
+  {
+    name: 'create_transfer',
+    description: '创建库存调拨单 — 在两个仓库之间转移库存（扣减来源仓，增加目标仓）。需要验证来源仓库存充足，同时更新两地库存状态。调拨记录记入审计日志。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sku: {
+          type: 'string',
+          description: '产品SKU，如: KA-RC4001',
+        },
+        sourceWarehouse: {
+          type: 'string',
+          description: '来源仓库，如: 深圳仓',
+        },
+        targetWarehouse: {
+          type: 'string',
+          description: '目标仓库，如: 义乌仓',
+        },
+        quantity: {
+          type: 'number',
+          description: '调拨数量，必须为正整数',
+        },
+        reason: {
+          type: 'string',
+          description: '调拨原因（可选），如: 区域调拨、紧急补货',
+        },
+      },
+      required: ['sku', 'sourceWarehouse', 'targetWarehouse', 'quantity'],
+    },
+    handler: async (params) => {
+      const { sku, sourceWarehouse, targetWarehouse, quantity, reason } = params;
+
+      if (!sku) throw new Error('缺少必填参数: sku');
+      if (!sourceWarehouse) throw new Error('缺少必填参数: sourceWarehouse');
+      if (!targetWarehouse) throw new Error('缺少必填参数: targetWarehouse');
+      if (typeof quantity !== 'number' || quantity <= 0) throw new Error('quantity 必须为正整数');
+      if (sourceWarehouse === targetWarehouse) throw new Error('来源仓库和目标仓库不能相同');
+
+      const { db } = await import('@/lib/db');
+      const { serverCache } = await import('@/lib/cache');
+
+      const qty = quantity as number;
+
+      // 1. Validate source has enough stock
+      const sourceInventory = await db.inventory.findFirst({
+        where: { sku: sku as string, warehouse: sourceWarehouse as string },
+      });
+      if (!sourceInventory) {
+        throw new Error(`未找到 SKU: ${sku} 在仓库 ${sourceWarehouse} 的库存记录`);
+      }
+      if (sourceInventory.quantity < qty) {
+        throw new Error(
+          `库存不足。SKU ${sku} 在 ${sourceWarehouse} 当前库存: ${sourceInventory.quantity}，调拨量: ${qty}`
+        );
+      }
+
+      // 2. Find (or prepare to create) target inventory
+      const targetInventory = await db.inventory.findFirst({
+        where: { sku: sku as string, warehouse: targetWarehouse as string },
+      });
+
+      const transferReason = (reason as string) || '仓库调拨';
+
+      // 3. Decrement source
+      const sourceNewQty = sourceInventory.quantity - qty;
+      const sourceNewStatus = computeStockStatus(sourceNewQty, sourceInventory.safetyStock);
+
+      await db.inventory.update({
+        where: { id: sourceInventory.id },
+        data: {
+          quantity: sourceNewQty,
+          stockStatus: sourceNewStatus,
+          lastSyncAt: new Date(),
+        },
+      });
+
+      // 4. Increment target (create if not exists)
+      let targetNewQty: number;
+      if (targetInventory) {
+        targetNewQty = targetInventory.quantity + qty;
+        const targetNewStatus = computeStockStatus(targetNewQty, targetInventory.safetyStock);
+        await db.inventory.update({
+          where: { id: targetInventory.id },
+          data: {
+            quantity: targetNewQty,
+            stockStatus: targetNewStatus,
+            lastSyncAt: new Date(),
+          },
+        });
+      } else {
+        targetNewQty = qty;
+        await db.inventory.create({
+          data: {
+            productId: sourceInventory.productId,
+            sku: sku as string,
+            productName: sourceInventory.productName,
+            warehouse: targetWarehouse as string,
+            quantity: qty,
+            safetyStock: 0,
+            reorderPoint: 0,
+            stockStatus: 'healthy',
+            lastSyncAt: new Date(),
+          },
+        });
+      }
+
+      // 5. Create supply chain event
+      await db.supplyChainEvent.create({
+        data: {
+          type: '库存调整',
+          title: `库存调拨: ${sourceInventory.productName}`,
+          description: `从 ${sourceWarehouse} 调拨 ${qty} 件至 ${targetWarehouse}，原因: ${transferReason}. 来源仓从 ${sourceInventory.quantity} 变为 ${sourceNewQty}，目标仓从 ${targetInventory?.quantity ?? 0} 变为 ${targetNewQty}`,
+          icon: '🔄',
+          color: '#8b5cf6',
+          severity: 'info',
+          sku: sku as string,
+        },
+      });
+
+      // 6. Create audit log
+      await db.auditLog.create({
+        data: {
+          action: 'TRANSFER',
+          entity: 'inventory',
+          sku: sku as string,
+          details: {
+            fromWarehouse: sourceWarehouse,
+            toWarehouse: targetWarehouse,
+            quantity: qty,
+            reason: transferReason,
+            sourcePreviousQty: sourceInventory.quantity,
+            sourceNewQty,
+            targetPreviousQty: targetInventory?.quantity ?? 0,
+            targetNewQty,
+          },
+        },
+      });
+
+      serverCache.invalidate('inventory');
+      serverCache.invalidate('dashboard');
+
+      return {
+        success: true,
+        transfer: {
+          sku,
+          productName: sourceInventory.productName,
+          from: {
+            warehouse: sourceWarehouse,
+            previousQuantity: sourceInventory.quantity,
+            newQuantity: sourceNewQty,
+            stockStatus: sourceNewStatus,
+          },
+          to: {
+            warehouse: targetWarehouse,
+            previousQuantity: targetInventory?.quantity ?? 0,
+            newQuantity: targetNewQty,
+            stockStatus: targetInventory
+              ? computeStockStatus(targetNewQty, targetInventory.safetyStock)
+              : 'healthy',
+          },
+          quantity: qty,
+          reason: transferReason,
+        },
+      };
+    },
+  },
+
+  // ─── 12. update_cost_record ─────────────────────────────────────────────
   {
     name: 'update_cost_record',
     description: '更新成本记录。可以更新原材料、人工、物流、关税、平台费等成本构成，以及售价和汇率。系统会自动重算到岸成本和毛利率。',
@@ -391,6 +559,392 @@ export const operationsTools: MCPTool[] = [
         threshold: threshold as number | undefined,
         severity: severity as string | undefined,
       });
+    },
+  },
+
+  // ─── 14. update_supplier_status ─────────────────────────────────────────
+  {
+    name: 'update_supplier_status',
+    description: 'Activate or suspend a supplier. Updates the supplier status and logs an audit event.',
+    parameters: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: '供应商编码，如: SUP-GD001',
+        },
+        status: {
+          type: 'string',
+          description: '新状态: active(激活) 或 suspended(暂停)',
+          enum: ['active', 'suspended'],
+        },
+        reason: {
+          type: 'string',
+          description: '状态变更原因（可选）',
+        },
+      },
+      required: ['code', 'status'],
+    },
+    handler: async (params) => {
+      const { code, status, reason } = params;
+      if (!code) throw new Error('缺少必填参数: code');
+      if (!status) throw new Error('缺少必填参数: status');
+
+      const { db } = await import('@/lib/db');
+
+      const supplier = await db.supplier.findUnique({ where: { code: code as string } });
+      if (!supplier) throw new Error(`未找到供应商: ${code}`);
+
+      const updated = await db.supplier.update({
+        where: { code: code as string },
+        data: { status: status as string },
+      });
+
+      // Create audit log
+      await db.auditLog.create({
+        data: {
+          action: 'UPDATE',
+          entity: 'supplier',
+          entityId: updated.id,
+          details: {
+            field: 'status',
+            previousValue: supplier.status,
+            newValue: status,
+            reason: reason || null,
+          },
+        },
+      });
+
+      if (reason) {
+        await db.supplyChainEvent.create({
+          data: {
+            type: '供应商状态变更',
+            title: `供应商${status === 'active' ? '激活' : '暂停'}: ${updated.name}`,
+            description: `供应商 ${updated.code} (${updated.name}) 状态从 ${supplier.status} 变更为 ${status}。原因: ${reason}`,
+            icon: status === 'active' ? '✅' : '⏸️',
+            color: status === 'active' ? '#22c55e' : '#f59e0b',
+            severity: status === 'active' ? 'info' : 'warning',
+          },
+        });
+      }
+
+      return {
+        code: updated.code,
+        name: updated.name,
+        previousStatus: supplier.status,
+        newStatus: updated.status,
+        reason: reason || null,
+      };
+    },
+  },
+
+  // ─── 15. create_supplier ────────────────────────────────────────────────
+  {
+    name: 'create_supplier',
+    description: 'Add a new supplier to the system. Creates a supplier record with status=active and rating=3.0.',
+    parameters: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: '唯一供应商编码，如: SUP-GD001',
+        },
+        name: {
+          type: 'string',
+          description: '供应商名称',
+        },
+        region: {
+          type: 'string',
+          description: '所属地区',
+          enum: ['华东', '华南', '华北', '华中', '海外'],
+        },
+        category: {
+          type: 'string',
+          description: '供应品类',
+          enum: ['电子元器件', '塑料五金件', '成品代工', '物流运输', '清关服务', '包装材料'],
+        },
+        leadTime: {
+          type: 'number',
+          description: '平均交货天数',
+        },
+        contact: {
+          type: 'string',
+          description: '联系人（可选）',
+        },
+        email: {
+          type: 'string',
+          description: '联系邮箱（可选）',
+        },
+        phone: {
+          type: 'string',
+          description: '联系电话（可选）',
+        },
+      },
+      required: ['code', 'name', 'region', 'category', 'leadTime'],
+    },
+    handler: async (params) => {
+      const { code, name, region, category, leadTime, contact, email, phone } = params;
+      if (!code) throw new Error('缺少必填参数: code');
+      if (!name) throw new Error('缺少必填参数: name');
+      if (!region) throw new Error('缺少必填参数: region');
+      if (!category) throw new Error('缺少必填参数: category');
+      if (typeof leadTime !== 'number') throw new Error('缺少必填参数: leadTime');
+
+      const { db } = await import('@/lib/db');
+      const { serverCache } = await import('@/lib/cache');
+
+      // Check if code already exists
+      const existing = await db.supplier.findUnique({ where: { code: code as string } });
+      if (existing) {
+        throw new Error(`供应商编码已存在: ${code}`);
+      }
+
+      const supplier = await db.supplier.create({
+        data: {
+          code: code as string,
+          name: name as string,
+          region: region as string,
+          category: category as string,
+          leadTime: leadTime as number,
+          contact: (contact as string) || null,
+          email: (email as string) || null,
+          phone: (phone as string) || null,
+          status: 'active',
+          rating: 3.0,
+        },
+      });
+
+      // Create supply chain event
+      await db.supplyChainEvent.create({
+        data: {
+          type: '供应商新增',
+          title: `新供应商: ${supplier.name}`,
+          description: `新增供应商 ${supplier.code} (${supplier.name})，地区: ${supplier.region}，品类: ${supplier.category}`,
+          icon: '🏭',
+          color: '#22c55e',
+          severity: 'info',
+        },
+      });
+
+      serverCache.invalidate('suppliers');
+
+      return supplier;
+    },
+  },
+
+  // ─── 16. update_supplier ────────────────────────────────────────────────
+  {
+    name: 'update_supplier',
+    description: 'Update supplier information. Only provided fields are updated. Use update_supplier_status for status changes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: '供应商编码',
+        },
+        name: {
+          type: 'string',
+          description: '供应商名称',
+        },
+        region: {
+          type: 'string',
+          description: '所属地区',
+        },
+        category: {
+          type: 'string',
+          description: '供应品类',
+        },
+        leadTime: {
+          type: 'number',
+          description: '平均交货天数',
+        },
+        contact: {
+          type: 'string',
+          description: '联系人',
+        },
+        email: {
+          type: 'string',
+          description: '联系邮箱',
+        },
+        phone: {
+          type: 'string',
+          description: '联系电话',
+        },
+        rating: {
+          type: 'number',
+          description: '综合评分 0-5',
+        },
+      },
+      required: ['code'],
+    },
+    handler: async (params) => {
+      const { code, name, region, category, leadTime, contact, email, phone, rating } = params;
+      if (!code) throw new Error('缺少必填参数: code');
+
+      const { db } = await import('@/lib/db');
+      const { serverCache } = await import('@/lib/cache');
+
+      const existing = await db.supplier.findUnique({ where: { code: code as string } });
+      if (!existing) throw new Error(`未找到供应商: ${code}`);
+
+      const updateData: Record<string, unknown> = {};
+      if (name) updateData.name = name;
+      if (region) updateData.region = region;
+      if (category) updateData.category = category;
+      if (typeof leadTime === 'number') updateData.leadTime = leadTime;
+      if (contact !== undefined) updateData.contact = contact;
+      if (email !== undefined) updateData.email = email;
+      if (phone !== undefined) updateData.phone = phone;
+      if (typeof rating === 'number') {
+        if (rating < 0 || rating > 5) throw new Error('rating 必须为 0-5 之间的数值');
+        updateData.rating = rating;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        throw new Error('至少需要提供一个要更新的字段');
+      }
+
+      const updated = await db.supplier.update({
+        where: { code: code as string },
+        data: updateData,
+      });
+
+      // Log changed fields
+      const changedFields = Object.keys(updateData);
+      await db.auditLog.create({
+        data: {
+          action: 'UPDATE',
+          entity: 'supplier',
+          entityId: updated.id,
+          details: { updatedFields: changedFields },
+        },
+      });
+
+      serverCache.invalidate('suppliers');
+
+      return {
+        code: updated.code,
+        name: updated.name,
+        region: updated.region,
+        category: updated.category,
+        leadTime: updated.leadTime,
+        contact: updated.contact,
+        email: updated.email,
+        phone: updated.phone,
+        rating: updated.rating,
+        status: updated.status,
+        updatedFields: changedFields,
+      };
+    },
+  },
+
+  // ─── 17. batch_create_reorder ───────────────────────────────────────────
+  {
+    name: 'batch_create_reorder',
+    description: 'Create reorder orders for multiple products at once. Each item requires sku, productName, quantity, and warehouse. Returns summary with created count and any failures.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: '补货项目列表，每个项目需包含 sku, productName, quantity, warehouse',
+          items: {
+            type: 'object',
+            properties: {
+              sku: { type: 'string', description: '产品SKU' },
+              productName: { type: 'string', description: '产品名称' },
+              quantity: { type: 'number', description: '补货数量' },
+              warehouse: { type: 'string', description: '目标仓库' },
+              priority: { type: 'string', description: '优先级: 常规 或 紧急', enum: ['常规', '紧急'] },
+            },
+            required: ['sku', 'productName', 'quantity', 'warehouse'],
+          },
+        },
+        priority: {
+          type: 'string',
+          description: '全局默认优先级（被单项priority覆盖）',
+          enum: ['常规', '紧急'],
+        },
+      },
+      required: ['items'],
+    },
+    handler: async (params) => {
+      const { items, priority } = params;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new Error('缺少必填参数: items（至少需要一个补货项目）');
+      }
+
+      const { db } = await import('@/lib/db');
+      const { serverCache } = await import('@/lib/cache');
+
+      const orders: Array<Record<string, unknown>> = [];
+      const errors: Array<{ sku: string; error: string }> = [];
+      const defaultPriority = (priority as string) || '常规';
+
+      for (const item of items) {
+        const sku = item.sku as string;
+        const productName = item.productName as string;
+        const quantity = item.quantity as number;
+        const warehouse = item.warehouse as string;
+        const itemPriority = (item.priority as string) || defaultPriority;
+
+        try {
+          if (!sku || !productName || !quantity || !warehouse) {
+            throw new Error('补货项目缺少必填字段: sku, productName, quantity, warehouse');
+          }
+          if (typeof quantity !== 'number' || quantity <= 0) {
+            throw new Error(`SKU ${sku}: quantity 必须为正整数`);
+          }
+
+          const order = await db.reorderOrder.create({
+            data: {
+              sku,
+              productName,
+              quantity,
+              warehouse,
+              priority: itemPriority,
+              status: 'pending',
+            },
+          });
+
+          await db.supplyChainEvent.create({
+            data: {
+              type: '补货订单',
+              title: `批量补货: ${productName}`,
+              description: `批量创建补货订单: SKU ${sku}, 数量 ${quantity}, 仓库 ${warehouse}, 优先级 ${itemPriority}`,
+              icon: '📦',
+              color: '#f97316',
+              severity: itemPriority === '紧急' ? 'warning' : 'info',
+              sku,
+            },
+          });
+
+          orders.push({
+            id: order.id,
+            sku: order.sku,
+            productName: order.productName,
+            quantity: order.quantity,
+            warehouse: order.warehouse,
+            priority: order.priority,
+            status: order.status,
+          });
+        } catch (err) {
+          errors.push({
+            sku: sku || 'unknown',
+            error: err instanceof Error ? err.message : '未知错误',
+          });
+        }
+      }
+
+      serverCache.invalidate('reorder');
+
+      return {
+        created: orders.length,
+        failed: errors.length,
+        orders,
+        errors: errors.length > 0 ? errors : undefined,
+      };
     },
   },
 ];

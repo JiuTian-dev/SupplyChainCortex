@@ -52,17 +52,12 @@ const SandboxReplay = dynamic(
   () => import('@/components/dashboard/SandboxReplay').then(m => ({ default: m.SandboxReplay })),
   { ssr: false, loading: () => <LazyLoader type="chart" /> },
 );
-const CalibrationPanel = dynamic(
-  () => import('@/components/engine/CalibrationPanel').then(m => ({ default: m.CalibrationPanel })),
-  { ssr: false, loading: () => <LazyLoader type="chart" /> },
-);
 
 const PANEL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   monitor: MonitorStrip,
   'cascade-risk': CascadeRiskPanel,
   'decision-center': DecisionCenter,
   sandbox: SandboxReplay,
-  calibration: CalibrationPanel,
 };
 
 // ─── Sortable Panel Card ────────────────────────────────────────────────────

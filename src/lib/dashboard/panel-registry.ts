@@ -15,7 +15,7 @@
 
 import {
   Eye, Search, Zap, Cpu, Boxes, DollarSign, Ship, TrendingUp,
-  Building2, Shield, Calendar, Settings, BrainCircuit,
+  Building2, Shield,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -68,13 +68,6 @@ export const PANEL_REGISTRY: PanelDef[] = [
     category: 'decision', tags: ['all', 'risk'],
     defaultEnabled: false, loaderType: 'chart',
   },
-  {
-    id: 'calibration', label: '引擎校准', icon: BrainCircuit,
-    path: '@/components/engine/CalibrationPanel',
-    category: 'decision', tags: ['all', 'executive', 'ops'],
-    defaultEnabled: false, loaderType: 'chart',
-  },
-
   // ── Operational Drill-down ─────────────────────────────────────────────────
   {
     id: 'inventory', label: '库存', icon: Boxes,
@@ -111,6 +104,12 @@ export const PANEL_REGISTRY: PanelDef[] = [
     path: '@/components/risk/RiskTab',
     category: 'ops', tags: ['all', 'risk', 'executive'],
     defaultEnabled: true, loaderType: 'chart',
+  },
+  {
+    id: 'audit', label: '审计', icon: Shield,
+    path: '@/components/audit/AuditTab',
+    category: 'decision', tags: ['all', 'executive'],
+    defaultEnabled: true, loaderType: 'tab',
   },
 ];
 

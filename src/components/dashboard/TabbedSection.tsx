@@ -29,8 +29,7 @@ const LogisticsTab = dynamic(() => import('@/components/logistics/LogisticsTab')
 const SalesTab = dynamic(() => import('@/components/sales/SalesTab').then(m => ({ default: m.SalesTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
 const SupplierTab = dynamic(() => import('@/components/supplier/SupplierTab').then(m => ({ default: m.SupplierTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
 const RiskTab = dynamic(() => import('@/components/risk/RiskTab').then(m => ({ default: m.RiskTab })), { ssr: false, loading: () => <LazyLoader type="chart" /> });
-const QualityTab = dynamic(() => import('@/components/quality/QualityTab').then(m => ({ default: m.QualityTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
-const ComplianceTab = dynamic(() => import('@/components/compliance/ComplianceTab').then(m => ({ default: m.ComplianceTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
+const AuditTabComponent = dynamic(() => import('@/components/audit/AuditTab').then(m => ({ default: m.AuditTab })), { ssr: false, loading: () => <LazyLoader type="tab" /> });
 
 const PANEL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   'monitor': MonitorStrip,
@@ -43,8 +42,7 @@ const PANEL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   'sales': SalesTab,
   'supplier': SupplierTab,
   'risk': RiskTab,
-  'quality': QualityTab,
-  'compliance': ComplianceTab,
+  'audit': AuditTabComponent,
   'dashboard': SalesTab, // dashboard uses SalesTab
 };
 

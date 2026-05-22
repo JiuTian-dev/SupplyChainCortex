@@ -60,9 +60,11 @@ server.log
 /upload/
 /download/
 /screenshots/
+/public/charts/
 /backups/
 /db/custom.db
 *.tar
 mcp-card-*.png.idea/
 .idea/
 .chat-history/
+.worktrees/

@@ -74,14 +74,15 @@ export async function getCostAnalysis(): Promise<CostAnalysisResult> {
     cacheKey('reports', 'cost-analysis'),
     async () => {
       const [costRecords, products, inventory] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.product.findMany(),
         db.inventory.findMany(),
       ]);
 
       const categoryBreakdown: Record<string, { category: string; count: number; avgRawMaterial: number; avgLabor: number; avgLogistics: number; avgTariff: number; avgPlatformFee: number; avgTotalLanded: number; avgMargin: number }> = {};
       costRecords.forEach(c => {
-        const category = c.product?.category || '未分类';
+        const product = products.find(p => p.sku === c.sku);
+        const category = product?.category || '未分类';
         if (!categoryBreakdown[category]) {
           categoryBreakdown[category] = { category, count: 0, avgRawMaterial: 0, avgLabor: 0, avgLogistics: 0, avgTariff: 0, avgPlatformFee: 0, avgTotalLanded: 0, avgMargin: 0 };
         }
@@ -111,10 +112,10 @@ export async function getCostAnalysis(): Promise<CostAnalysisResult> {
       });
 
       const highestCostProducts = [...costRecords].sort((a, b) => b.totalLanded - a.totalLanded).slice(0, 5)
-        .map(c => ({ sku: c.sku, productName: c.productName, category: c.product?.category || '未分类', totalLanded: roundTo(c.totalLanded, 2), sellingPrice: c.sellingPrice, grossMargin: c.grossMargin }));
+        .map(c => ({ sku: c.sku, productName: c.productName, category: products.find(p => p.sku === c.sku)?.category || '未分类', totalLanded: roundTo(c.totalLanded, 2), sellingPrice: c.sellingPrice, grossMargin: c.grossMargin }));
 
       const lowestMarginProducts = [...costRecords].sort((a, b) => a.grossMargin - b.grossMargin).slice(0, 5)
-        .map(c => ({ sku: c.sku, productName: c.productName, category: c.product?.category || '未分类', grossMargin: c.grossMargin, totalLanded: roundTo(c.totalLanded, 2), sellingPrice: c.sellingPrice }));
+        .map(c => ({ sku: c.sku, productName: c.productName, category: products.find(p => p.sku === c.sku)?.category || '未分类', grossMargin: c.grossMargin, totalLanded: roundTo(c.totalLanded, 2), sellingPrice: c.sellingPrice }));
 
       const currentAvgRate = costRecords.length > 0
         ? costRecords.reduce((s, c) => s + c.exchangeRate, 0) / costRecords.length
@@ -129,7 +130,7 @@ export async function getCostAnalysis(): Promise<CostAnalysisResult> {
 
       const tariffByOrigin: Record<string, { origin: string; count: number; avgTariff: number; avgTariffPercent: number; totalTariffExposure: number }> = {};
       costRecords.forEach(c => {
-        const origin = c.product?.origin || 'CN';
+        const origin = products.find(p => p.sku === c.sku)?.origin || 'CN';
         if (!tariffByOrigin[origin]) tariffByOrigin[origin] = { origin, count: 0, avgTariff: 0, avgTariffPercent: 0, totalTariffExposure: 0 };
         const tbo = tariffByOrigin[origin]; tbo.count++;
         tbo.avgTariff += c.tariff; tbo.totalTariffExposure += c.tariff;
@@ -163,7 +164,7 @@ export async function getCostSummary(): Promise<CostSummaryResult> {
     cacheKey('reports', 'cost-summary'),
     async () => {
       const [costRecords, products, inventory] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.product.findMany(),
         db.inventory.findMany(),
       ]);
@@ -187,7 +188,7 @@ export async function getCostSummary(): Promise<CostSummaryResult> {
       const productsBelowSafetyMargin = costRecords
         .filter(c => c.grossMargin < safetyMargin)
         .map(c => ({
-          sku: c.sku, productName: c.productName, category: c.product?.category || '未分类',
+          sku: c.sku, productName: c.productName, category: products.find(p => p.sku === c.sku)?.category || '未分类',
           grossMargin: c.grossMargin, totalLanded: roundTo(c.totalLanded, 2),
           sellingPrice: c.sellingPrice, deficit: roundTo(safetyMargin - c.grossMargin, 1),
         }))
@@ -195,7 +196,7 @@ export async function getCostSummary(): Promise<CostSummaryResult> {
 
       const categoryBreakdown: Record<string, { category: string; count: number; avgLandedCost: number; avgMargin: number; avgRawMaterial: number; avgLabor: number; avgLogistics: number; avgTariff: number; avgPlatformFee: number }> = {};
       costRecords.forEach(c => {
-        const category = c.product?.category || '未分类';
+        const category = products.find(p => p.sku === c.sku)?.category || '未分类';
         if (!categoryBreakdown[category]) {
           categoryBreakdown[category] = { category, count: 0, avgLandedCost: 0, avgMargin: 0, avgRawMaterial: 0, avgLabor: 0, avgLogistics: 0, avgTariff: 0, avgPlatformFee: 0 };
         }
@@ -262,7 +263,7 @@ export async function getCostReportEnhanced(): Promise<CostReportEnhancedResult>
     cacheKey('reports', 'cost-report-enhanced'),
     async () => {
       const [costRecords, products, inventory, salesRecords] = await Promise.all([
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.product.findMany(),
         db.inventory.findMany(),
         db.salesRecord.findMany(),
@@ -295,7 +296,7 @@ export async function getCostReportEnhanced(): Promise<CostReportEnhancedResult>
       const costTrend = recentAvgMargin > avgMargin + 2 ? 'improving' : recentAvgMargin < avgMargin - 2 ? 'declining' : 'stable';
 
       const highestCostItems = [...costRecords].sort((a, b) => b.totalLanded - a.totalLanded).slice(0, 5)
-        .map(c => ({ sku: c.sku, productName: c.productName, totalLanded: roundTo(c.totalLanded, 2), category: c.product?.category || '未分类', grossMargin: c.grossMargin }));
+        .map(c => ({ sku: c.sku, productName: c.productName, totalLanded: roundTo(c.totalLanded, 2), category: products.find(p => p.sku === c.sku)?.category || '未分类', grossMargin: c.grossMargin }));
       const highestMarginItems = [...costRecords].sort((a, b) => b.grossMargin - a.grossMargin).slice(0, 5)
         .map(c => ({ sku: c.sku, productName: c.productName, grossMargin: c.grossMargin, totalLanded: roundTo(c.totalLanded, 2), sellingPrice: c.sellingPrice }));
 

@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo } from 'react';
 import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
   CheckCircle2, AlertTriangle, XCircle, Layers,
-  Zap, Eye, Search, Filter, SlidersHorizontal,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart as RechartsPieChart, Pie, Cell,
+  Cell,
   ComposedChart, ReferenceLine,
 } from 'recharts';
 import { toast } from 'sonner';
@@ -53,7 +52,6 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 
 import { CHART_TOOLTIP_STYLE } from './InventoryTab.helpers';
-import { InventorySlowMovingAlert } from './InventorySlowMovingAlert';
 import { InventoryWarehouseCapacity } from './InventoryWarehouseCapacity';
 import { InventoryDetailDialog } from './InventoryDetailDialog';
 import { InventoryProcurementSection } from './InventoryProcurementSection';
@@ -132,9 +130,6 @@ export function InventoryTab() {
     }
     return [];
   }, [agingResponse]);
-
-  // Slow-moving products (turnover > 90 days)
-  const slowMoving = useMemo(() => inventory.filter((i: Inventory) => i.turnoverDays > 90), [inventory]);
 
   // Filtered inventory for search/filter
   const filteredInventory = useMemo(() => {
@@ -320,82 +315,6 @@ export function InventoryTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* ABC 分类 */}
-        <Card className="card-dashboard chart-container">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">ABC 分类分布</CardTitle>
-            <CardDescription>基于销售额贡献的产品分级</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <RechartsPieChart className="pie-slice-in">
-                <Pie data={[
-                  { class: 'A (核心)', count: 3, color: '#f97316' },
-                  { class: 'B (重要)', count: 4, color: '#06b6d4' },
-                  { class: 'C (一般)', count: 5, color: '#8b5cf6' },
-                ]} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="count" nameKey="class" animationBegin={200}>
-                  {[0, 1, 2].map(i => <Cell key={i} fill={['#f97316', '#06b6d4', '#8b5cf6'][i]} style={{ '--slice-index': i } as React.CSSProperties} />)}
-                </Pie>
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 mt-2">
-              {[{ cls: 'A (核心)', desc: '占 80% 销售额', cnt: 3, color: '#f97316' }, { cls: 'B (重要)', desc: '占 15% 销售额', cnt: 4, color: '#06b6d4' }, { cls: 'C (一般)', desc: '占 5% 销售额', cnt: 5, color: '#8b5cf6' }].map(item => (
-                <div key={item.cls} className="flex items-center justify-between text-sm p-1.5 rounded hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <div>
-                      <span className="font-medium">{item.cls}</span>
-                      <span className="text-xs text-muted-foreground ml-2">{item.desc}</span>
-                    </div>
-                  </div>
-                  <span className="font-semibold">{item.cnt} 项</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 周转天数分布 */}
-        <Card className="sm:col-span-2 lg:col-span-2 card-dashboard chart-container">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">产品周转天数</CardTitle>
-            <CardDescription>周转天数越短代表库存效率越高 | 红色虚线 = 90天滞销线</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={inventory.slice(0, 8).map((i: Inventory) => ({
-                name: i.productName.length > 6 ? i.productName.slice(0, 6) + '...' : i.productName,
-                sku: i.sku,
-                turnoverDays: i.turnoverDays,
-                safetyStock: i.safetyStock,
-              }))} layout="vertical"
-                onClick={(e: { activePayload?: Array<{ payload?: { sku?: string } }> }) => {
-                  if (e?.activePayload?.[0]?.payload?.sku) {
-                    const sku = e.activePayload[0].payload.sku;
-                    updateSkus(selectedSkus.includes(sku) ? selectedSkus.filter(s => s !== sku) : [...selectedSkus, sku]);
-                  }
-                }}
-                style={{ cursor: 'pointer' }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                <ReferenceLine x={90} stroke="#ef4444" strokeDasharray="5 5" label={{ value: '滞销线', position: 'top', fill: '#ef4444', fontSize: 10 }} />
-                <Bar dataKey="turnoverDays" radius={[0, 4, 4, 0]} className="chart-draw-in">
-                  {inventory.slice(0, 8).map((i: Inventory, index: number) => (
-                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[i.stockStatus]} style={{ '--bar-index': index } as React.CSSProperties} />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <InventorySlowMovingAlert slowMoving={slowMoving} />
-
       {/* 库存库龄分布 */}
       <Card className="card-dashboard chart-container border-l-[4px] border-l-emerald-400">
         <CardHeader className="pb-2">
@@ -427,27 +346,6 @@ export function InventoryTab() {
                 <span className="text-muted-foreground">{label}</span>
               </div>
             ))}
-          </div>
-          {/* 库存周转建议 */}
-          <div className="mt-4 p-3 rounded-lg border bg-emerald-50 dark:bg-emerald-950/20">
-            <h4 className="text-sm font-semibold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-              <Zap className="h-3.5 w-3.5" />
-              库存周转建议
-            </h4>
-            <div className="mt-2 space-y-1.5">
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <span className="text-red-500 shrink-0">●</span>
-                榨汁机库存超过 90 天达 180 件，建议促销清仓或捆绑销售
-              </p>
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <span className="text-yellow-500 shrink-0">●</span>
-                咖啡机 90+天库存 130 件且 61-90天 110 件，积压风险高，建议限时折扣
-              </p>
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <span className="text-green-500 shrink-0">●</span>
-                电吹风 0-30天库存 410 件充足，建议维持当前补货节奏
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -497,154 +395,6 @@ export function InventoryTab() {
       />
 
 
-      {/* 搜索和筛选 + 库存明细 */}
-      <Card className="card-dashboard">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <CardTitle className="text-base font-semibold">库存明细</CardTitle>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <ExportMenu
-                data={filteredInventory.map((inv: Inventory) => ({
-                  sku: inv.sku,
-                  productName: inv.productName,
-                  warehouse: inv.warehouse,
-                  quantity: inv.quantity,
-                  safetyStock: inv.safetyStock,
-                  inTransit: inv.inTransit,
-                  turnoverDays: inv.turnoverDays,
-                  status: STATUS_LABELS[inv.stockStatus],
-                }))}
-                columns={[
-                  { key: 'sku', label: 'SKU' },
-                  { key: 'productName', label: '产品名称' },
-                  { key: 'warehouse', label: '仓库' },
-                  { key: 'quantity', label: '当前库存' },
-                  { key: 'safetyStock', label: '安全库存' },
-                  { key: 'inTransit', label: '在途' },
-                  { key: 'turnoverDays', label: '周转天数' },
-                  { key: 'status', label: '状态' },
-                ]}
-                filename="库存数据"
-                variant="outline"
-                size="sm"
-                label=""
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30"
-                onClick={() => { setAdjustmentDefaultSku(undefined); setAdjustmentDialogOpen(true); }}
-              >
-                <SlidersHorizontal className="h-3 w-3" />库存调整
-              </Button>
-              <div className="relative flex-1 sm:w-60">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="搜索 SKU/产品名/仓库..."
-                  className="pl-8 h-8 text-sm focus:ring-1 focus:ring-orange-300 focus:border-orange-400 transition-all"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Select value={inventoryFilter} onValueChange={setInventoryFilter}>
-                <SelectTrigger className="w-28 h-8 text-sm focus:ring-1 focus:ring-orange-300">
-                  <Filter className="h-3.5 w-3.5 mr-1" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="healthy">健康</SelectItem>
-                  <SelectItem value="warning">预警</SelectItem>
-                  <SelectItem value="critical">紧急</SelectItem>
-                  <SelectItem value="overstock">积压</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="max-h-96 overflow-y-auto overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-10 px-2">
-                    <Checkbox
-                      checked={
-                        batchSelection.isAllSelected
-                          ? true
-                          : batchSelection.isIndeterminate
-                            ? 'indeterminate'
-                            : false
-                      }
-                      onCheckedChange={() => batchSelection.toggleAll()}
-                      aria-label="全选"
-                    />
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">SKU</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">产品名称</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:table-cell">仓库</TableHead>
-                  <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground">当前库存</TableHead>
-                  <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:table-cell">安全库存</TableHead>
-                  <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground hidden md:table-cell">在途</TableHead>
-                  <TableHead className="text-right text-[10px] uppercase tracking-wider text-muted-foreground hidden md:table-cell">周转天数</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground">状态</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:table-cell">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="data-grid-stripe">
-                {filteredInventory.map((inv: Inventory, idx: number) => (
-                  <TableRow key={inv.id} className={`data-grid-row cursor-pointer hover:bg-orange-50/50 dark:hover:bg-orange-950/20 group relative border-l-[3px] transition-colors duration-200 ${
-                    inv.stockStatus === 'critical' ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/10' :
-                    inv.stockStatus === 'warning' ? 'border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10' :
-                    inv.stockStatus === 'overstock' ? 'border-l-purple-500 bg-purple-50/30 dark:bg-purple-950/10' :
-                    'border-l-emerald-400'
-                  }`} onClick={() => viewInventoryDetail(inv.sku)}>
-                    <TableCell className="w-10 px-2" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={batchSelection.selectedIds.has(inv.sku)}
-                        onCheckedChange={() => batchSelection.toggleItem(inv.sku)}
-                        aria-label={`选择 ${inv.sku}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{inv.sku}</TableCell>
-                    <TableCell className="font-medium">{inv.productName}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{inv.warehouse}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={inv.quantity < inv.safetyStock ? 'text-red-600 font-semibold' : ''}>{inv.quantity.toLocaleString()}</span>
-                    </TableCell>
-                    <TableCell className="text-right hidden sm:table-cell">{inv.safetyStock.toLocaleString()}</TableCell>
-                    <TableCell className="text-right hidden md:table-cell">
-                      {inv.inTransit > 0 ? <span className="text-blue-600">{inv.inTransit}</span> : <span className="text-muted-foreground">0</span>}
-                    </TableCell>
-                    <TableCell className="text-right hidden md:table-cell">
-                      <span className={inv.turnoverDays > 90 ? 'text-amber-600' : ''}>{inv.turnoverDays}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        style={{ backgroundColor: STATUS_COLORS[inv.stockStatus] + '20', color: STATUS_COLORS[inv.stockStatus], borderColor: STATUS_COLORS[inv.stockStatus] + '40' }}
-                        className={`text-xs tag-chip ${inv.stockStatus === 'critical' ? 'badge-pulse' : ''}`}
-                      >
-                        {STATUS_LABELS[inv.stockStatus]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); viewInventoryDetail(inv.sku); }}>
-                        <Eye className="h-3 w-3 mr-1" />详情
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {filteredInventory.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">未找到匹配的库存记录</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       <InventoryDetailDialog
         open={!!selectedInventorySku}

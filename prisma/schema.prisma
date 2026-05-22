@@ -533,3 +533,73 @@ model EngineWeight {
 
   @@map("engine_weights")
 }
+
+// ─── Decision Trace Models (Agent Engine v2 Audit) ───────────────────────
+
+model DecisionTrace {
+  id          String   @id @default(cuid())
+  auditId     String   @unique
+  userQuery   String
+  intent      String
+  confidence  Float
+  mode        String   @default("fsm-v2")
+  tier        Int?
+  durationMs  Int
+  toolsUsed   String[]
+  claimsCount Int      @default(0)
+  passport    Json
+  userId      String?
+  summary     String?
+  createdAt   DateTime @default(now())
+
+  steps TraceStep[]
+
+  @@index([createdAt])
+  @@index([intent])
+}
+
+model TraceStep {
+  id         String   @id @default(cuid())
+  traceId    String
+  trace      DecisionTrace @relation(fields: [traceId], references: [id], onDelete: Cascade)
+  stepIndex  Int
+  state      String
+  confidence Float?
+  findings   String?
+  nextState  String?
+  durationMs Int      @default(0)
+
+  toolCalls TraceToolCall[]
+  claims    TracedClaim[]
+
+  @@index([traceId])
+  @@index([traceId, stepIndex])
+}
+
+model TraceToolCall {
+  id        String   @id @default(cuid())
+  stepId    String
+  step      TraceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  toolName  String
+  params    Json
+  result    Json?
+  success   Boolean
+  latencyMs Int
+  error     String?
+
+  @@index([stepId])
+}
+
+model TracedClaim {
+  id          String @id @default(cuid())
+  stepId      String
+  step        TraceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  claimIndex  Int
+  text        String
+  source      String
+  confidence  String
+
+  @@index([stepId])
+  @@index([source])
+  @@index([confidence])
+}

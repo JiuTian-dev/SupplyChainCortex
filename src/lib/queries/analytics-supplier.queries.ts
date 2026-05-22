@@ -40,9 +40,8 @@ export async function getSupplierPerformanceAnalytics() {
       });
 
       const shipments = await db.shipmentItem.findMany();
-      const costRecords = await db.costRecord.findMany({
-        include: { product: true },
-      });
+      const costRecords = await db.costRecord.findMany();
+      const products = await db.product.findMany();
 
       const supplierAnalysis = suppliers.map((supplier) => {
         const supplierShipments = shipments.filter(
@@ -55,7 +54,7 @@ export async function getSupplierPerformanceAnalytics() {
             : 85 + Math.round(supplier.rating * 3);
 
         const categoryProducts = costRecords.filter(
-          (c) => c.product?.category === supplier.category
+          (c) => products.find(p => p.sku === c.sku)?.category === supplier.category
         );
         const avgMargin =
           categoryProducts.length > 0
@@ -145,7 +144,7 @@ export async function getSupplierPerformanceAnalyticsEnhanced(months: number = 6
       const [suppliers, shipments, costRecords, reorderOrders, inventory] = await Promise.all([
         db.supplier.findMany({ where: { status: "active" } }),
         db.shipmentItem.findMany(),
-        db.costRecord.findMany({ include: { product: true } }),
+        db.costRecord.findMany(),
         db.reorderOrder.findMany(),
         db.inventory.findMany(),
       ]);

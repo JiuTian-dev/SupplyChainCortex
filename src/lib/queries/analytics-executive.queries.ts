@@ -232,7 +232,7 @@ export async function getAnomaliesAnalytics() {
     cacheKey('analytics', 'anomalies'),
     async () => {
       const [inventory, costRecords, salesRecords, shipments] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.costRecord.findMany(),
         db.salesRecord.findMany(),
         db.shipmentItem.findMany(),

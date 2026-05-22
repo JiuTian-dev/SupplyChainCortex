@@ -6,7 +6,6 @@ const globalForPrisma = globalThis as unknown as {
 
 function buildDatabaseUrl(): string {
   const base = process.env.DATABASE_URL!;
-  // Inject connection_limit if not already present (safe default for serverless / multi-instance)
   if (base.includes('connection_limit=')) return base;
   const limit = process.env.PRISMA_CONNECTION_LIMIT || '5';
   const sep = base.includes('?') ? '&' : '?';

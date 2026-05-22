@@ -114,18 +114,6 @@ export type {
   CounterfactualResult,
 } from './causal-reasoning';
 
-// ReAct Agent (2026 upgrade)
-export {
-  runReActAgent,
-  runReActAgentSync,
-  parseToolCalls as parseReActToolCalls,
-} from './react-agent';
-export type {
-  ReActStep,
-  ReActResult,
-  ReActOptions,
-} from './react-agent';
-
 // Dynamic Context Builder (2026 upgrade)
 export {
   gatherBriefing,

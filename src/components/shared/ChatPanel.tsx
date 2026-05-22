@@ -15,7 +15,7 @@ import {
   Trash2, StickyNote, AlertTriangle, Settings, Key, Globe, Cpu,
   Wifi, RefreshCw, CircleDot, Loader2, Check, Square,
   MoreHorizontal, Paperclip, FileDown, FolderOpen, HardDrive, FileText, RotateCcw,
-  PanelRightClose, Eye, EyeOff,
+  PanelRightClose, Eye, EyeOff, Brain, Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS, getProviderModels, getDefaultModel } from '@/lib/services/ai-providers.service';
@@ -321,6 +321,7 @@ export function ChatPanel() {
       let accumulatedContent = '';
       const toolsUsedSet: string[] = [];
       const toolResults: Record<string, unknown> = {};
+      const thinkingSteps: Array<{ status: string; tool?: string; timestamp?: string }> = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -329,15 +330,22 @@ export function ChatPanel() {
         const events = parseSSEChunk(chunk, sseBuffer);
         for (const sseEvent of events) {
           switch (sseEvent.event) {
-            case 'thinking': setThinking(true); break;
+            case 'thinking': {
+              setThinking(true);
+              const thinkStatus = sseEvent.data.status as string || 'thinking';
+              thinkingSteps.push({ status: thinkStatus, timestamp: new Date().toISOString() });
+              break;
+            }
             case 'tool_call': {
               setThinking(false);
               const toolName = sseEvent.data.tool as string;
+              thinkingSteps.push({ status: 'tool_call', tool: toolName, timestamp: new Date().toISOString() });
               if (toolName && !toolsUsedSet.includes(toolName)) { toolsUsedSet.push(toolName); setStreamingToolCalls([...toolsUsedSet]); }
               break;
             }
             case 'tool_result': {
               const toolName = sseEvent.data.tool as string;
+              thinkingSteps.push({ status: 'tool_result', tool: toolName, timestamp: new Date().toISOString() });
               if (toolName) toolResults[toolName] = sseEvent.data.result;
               break;
             }
@@ -364,7 +372,17 @@ export function ChatPanel() {
             case 'done': {
               const finalToolsUsed = sseEvent.data.toolsUsed as string[] || toolsUsedSet;
               const passport = sseEvent.data.passport as Record<string, unknown> | undefined;
-              setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: accumulatedContent || '查询完成，但未能生成回复。', toolsUsed: finalToolsUsed, data: Object.keys(toolResults).length > 0 ? toolResults : undefined } : msg));
+              setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? {
+                ...msg,
+                content: accumulatedContent || '查询完成，但未能生成回复。',
+                toolsUsed: finalToolsUsed,
+                data: Object.keys(toolResults).length > 0 ? toolResults : undefined,
+                thinkingSteps,
+                durationMs: sseEvent.data.durationMs as number,
+                steps: sseEvent.data.steps as number,
+                tier: sseEvent.data.tier as number,
+                mode: sseEvent.data.mode as string,
+              } : msg));
               if (passport) {
                 setPassports(prev => ({ ...prev, [assistantMsgId]: passport }));
               }
@@ -388,7 +406,16 @@ export function ChatPanel() {
         });
         const result = await fallbackResponse.json();
         if (result.success && result.data) {
-          setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: result.data.reply || '查询完成，但未能生成回复。', toolsUsed: result.data.toolsUsed || [], data: result.data.data } : msg));
+          setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? {
+            ...msg,
+            content: result.data.reply || '查询完成，但未能生成回复。',
+            toolsUsed: result.data.toolsUsed || [],
+            data: result.data.data,
+            durationMs: result.data.durationMs as number,
+            steps: result.data.steps as number,
+            tier: result.data.tier as number,
+            mode: result.data.mode as string,
+          } : msg));
         } else {
           setMessages(prev => prev.map(msg => msg.id === assistantMsgId ? { ...msg, content: result.error || '抱歉，查询时发生了错误。' } : msg));
         }
@@ -711,6 +738,60 @@ export function ChatPanel() {
                               ))}</div>
                             </div>
                           </CardContent></Card>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {/* Thinking Process — collapsible header */}
+                  {msg.role === 'assistant' && !(streaming && msg.id.endsWith('-ai')) && (msg.durationMs || msg.thinkingSteps?.length || msg.tier != null) && (() => {
+                    const isExpanded = expandedPassports[`think-${msg.id}`];
+                    const toggle = () => setExpandedPassports(prev => ({ ...prev, [`think-${msg.id}`]: !prev[`think-${msg.id}`] }));
+                    const duration = msg.durationMs ? `${(msg.durationMs / 1000).toFixed(1)}s` : '';
+                    const tierLabel = msg.tier != null ? `Tier ${msg.tier}` : '';
+                    const toolCount = msg.toolsUsed?.length ? `${msg.toolsUsed.length}个工具` : '';
+                    const modeLabel = msg.mode ? (msg.mode === 'react' ? 'ReAct' : msg.mode) : '';
+                    const meta = [duration, toolCount, tierLabel, modeLabel].filter(Boolean).join(' · ');
+                    const steps = msg.thinkingSteps || [];
+                    return (
+                      <div className="mt-1">
+                        <button onClick={toggle} className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors group w-full">
+                          <Brain className="h-3 w-3 text-purple-500" />
+                          <span className="font-medium">思考过程</span>
+                          <span className="tabular-nums">{meta}</span>
+                          <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isExpanded && (
+                          <div className="mt-1.5 p-2 rounded-md bg-muted/30 border text-[10px] space-y-1 max-h-48 overflow-y-auto">
+                            {steps.length > 0 ? steps.map((s, i) => {
+                              const time = s.timestamp ? new Date(s.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                              if (s.status === 'tool_call') return (
+                                <div key={i} className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                  <Wrench className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="text-muted-foreground">{time}</span>
+                                  <span>调用 {TOOL_LABELS[s.tool || ''] || s.tool || '工具'}</span>
+                                </div>
+                              );
+                              if (s.status === 'tool_result') return (
+                                <div key={i} className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                                  <Check className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="text-muted-foreground">{time}</span>
+                                  <span>{TOOL_LABELS[s.tool || ''] || s.tool} 完成</span>
+                                </div>
+                              );
+                              return (
+                                <div key={i} className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400">
+                                  <CircleDot className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="text-muted-foreground">{time}</span>
+                                  <span>{s.status === 'context' ? '分析上下文' : s.status === 'analyzing' ? '分析中...' : s.status}</span>
+                                </div>
+                              );
+                            }) : (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <CircleDot className="h-2.5 w-2.5" />
+                                <span>耗时 {duration} · {msg.steps || 0}步完成</span>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     );

@@ -251,7 +251,6 @@ function LogisticsRiskCard({ selectedSkus }: { selectedSkus: string[] }) {
                   {severityLabels[String(risk.severity)]}
                 </Badge>
               </div>
-              <p className="text-xs opacity-80 leading-relaxed">{String(risk.description)}</p>
               <div className="flex gap-1 mt-2">
                 {(risk.affectedRoutes as string[])?.map((route: string) => (
                   <Badge key={route} variant="outline" className="text-[10px] bg-background/50">
@@ -299,18 +298,11 @@ export function LogisticsTab() {
   const etaPredictions = useMemo(() => {
     if (!shipments || shipments.length === 0) return [];
     
-    // Route-specific transit time baselines (days) — realistic small appliance supply chain
-    const routeBaseline: Record<string, number> = {
-      '深圳→洛杉矶': 14, '深圳→纽约': 16, '深圳→伦敦': 18,
-      '深圳→东京': 5, '深圳→悉尼': 11, '深圳→多伦多': 15,
-      '义乌→洛杉矶': 13, '宁波→汉堡': 20, '佛山→大阪': 4,
-    };
+    // Route transit time baseline (default 12 days)
+    const routeBaseline: Record<string, number> = {};
     
-    // Carrier reliability factors
-    const carrierReliability: Record<string, number> = {
-      '中远海运': 0.88, '马士基': 0.92, 'DHL': 0.95, '顺丰国际': 0.93,
-      'FedEx': 0.94, 'COSCO': 0.87, 'OOCL': 0.90, 'APL': 0.89,
-    };
+    // Carrier reliability factor (default 0.88)
+    const carrierReliability: Record<string, number> = {};
     
     const now = new Date();
     
@@ -707,25 +699,6 @@ export function LogisticsTab() {
                 })}
               </div>
 
-              {/* Prediction accuracy footer */}
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-cyan-50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/30">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Target className="h-3.5 w-3.5 text-cyan-500 shrink-0" />
-                    <p className="text-xs font-medium">历史预测准确率</p>
-                  </div>
-                  <p className="text-lg font-bold text-cyan-700 dark:text-cyan-400">89.2%</p>
-                  <p className="text-[10px] text-muted-foreground">基于近90天到货数据回测</p>
-                </div>
-                <div className="p-3 rounded-lg bg-cyan-50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/30">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Clock className="h-3.5 w-3.5 text-cyan-500 shrink-0" />
-                    <p className="text-xs font-medium">平均偏差范围</p>
-                  </div>
-                  <p className="text-lg font-bold text-cyan-700 dark:text-cyan-400">&plusmn;1.3 天</p>
-                  <p className="text-[10px] text-muted-foreground">跨太平洋航线 &plusmn;2.1 天</p>
-                </div>
-              </div>
             </>
           )}
         </CardContent>

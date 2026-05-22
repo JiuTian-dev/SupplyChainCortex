@@ -1,14 +1,11 @@
 'use client';
 
-import { useMemo, useEffect, useState, useCallback } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useSkuFilter } from '@/hooks/useSkuFilter';
 import {
-  DollarSign, TrendingUp, AlertTriangle,
-  PieChart, Ship, Globe, Package, Download,
+  DollarSign, TrendingUp, AlertTriangle, PieChart, Globe, Package,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
@@ -27,11 +24,8 @@ import { useInventoryUIStore } from '@/stores/useInventoryUIStore';
 import { useDashboardConfigStore } from '@/stores/dashboard-config-store';
 import { useExchangeRate } from '@/hooks/use-exchange-rate';
 import { CURRENCY_SYMBOLS } from '@/lib/dashboard/config';
-import { CHART_COLORS } from '@/lib/constants';
-import { CostSimulatorEnhanced } from '@/components/cost/CostSimulatorEnhanced';
-import { ExchangeRateMatrix } from '@/components/cost/ExchangeRateMatrix';
+// CHART_COLORS moved to CostTab.helpers.tsx
 import type { CostRecord } from '@prisma/client';
-import { MetricCard } from '@/components/shared/MetricCard';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton';
 import dynamic from 'next/dynamic';
@@ -41,101 +35,20 @@ const CostImpactHeatmap = dynamic(
   () => import('@/components/cost/CostImpactHeatmap').then((m) => ({ default: m.CostImpactHeatmap })),
   { loading: () => <LazyLoader type="chart" className="h-[280px]" />, ssr: false }
 );
-import { CostOptimizationPanel } from '@/components/cost/CostOptimizationPanel';
+const CostSimulatorEnhanced = dynamic(
+  () => import('@/components/cost/CostSimulatorEnhanced').then((m) => ({ default: m.CostSimulatorEnhanced })),
+  { ssr: false, loading: () => <LazyLoader type="chart" className="h-[400px]" /> }
+);
+const ExchangeRateMatrix = dynamic(
+  () => import('@/components/cost/ExchangeRateMatrix').then((m) => ({ default: m.ExchangeRateMatrix })),
+  { ssr: false, loading: () => <LazyLoader type="chart" className="h-[200px]" /> }
+);
+const CostOptimizationPanel = dynamic(
+  () => import('@/components/cost/CostOptimizationPanel').then((m) => ({ default: m.CostOptimizationPanel })),
+  { ssr: false, loading: () => <LazyLoader type="chart" className="h-[300px]" /> }
+);
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-
-// ==================== Tooltip style shared across charts ====================
-const CHART_TOOLTIP_STYLE = {
-  borderRadius: '10px',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-  border: '1px solid #e5e7eb',
-  fontSize: '12px',
-  backgroundColor: 'var(--tooltip-bg, #fff)',
-  className: 'chart-tooltip-custom',
-};
-
-// ==================== Cost Breakdown Sub-component ====================
-function CostBreakdownChart({ sku, costs }: { sku: string; costs: CostRecord[] }) {
-  const cost = costs.find(c => c.sku === sku);
-  if (!cost) return null;
-
-  const data = [
-    { name: '原材料', value: cost.rawMaterial },
-    { name: '人工', value: cost.labor },
-    { name: '物流', value: cost.logistics },
-    { name: '关税', value: cost.tariff },
-    { name: '平台费', value: cost.platformFee },
-  ];
-
-  return (
-    <div>
-      <ResponsiveContainer width="100%" height={220}>
-        <RechartsPieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={45}
-            outerRadius={80}
-            dataKey="value"
-            nameKey="name"
-            label={({ name, percent }: { name: string; percent: number }) =>
-              `${name} ${(percent * 100).toFixed(0)}%`
-            }
-          >
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={CHART_COLORS[index]} />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={CHART_TOOLTIP_STYLE}
-            formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
-          />
-        </RechartsPieChart>
-      </ResponsiveContainer>
-      <div className="mt-2 space-y-1.5">
-        {data.map((item, idx) => (
-          <div key={item.name} className="flex items-center justify-between text-sm px-2">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: CHART_COLORS[idx] }} />
-              <span>{item.name}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">${item.value.toFixed(2)}</span>
-              <span className="text-xs text-muted-foreground">
-                ({(item.value / cost.totalLanded * 100).toFixed(1)}%)
-              </span>
-            </div>
-          </div>
-        ))}
-        <Separator className="my-1" />
-        <div className="flex items-center justify-between text-sm px-2 font-semibold">
-          <span>到岸总成本</span>
-          <span>${cost.totalLanded.toFixed(2)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ==================== Banner Helpers ====================
-function pillStyle(trend: string) {
-  const base = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ';
-  if (trend === 'rising') return base + 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400';
-  if (trend === 'falling') return base + 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-400';
-  return base + 'border-border bg-muted/30 text-muted-foreground';
-}
-
-function CommodityBanner({ data }: { data: Record<string, unknown> }) {
-  const trend = (data?.overallTrend as string) || 'stable';
-  const pct = data?.avgChangePct as number || 0;
-  return <span className={pillStyle(trend)}><Package className="h-3 w-3" />商品 {pct > 0 ? '+' : ''}{pct}%</span>;
-}
-
-function FreightBanner({ data }: { data: Record<string, unknown> }) {
-  const trend = (data?.trend as string) || 'stable';
-  return <span className={pillStyle(trend)}><Ship className="h-3 w-3" />运费 ${data?.avgRate40GP as number || 0}/40GP</span>;
-}
+import { CHART_TOOLTIP_STYLE, CostBreakdownChart, CommodityBanner, FreightBanner } from './CostTab.helpers';
 
 // ==================== Main CostTab Component ====================
 export function CostTab() {
@@ -541,47 +454,7 @@ export function CostTab() {
       </Card>
       </Collapsible>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* 毛利率对比 */}
-        <Card
-          className="card-dashboard chart-container"
-         
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">产品毛利率对比</CardTitle>
-            <CardDescription>绿色虚线 = 48% 安全线</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart
-                data={costs.map((c: CostRecord) => ({
-                  name: c.productName.length > 6 ? c.productName.slice(0, 6) + '...' : c.productName,
-                  grossMargin: c.grossMargin,
-                  totalLanded: c.totalLanded,
-                }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} domain={[0, 80]} />
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                <Legend />
-                <ReferenceLine
-                  y={48}
-                  stroke="#ef4444"
-                  strokeDasharray="5 5"
-                  label={{ value: '预警线 48%', position: 'top', fill: '#ef4444', fontSize: 10 }}
-                />
-                <Bar dataKey="grossMargin" name="毛利率 (%)" radius={[4, 4, 0, 0]} className="bar-grow-in">
-                  {costs.map((c: CostRecord, i: number) => (
-                    <Cell key={i} fill={c.grossMargin < 48 ? '#ef4444' : '#22c55e'} style={{ '--bar-index': i } as React.CSSProperties} />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* 成本变动追踪 */}
+      {/* 成本变动追踪 */}
         <Card
           id="cost-tracking"
           className="card-dashboard chart-container border-l-[4px] border-l-rose-400"
@@ -940,7 +813,6 @@ export function CostTab() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* 成本影响热力图 */}
       <CostImpactHeatmap costs={costs} />

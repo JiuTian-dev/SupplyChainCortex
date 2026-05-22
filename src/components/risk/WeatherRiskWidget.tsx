@@ -129,7 +129,6 @@ export function WeatherRiskWidget() {
               <div key={i} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs ${severityColor[a.severity]}`}>
                 <AlertTriangle className="h-3 w-3 shrink-0" />
                 <span className="font-medium">{a.port}:</span>
-                <span className="truncate">{a.description}</span>
               </div>
             ))}
           </div>

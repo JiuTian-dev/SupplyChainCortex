@@ -24,7 +24,7 @@ export interface MCPToolParameter {
   type: string;
   description: string;
   enum?: string[];
-  items?: { type: string };
+  items?: { type: string; properties?: Record<string, MCPToolParameter | { type: string; description?: string; enum?: string[] }>; required?: string[]; description?: string; enum?: string[] };
 }
 
 export interface MCPTool {

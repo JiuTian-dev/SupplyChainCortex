@@ -55,7 +55,7 @@ export function SalesForecastEnhanced() {
 
     projections.forEach((d, idx) => {
       const fRev = Number(d.revenue || 0);
-      // Uncertainty cone: widens over time (±5% → ±25%)
+      // HACK: client-side confidence heuristic — TODO: replace with API `forecast_demand` confidence interval data
       const spread = 0.05 + (idx / Math.max(projections.length - 1, 1)) * 0.20;
       const upper = Math.round(fRev * (1 + spread));
       const lower = Math.round(fRev * (1 - spread));

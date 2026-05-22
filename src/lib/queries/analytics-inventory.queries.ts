@@ -17,12 +17,14 @@ export async function getInventoryForecastAnalytics(
   return cachedFetch(
     cacheKey('analytics', 'inventory-forecast', forecastDays, alpha, beta),
     async () => {
-      const inventory = await db.inventory.findMany({
-        include: { product: true },
-      });
+      const [inventory, products] = await Promise.all([
+        db.inventory.findMany(),
+        db.product.findMany(),
+      ]);
 
       const forecasts = await Promise.all(
         inventory.map(async (inv) => {
+          const invProduct = products.find(p => p.id === inv.productId);
           const salesRecords = await db.salesRecord.findMany({
             where: { productId: inv.productId },
             orderBy: { date: "asc" },
@@ -32,7 +34,7 @@ export async function getInventoryForecastAnalytics(
             return {
               sku: inv.sku,
               productName: inv.productName,
-              category: inv.product?.category,
+              category: invProduct?.category,
               currentStock: inv.quantity,
               dailyVelocity: 0,
               forecast: [],
@@ -113,7 +115,7 @@ export async function getInventoryForecastAnalytics(
           return {
             sku: inv.sku,
             productName: inv.productName,
-            category: inv.product?.category,
+            category: invProduct?.category,
             currentStock: inv.quantity,
             dailyVelocity: Math.round(dailyVelocity * 10) / 10,
             daysOfStock,
@@ -170,7 +172,7 @@ export async function getInventoryOptimizationAnalytics() {
     cacheKey('analytics', 'inventory_optimization'),
     async () => {
       const [inventory, products, costRecords, salesRecords, suppliers] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.product.findMany(),
         db.costRecord.findMany(),
         db.salesRecord.findMany(),
@@ -285,7 +287,7 @@ export async function getInventoryTurnoverAnalytics() {
     cacheKey('analytics', 'inventory_turnover'),
     async () => {
       const [inventory, salesRecords, costRecords, products] = await Promise.all([
-        db.inventory.findMany({ include: { product: true } }),
+        db.inventory.findMany(),
         db.salesRecord.findMany(),
         db.costRecord.findMany(),
         db.product.findMany(),
@@ -307,7 +309,7 @@ export async function getInventoryTurnoverAnalytics() {
       const turnoverAnalysis = inventory.map(inv => {
         const sales = salesByProduct[inv.productId];
         const cost = costRecords.find(c => c.sku === inv.sku);
-        const product = inv.product || products.find(p => p.id === inv.productId);
+        const product = products.find(p => p.id === inv.productId);
 
         const dailySalesVelocity = sales ? sales.totalQuantity / 90 : 0;
         const annualizedSales = dailySalesVelocity * 365;

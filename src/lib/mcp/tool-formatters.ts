@@ -1,6 +1,5 @@
 /**
- * Shared Tool Formatters — consolidated from duplicated copies in
- * chat.helpers.ts and react-agent.ts.
+ * Shared Tool Formatters — consolidated from duplicated copies.
  *
  * Single source of truth for formatToolResult() and DEFAULT_TOOL_ACTIONS.
  */

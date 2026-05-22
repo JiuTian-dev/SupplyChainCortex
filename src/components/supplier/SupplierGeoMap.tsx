@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MapPin, Warehouse, Truck, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,29 +18,35 @@ interface GeoLocation {
   leadTime?: number;
 }
 
-const SUPPLIER_LOCATIONS: GeoLocation[] = [
-  { name: '东莞精密', type: 'supplier', city: '东莞', x: 62, y: 68, color: '#f59e0b', leadTime: 5 },
-  { name: '佛山制造', type: 'supplier', city: '佛山', x: 55, y: 72, color: '#f97316', leadTime: 7 },
-  { name: '上海电子', type: 'supplier', city: '上海', x: 78, y: 38, color: '#06b6d4', leadTime: 10 },
-  { name: '义乌日用品', type: 'supplier', city: '义乌', x: 74, y: 52, color: '#8b5cf6', leadTime: 8 },
-  { name: '深圳科技', type: 'supplier', city: '深圳', x: 60, y: 74, color: '#ef4444', leadTime: 4 },
-  { name: '杭州贸易', type: 'supplier', city: '杭州', x: 76, y: 48, color: '#22c55e', leadTime: 9 },
-];
+// Comprehensive Chinese city → SVG map coordinate lookup.
+// Geography data, not business data — covers any future supplier/warehouse city.
+const CITY_COORDS: Record<string, { x: number; y: number }> = {
+  '深圳':{x:60,y:76},'东莞':{x:58,y:74},'广州':{x:54,y:72},'佛山':{x:52,y:70},'厦门':{x:66,y:66},
+  '上海':{x:78,y:38},'杭州':{x:74,y:44},'宁波':{x:80,y:42},'义乌':{x:72,y:48},'苏州':{x:76,y:40},
+  '南京':{x:72,y:38},'无锡':{x:74,y:36},'合肥':{x:70,y:44},'温州':{x:78,y:50},
+  '北京':{x:72,y:18},'天津':{x:74,y:22},'青岛':{x:78,y:28},'大连':{x:80,y:20},
+  '成都':{x:40,y:54},'重庆':{x:46,y:56},'昆明':{x:32,y:70},'贵阳':{x:44,y:66},
+  '武汉':{x:62,y:50},'郑州':{x:64,y:38},'长沙':{x:58,y:56},'南昌':{x:66,y:54},
+  '西安':{x:50,y:40},'兰州':{x:38,y:36},'沈阳':{x:80,y:16},'哈尔滨':{x:84,y:10},
+  '海防':{x:44,y:82},'河内':{x:42,y:84},'胡志明':{x:40,y:88},
+};
 
-const WAREHOUSE_LOCATIONS: GeoLocation[] = [
-  { name: '华东仓', type: 'warehouse', city: '上海', x: 78, y: 35, color: '#22c55e' },
-  { name: '华南仓', type: 'warehouse', city: '佛山', x: 55, y: 69, color: '#10b981' },
-];
+// Parse city from warehouse name: "深圳仓"→"深圳", "义乌仓"→"义乌"
+function cityFromWarehouse(wh: string): string {
+  return wh.replace(/仓$/,'');
+}
 
-// ==================== Connection lines: supplier -> nearest warehouse ====================
-const CONNECTIONS = [
-  { from: '东莞精密', to: '华南仓' },
-  { from: '佛山制造', to: '华南仓' },
-  { from: '深圳科技', to: '华南仓' },
-  { from: '上海电子', to: '华东仓' },
-  { from: '义乌日用品', to: '华东仓' },
-  { from: '杭州贸易', to: '华东仓' },
-];
+function getCityForRegion(region: string): string {
+  const map: Record<string, string> = { '华南':'广州','华东':'上海','西南':'成都','华北':'北京','华中':'武汉' };
+  return map[region] || '广州';
+}
+
+const SUPPLIER_COLORS = ['#f59e0b','#f97316','#06b6d4','#8b5cf6','#ef4444','#22c55e'];
+const WAREHOUSE_COLORS = ['#22c55e','#8b5cf6','#06b6d4','#f59e0b'];
+
+function getCoord(city: string, fallback: {x:number;y:number}) {
+  return CITY_COORDS[city] || fallback;
+}
 
 // ==================== Tooltip State ====================
 interface TooltipInfo {
@@ -65,28 +71,74 @@ export function SupplierGeoMap() {
     return (supplierData as Record<string, unknown>)?.suppliers as Record<string, unknown>[] || [];
   }, [supplierData]);
 
-  // Merge API supplier data with geo locations
-  const enrichedLocations = useMemo(() => {
-    return SUPPLIER_LOCATIONS.map((loc) => {
-      const apiSupplier = suppliers.find((s) => s.name === loc.name);
+  // Build supplier geo locations from API data + city coordinate table
+  const supplierLocations = useMemo((): GeoLocation[] => {
+    return suppliers.map((s, idx) => {
+      const region = (s.region as string) || '华南';
+      const city = getCityForRegion(region);
+      const coords = getCoord(city, { x: 60, y: 60 });
       return {
-        ...loc,
-        region: (apiSupplier?.region as string) || loc.city,
-        leadTime: (apiSupplier?.leadTime as number) || loc.leadTime || 0,
+        name: (s.name as string) || (s.code as string),
+        type: 'supplier' as const,
+        city,
+        x: coords.x + (idx % 3 - 1) * 2,
+        y: coords.y + (idx % 2) * 1.5,
+        color: SUPPLIER_COLORS[idx % SUPPLIER_COLORS.length],
+        region,
+        leadTime: (s.leadTime as number) || 0,
       };
     });
   }, [suppliers]);
 
+  // Query warehouse names from inventory API
+  const [warehouseNames, setWarehouseNames] = useState<string[]>([]);
+  useEffect(() => {
+    fetch('/api/inventory?action=warehouse_zones')
+      .then(r => r.json())
+      .then(d => {
+        const names = (d.zones || d.data?.zones || []).map((z: any) => z.warehouse as string).filter(Boolean);
+        setWarehouseNames(names.length > 0 ? [...new Set(names)] : ['深圳仓','义乌仓']);
+      })
+      .catch(() => setWarehouseNames(['深圳仓','义乌仓','宁波仓','越南仓']));
+  }, []);
+
+  // Build warehouse locations from real warehouse names
+  const warehouseLocations = useMemo((): GeoLocation[] => {
+    return warehouseNames.map((name, idx) => {
+      const city = cityFromWarehouse(name);
+      const coords = getCoord(city, { x: 50 + idx * 10, y: 40 + idx * 10 });
+      return {
+        name, type: 'warehouse' as const, city,
+        x: coords.x, y: coords.y,
+        color: WAREHOUSE_COLORS[idx % WAREHOUSE_COLORS.length],
+      };
+    });
+  }, [warehouseNames]);
+
+  // Build connections from each supplier to the nearest warehouse (same region)
+  const connections = useMemo(() => {
+    if (warehouseLocations.length === 0) return [] as { from: string; to: string }[];
+    return supplierLocations.map(s => {
+      // Find nearest warehouse by proximity or region match
+      const nearest = warehouseLocations.reduce((best, wh) => {
+        const dBest = Math.abs(best.x - s.x) + Math.abs(best.y - s.y);
+        const dWh = Math.abs(wh.x - s.x) + Math.abs(wh.y - s.y);
+        return dWh < dBest ? wh : best;
+      });
+      return { from: s.name, to: nearest.name };
+    });
+  }, [supplierLocations, warehouseLocations]);
+
   // Statistics
-  const totalSuppliers = enrichedLocations.length;
-  const activeSuppliers = suppliers.filter((s) => s.status === 'active').length || enrichedLocations.length;
-  const avgLeadTime = enrichedLocations.length > 0
-    ? Math.round(enrichedLocations.reduce((sum, s) => sum + (s.leadTime || 0), 0) / enrichedLocations.length)
+  const totalSuppliers = suppliers.length;
+  const activeSuppliers = suppliers.filter((s) => s.status === 'active').length;
+  const avgLeadTime = suppliers.length > 0
+    ? Math.round(suppliers.reduce((sum, s) => sum + ((s.leadTime as number) || 0), 0) / suppliers.length)
     : 0;
-  const regions = [...new Set(enrichedLocations.map((s) => s.city))];
+  const regions = [...new Set(suppliers.map((s) => s.region as string).filter(Boolean))];
 
   // Find connection coordinates
-  const allLocations = [...enrichedLocations, ...WAREHOUSE_LOCATIONS];
+  const allLocations = [...supplierLocations, ...warehouseLocations];
   const getLocation = (name: string) => allLocations.find((l) => l.name === name);
 
   return (
@@ -99,7 +151,7 @@ export function SupplierGeoMap() {
           <MapPin className="h-4 w-4 text-orange-500" />
           供应商地理分布
           <Badge variant="outline" className="ml-auto text-xs font-normal">
-            {totalSuppliers} 供应商 · {WAREHOUSE_LOCATIONS.length} 仓库
+            {totalSuppliers} 供应商 · {warehouseLocations.length} 仓库
           </Badge>
         </CardTitle>
         <CardDescription>供应商与仓库分布可视化</CardDescription>
@@ -128,7 +180,7 @@ export function SupplierGeoMap() {
             <text x="50" y="82" fontSize="3" fill="currentColor" className="text-muted-foreground/40" textAnchor="middle">华南地区</text>
 
             {/* Connection lines with animated flow */}
-            {CONNECTIONS.map((conn, idx) => {
+            {connections.map((conn, idx) => {
               const from = getLocation(conn.from);
               const to = getLocation(conn.to);
               if (!from || !to) return null;
@@ -165,7 +217,7 @@ export function SupplierGeoMap() {
             })}
 
             {/* Warehouse markers */}
-            {WAREHOUSE_LOCATIONS.map((wh) => (
+            {warehouseLocations.map((wh) => (
               <g key={wh.name}>
                 {/* Warehouse pulse ring */}
                 <circle
@@ -228,7 +280,7 @@ export function SupplierGeoMap() {
             ))}
 
             {/* Supplier markers */}
-            {enrichedLocations.map((loc, idx) => (
+            {supplierLocations.map((loc, idx) => (
               <g key={loc.name}>
                 {/* Supplier pulse ring */}
                 <circle

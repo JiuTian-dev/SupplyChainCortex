@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   ShoppingCart, AlertTriangle, TrendingDown, Clock, DollarSign,
-  Package, Filter, ChevronDown, ChevronUp, Zap,
+  Package, Filter, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -318,16 +318,6 @@ export function ReorderRecommendationPanel() {
           </div>
         )}
 
-        {/* Info Footer */}
-        {filtered.length > 0 && (
-          <div className="mt-3 p-2.5 rounded-lg border bg-orange-50 dark:bg-orange-950/10 flex items-start gap-2">
-            <Zap className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
-            <div className="text-[11px] text-muted-foreground space-y-0.5">
-              <p>推荐补货量 = 日销量 × (交期天数 + 安全天数) − 当前库存</p>
-              <p>优先级: 紧急(&lt;7天) / 高(&lt;14天) / 中(&lt;21天) / 低(&lt;30天)</p>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

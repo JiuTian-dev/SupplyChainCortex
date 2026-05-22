@@ -6,7 +6,7 @@ import { useMemo, useState, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ShoppingCart, DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight,
-  BarChart3, Calendar, Activity, Download, GitCompare,
+  BarChart3, Calendar, Download, GitCompare,
   AlertTriangle, CheckCircle2, LayoutList, Rows3,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,11 +38,6 @@ const SalesPlatformAnalytics = dynamic(
 );
 import { SalesForecastEnhanced } from '@/components/sales/SalesForecastEnhanced';
 
-// Seeded pseudo-random number generator for deterministic daily variation
-function seededRandom(seed: number): number {
-  const x = Math.sin(seed * 9301 + 49297) * 233280;
-  return x - Math.floor(x);
-}
 
 // ==================== Tooltip style shared across charts ====================
 const CHART_TOOLTIP_STYLE = {
@@ -246,7 +241,7 @@ export function SalesTab() {
   // Fetch heatmap data from stats
   const stats30dQuery = useStats('30d');
 
-  // Derive heatmap data from stats when available, fallback to SALES_HEATMAP_DATA constant
+  // Derive heatmap data from stats API, empty if no data yet
   const salesHeatmapData = useMemo(() => {
     const statsData = (stats30dQuery.data as any)?.data ?? stats30dQuery.data as Record<string, unknown> | undefined;
     if (statsData && Array.isArray(statsData.revenueTrend) && (statsData.revenueTrend as Array<Record<string, unknown>>).length > 0) {
@@ -296,7 +291,12 @@ export function SalesTab() {
   // Category trend chart data - uses real daily sales data with per-category variation
   const categoryTrendChartData = useMemo(() => {
     const today = new Date();
-    const categories = ['厨房电器', '清洁电器', '个人护理'];
+    // Derive categories from product summaries (API data)
+    const cats = new Set<string>();
+    productSummaries.forEach((p: SalesSummary) => {
+      if (p.category) cats.add(p.category);
+    });
+    const categories = cats.size > 0 ? [...cats] : ['厨房电器', '清洁电器', '个人护理', '户外用品', '车载电器'];
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() - (6 - i));
@@ -338,10 +338,6 @@ export function SalesTab() {
       categories.forEach((cat, catIdx) => {
         // Base revenue for this category on this day = mean * day scale
         let catDayRevenue = categoryMean[cat] * dayScaleFactor;
-        // Add deterministic per-category variance (±20% based on seeded random)
-        const varianceSeed = dayIdx * 100 + catIdx * 37 + date.charCodeAt(5) * 7 + date.charCodeAt(8);
-        const variance = 1 + (seededRandom(varianceSeed) - 0.5) * 0.4;
-        catDayRevenue *= variance;
         // Ensure minimum floor so chart doesn't go to zero
         catDayRevenue = Math.max(catDayRevenue, categoryMean[cat] * 0.3);
         point[cat] = Math.round(catDayRevenue);
@@ -574,13 +570,6 @@ export function SalesTab() {
               <span className="text-muted-foreground">
                 日均: <span className="font-semibold text-foreground">{avgSales.toLocaleString()}</span>
               </span>
-            </div>
-            {/* 销售洞察 */}
-            <div className="mt-3 p-2.5 rounded-lg border bg-orange-50 dark:bg-orange-950/20">
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Activity className="h-3 w-3 text-orange-500 shrink-0" />
-                <span>本周三销量最高(1,420)，周末销售下降 23%</span>
-              </p>
             </div>
           </div>
         </CardContent>

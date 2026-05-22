@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Star, MapPin, Clock, Truck, MessageSquare, Shield,
-  TrendingUp, TrendingDown, AlertTriangle, Lightbulb, History,
+  TrendingUp, TrendingDown, AlertTriangle, Lightbulb,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -36,17 +36,6 @@ interface SupplierRatingDialogProps {
     ratingDetails?: unknown;
     updatedAt?: string | Date;
   } | null;
-}
-
-interface RatingHistoryEntry {
-  date: string;
-  overall: number;
-  quality: number;
-  delivery: number;
-  price: number;
-  service: number;
-  responsiveness: number;
-  comment?: string;
 }
 
 // ==================== Dimension Config ====================
@@ -126,34 +115,6 @@ function InteractiveStarRating({ value, onChange, size = 'lg' }: {
   );
 }
 
-// ==================== Simulated Rating History ====================
-
-function generateRatingHistory(supplier: NonNullable<SupplierRatingDialogProps['supplier']>): RatingHistoryEntry[] {
-  const history: RatingHistoryEntry[] = [];
-  const baseRating = supplier.rating;
-  const now = new Date();
-
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date(now);
-    date.setMonth(date.getMonth() - i);
-    const variation = (Math.sin(i * 1.5) * 0.5);
-    const overall = Math.max(1, Math.min(5, baseRating + variation));
-    history.push({
-      date: date.toISOString(),
-      overall: Math.round(overall * 10) / 10,
-      quality: Math.max(1, Math.min(5, overall + (Math.cos(i) * 0.4))),
-      delivery: Math.max(1, Math.min(5, overall + (Math.sin(i * 0.8) * 0.3))),
-      price: Math.max(1, Math.min(5, overall - (Math.sin(i * 1.2) * 0.2))),
-      service: Math.max(1, Math.min(5, overall + (Math.cos(i * 0.6) * 0.35))),
-      responsiveness: Math.max(1, Math.min(5, overall - (Math.cos(i * 1.4) * 0.25))),
-      comment: i === 0 ? '最近一次评审' : `${6 - i}个月前评审`,
-    });
-  }
-  return history;
-}
-
-// ==================== Main Component ====================
-
 export function SupplierRatingDialog({ open, onOpenChange, supplier }: SupplierRatingDialogProps) {
   const { data: performanceData } = useAnalytics('supplier-performance');
   const rateSupplier = useRateSupplier();
@@ -177,12 +138,6 @@ export function SupplierRatingDialog({ open, onOpenChange, supplier }: SupplierR
     : null;
 
   const metrics = matchedPerf?.metrics as Record<string, number> | undefined;
-
-  // Generate rating history
-  const ratingHistory = useMemo(() => {
-    if (!supplier) return [];
-    return generateRatingHistory(supplier);
-  }, [supplier]);
 
   // Compute radar chart data from dimension ratings
   const radarData = useMemo(() => {
@@ -467,83 +422,6 @@ export function SupplierRatingDialog({ open, onOpenChange, supplier }: SupplierR
             </div>
           </div>
         )}
-
-        {/* ==================== Rating History Timeline ==================== */}
-        <div className="rounded-lg border p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <History className="h-4 w-4 text-muted-foreground" />
-            <Label className="text-sm font-semibold">评分历史</Label>
-          </div>
-          <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-2">
-            {ratingHistory.map((entry, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  'flex items-center gap-3 p-2 rounded-md text-xs transition-colors',
-                  idx === 0
-                    ? 'bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800'
-                    : 'hover:bg-muted/30',
-                )}
-              >
-                {/* Timeline dot */}
-                <div className="flex flex-col items-center shrink-0">
-                  <div className={cn(
-                    'w-2.5 h-2.5 rounded-full',
-                    idx === 0 ? 'bg-orange-500' : 'bg-muted-foreground/30',
-                  )} />
-                  {idx < ratingHistory.length - 1 && (
-                    <div className="w-px h-4 bg-border mt-0.5" />
-                  )}
-                </div>
-
-                {/* Date */}
-                <span className="text-muted-foreground w-20 shrink-0">
-                  {new Date(entry.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
-                </span>
-
-                {/* Overall rating */}
-                <div className="flex items-center gap-1">
-                  <span className={cn(
-                    'font-bold',
-                    entry.overall >= 4.5 ? 'text-green-600' : entry.overall >= 3.5 ? 'text-amber-500' : 'text-red-500'
-                  )}>
-                    {entry.overall.toFixed(1)}
-                  </span>
-                  <div className="flex">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <svg
-                        key={star}
-                        className={cn('w-2.5 h-2.5', star <= Math.round(entry.overall) ? 'text-amber-400' : 'text-gray-200 dark:text-gray-700')}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Dimension mini badges */}
-                <div className="hidden sm:flex items-center gap-1">
-                  {RATING_DIMENSIONS.map(({ key, color }) => {
-                    const val = entry[key as keyof RatingHistoryEntry];
-                    if (typeof val !== 'number') return null;
-                    return (
-                      <span key={key} className={cn('text-[9px] px-1 py-0.5 rounded', color.replace('text-', 'bg-').replace('500', '500/15'))}>
-                        {val.toFixed(1)}
-                      </span>
-                    );
-                  })}
-                </div>
-
-                {/* Comment */}
-                {entry.comment && (
-                  <span className="text-muted-foreground ml-auto truncate max-w-[100px]">{entry.comment}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
 
         <Separator />
 

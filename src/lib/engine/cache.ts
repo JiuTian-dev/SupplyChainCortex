@@ -184,10 +184,10 @@ export async function versionedCachedFetch<T>(
   ttlMs: number,
 ): Promise<T> {
   const versionedKey = `v:${getConfigVersion()}:${key}`;
-  const cached = serverCache.get<T>(versionedKey);
+  const cached = await serverCache.get<T>(versionedKey);
   if (cached !== null) return cached;
 
   const data = await fetcher();
-  (serverCache as any).set(versionedKey, data, ttlMs / 1000); // Convert ms→s for serverCache
+  serverCache.set(versionedKey, data, ttlMs / 1000);
   return data;
 }
