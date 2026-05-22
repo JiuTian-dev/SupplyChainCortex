@@ -4,8 +4,17 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Send, Package, DollarSign, Ship, Shield, BarChart3,
   Loader2, X, ArrowRight, RotateCcw,
+  ChevronDown, Globe, Brain, Clock, Copy, Download,
+  Settings, Eye, EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -210,6 +219,26 @@ export function ChatPanel() {
   const [confirmationCards, setConfirmationCards] = useState<Record<string, ConfirmationCardData[]>>({});
   const [showDataPanel, setShowDataPanel] = useState(false);
 
+  // ─── Feature 1: Provider/Model ──────────────────────────────────────
+  const [selectedProvider, setSelectedProvider] = useState('deepseek');
+  const [selectedModel, setSelectedModel] = useState('deepseek-v4-flash');
+
+  // ─── Feature 2: Web Search Toggle ───────────────────────────────────
+  const [webSearchEnabled, setWebSearchEnabled] = useState<boolean | undefined>(undefined);
+
+  // ─── Feature 3: Thinking Process Panel ──────────────────────────────
+  const [thinkingSteps, setThinkingSteps] = useState<Array<{ status: string; durationMs?: number }>>([]);
+  const [thinkingOpen, setThinkingOpen] = useState(false);
+
+  // ─── Feature 4: Conversation History ────────────────────────────────
+  const [convList, setConvList] = useState<Array<{ id: string; title: string; messageCount: number }>>([]);
+  const [showConvList, setShowConvList] = useState(false);
+
+  // ─── Feature 7: Settings / API Key ──────────────────────────────────
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -243,6 +272,27 @@ export function ChatPanel() {
     return () => { abortRef.current?.abort(); };
   }, []);
 
+  // Load conversation list from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('chat-conversations');
+      if (stored) setConvList(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  // Save conversation list on message change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        const convs = JSON.parse(localStorage.getItem('chat-conversations') || '[]');
+        const existing = convs.findIndex((c: { id: string }) => c.id === 'current');
+        const entry = { id: 'current', title: messages[0]?.content?.slice(0, 40) || '新对话', messageCount: messages.length, updatedAt: new Date().toISOString() };
+        if (existing >= 0) convs[existing] = entry; else convs.unshift(entry);
+        localStorage.setItem('chat-conversations', JSON.stringify(convs.slice(0, 20)));
+      } catch {}
+    }
+  }, [messages]);
+
   const handleClaimVerdict = useCallback(async (_msgId: string, _claims: ClaimData[], claimId: string, verdict: ClaimVerdict) => {
     setFeedbackMap(prev => ({ ...prev, [claimId]: verdict }));
     try {
@@ -261,7 +311,10 @@ export function ChatPanel() {
     setStreamingContent('');
     setStreamingToolCalls([]);
     setShowDataPanel(false);
+    setThinkingSteps([]);
+    setThinkingOpen(false);
     setIsLoading(true);
+    const startTime = Date.now();
     setStreaming(true);
 
     const userMsg: ChatMessage = {
@@ -280,7 +333,9 @@ export function ChatPanel() {
         body: JSON.stringify({
           message: query,
           stream: true,
-          provider: 'deepseek',
+          provider: selectedProvider,
+          model: selectedModel,
+          webSearch: webSearchEnabled,
           history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
         }),
         signal: controller.signal,
@@ -310,13 +365,18 @@ export function ChatPanel() {
           try {
             const parsed = JSON.parse(data);
 
-            if (parsed.type === 'token' || (parsed.status && typeof parsed.content === 'string')) {
-              if (parsed.content) {
-                fullContent += parsed.content;
-                setStreamingContent(prev => prev + parsed.content);
-              }
+            // Token/content event: {"content":"text"} or {"status":"Intent: ..."}
+            if (parsed.content && typeof parsed.content === 'string' && !parsed.tool && !parsed.result && !parsed.error) {
+              fullContent += parsed.content;
+              setStreamingContent(prev => prev + parsed.content);
             }
 
+            // Thinking event: {"status":"..."} with no content/tool
+            if (parsed.status && typeof parsed.status === 'string' && !parsed.content && !parsed.tool) {
+              setThinkingSteps(prev => [...prev, { status: parsed.status, durationMs: Date.now() - startTime }]);
+            }
+
+            // Tool call: {"tool":"name","params":{...}}
             if (parsed.tool && parsed.params) {
               const evt: ToolEvent = { tool: parsed.tool, params: parsed.params };
               tools.push(evt);
@@ -370,7 +430,16 @@ export function ChatPanel() {
       {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar" ref={scrollRef}>
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative" ref={scrollRef}>
+          {/* Feature 4: Conversation history toggle */}
+          <button
+            onClick={() => setShowConvList(!showConvList)}
+            className="absolute top-4 left-6 h-7 w-7 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors z-10"
+            title="对话历史"
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </button>
+
           <div className="max-w-2xl mx-auto px-6 py-8">
             {/* Empty state */}
             {messages.length === 0 && !isLoading && (
@@ -409,8 +478,24 @@ export function ChatPanel() {
                       {renderMarkdown(msg.content)}
                     </div>
 
-                    {/* Copy button */}
-                    {msg.content && <CopyButton text={msg.content} />}
+                    {/* Feature 5: Copy + Export buttons */}
+                    {msg.content && (
+                      <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <CopyButton text={msg.content} />
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([msg.content], { type: 'text/markdown' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a'); a.href = url; a.download = `chat-${Date.now()}.md`; a.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400"
+                          title="导出 Markdown"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Claims */}
                     {msg.content && (() => {
@@ -475,6 +560,30 @@ export function ChatPanel() {
               </div>
             )}
 
+            {/* Feature 3: Thinking Process Panel */}
+            {thinkingSteps.length > 0 && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setThinkingOpen(!thinkingOpen)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  <Brain className="h-3 w-3" />
+                  思考过程 ({thinkingSteps.length}步)
+                  <ChevronDown className={`h-3 w-3 transition-transform ${thinkingOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {thinkingOpen && (
+                  <div className="mt-2 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 text-xs space-y-1">
+                    {thinkingSteps.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between text-zinc-500">
+                        <span>{s.status === 'context' ? '加载上下文' : s.status === 'classifying' ? '分类意图' : s.status === 'planning' ? '规划工具' : s.status === 'executing' ? '执行工具' : s.status === 'observing' ? '观察结果' : s.status === 'deciding' ? '决策' : s.status === 'synthesizing' ? '合成回复' : s.status === 'searching' ? '联网搜索' : s.status}</span>
+                        {s.durationMs ? <span className="font-mono text-zinc-400">{s.durationMs}ms</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {isLoading && !streaming && (
               <div className="flex items-center gap-2 text-zinc-400 text-sm mb-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -503,7 +612,44 @@ export function ChatPanel() {
               </div>
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
+              {/* Feature 1: Provider/Model Selector */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="h-9 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 shrink-0">
+                    {selectedProvider === 'deepseek' ? 'DS' : selectedProvider === 'openai' ? 'GPT' : 'CL'}
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuLabel className="text-xs">模型</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => { setSelectedProvider('deepseek'); setSelectedModel('deepseek-v4-flash'); }} className="text-xs">
+                    DeepSeek V4 Flash
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setSelectedProvider('openai'); setSelectedModel('gpt-4o'); }} className="text-xs">
+                    OpenAI GPT-4o
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setSelectedProvider('anthropic'); setSelectedModel('claude-sonnet-4-6'); }} className="text-xs">
+                    Anthropic Claude Sonnet 4.6
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Feature 2: Web Search Toggle */}
+              <button
+                onClick={() => setWebSearchEnabled(prev => prev === undefined ? true : prev === true ? false : undefined)}
+                className={`h-9 w-9 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                  webSearchEnabled === true
+                    ? 'bg-blue-50 border-blue-300 text-blue-600 dark:bg-blue-950 dark:border-blue-700 dark:text-blue-400'
+                    : webSearchEnabled === false
+                      ? 'bg-zinc-50 border-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:border-zinc-700'
+                      : 'border-zinc-200 text-zinc-400 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+                title={webSearchEnabled === true ? '已启用联网搜索' : webSearchEnabled === false ? '已禁用联网搜索' : '自动决定是否搜索'}
+              >
+                <Globe className="h-4 w-4" />
+              </button>
+
               <div className="flex-1 relative">
                 <Input
                   ref={inputRef}
@@ -523,6 +669,42 @@ export function ChatPanel() {
               >
                 <Send className="h-4 w-4" />
               </Button>
+
+              {/* Feature 7: Settings / API Key */}
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="h-9 w-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+
+              {/* Settings popover */}
+              {showSettings && (
+                <div className="absolute bottom-full right-0 mb-2 w-72 p-4 rounded-xl border bg-white dark:bg-zinc-900 shadow-xl z-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-semibold">设置</h3>
+                    <button onClick={() => setShowSettings(false)}><X className="h-3 w-3" /></button>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 mb-1 block">API Key</label>
+                      <div className="flex gap-1">
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={apiKey}
+                          onChange={e => setApiKey(e.target.value)}
+                          placeholder="sk-..."
+                          className="flex-1 h-8 text-xs px-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+                        />
+                        <button onClick={() => setShowApiKey(!showApiKey)} className="h-8 w-8 rounded-lg border flex items-center justify-center text-xs">
+                          {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-1">留空使用环境变量</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -534,6 +716,30 @@ export function ChatPanel() {
           tools={streamingToolCalls}
           onClose={() => setShowDataPanel(false)}
         />
+      )}
+
+      {/* Feature 4: Conversation History slide-out */}
+      {showConvList && (
+        <div className="fixed inset-y-0 left-0 w-72 bg-white dark:bg-zinc-900 border-r shadow-lg z-50 p-4 overflow-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold">对话历史</h3>
+            <button onClick={() => setShowConvList(false)}><X className="h-4 w-4" /></button>
+          </div>
+          <button
+            onClick={() => { setMessages([]); setShowConvList(false); }}
+            className="w-full text-left text-xs px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 mb-2 border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500"
+          >
+            + 新对话
+          </button>
+          <div className="space-y-1">
+            {convList.map(c => (
+              <div key={c.id} className="px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-xs">
+                <p className="truncate font-medium">{c.title}</p>
+                <p className="text-zinc-400">{c.messageCount} 条消息</p>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
