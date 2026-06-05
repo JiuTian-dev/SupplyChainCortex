@@ -29,9 +29,10 @@ export const useNotificationStore = create<NotificationState & NotificationActio
 
   // ==================== Actions ====================
   addNotification: (notification) =>
-    set((state) => ({
-      backendNotifications: [notification, ...state.backendNotifications],
-    })),
+    set((state) => {
+      if (state.backendNotifications.some((n) => n.id === notification.id)) return state;
+      return { backendNotifications: [notification, ...state.backendNotifications] };
+    }),
 
   markAsRead: (id) =>
     set((state) => ({

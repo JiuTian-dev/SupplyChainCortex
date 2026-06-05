@@ -13,6 +13,7 @@ import { agentMemory, type SharedContext } from '@/lib/engine/memory';
 import { buildGraphContext, formatGraphContext } from '@/lib/engine/graph-rag';
 import { episodeStore, formatEpisodeContext } from '@/lib/engine/episode-store';
 import { formatConsolidatedFactsContext } from '@/lib/engine/memory-consolidation';
+import { jiutianMemory } from '@/lib/engine/memory-adapter';
 import { recommendStrategies, formatStrategyContext, type RiskContext } from '@/lib/engine/strategy-engine';
 import { getSourceHealthSummary } from '@/lib/engine/connector-health';
 import type { FeedbackLog } from '@prisma/client';
@@ -334,10 +335,17 @@ export function formatBriefingContext(briefing: AgentBriefing): string {
  * One-shot: gather briefing + graph context and format for prompt injection.
  * The query parameter enables entity extraction for targeted graph analysis.
  */
-export async function buildDynamicSystemContext(query?: string): Promise<string> {
+export async function buildDynamicSystemContext(query?: string, memoryMode = true): Promise<string> {
   try {
     const briefing = await gatherBriefing();
     let context = formatBriefingContext(briefing);
+
+    // Memory mode indicator — tells the agent whether to expect user memory
+    if (memoryMode) {
+      context += '\n[系统] 记忆模式已开启 — 系统已注入用户的历史记忆和偏好，请在回答中引用。\n';
+    } else {
+      context += '\n[系统] 干净模式 — 本轮不引用历史记忆，独立分析。\n';
+    }
 
     // Add graph context if query mentions supply chain entities
     if (query) {
@@ -348,7 +356,7 @@ export async function buildDynamicSystemContext(query?: string): Promise<string>
     }
 
     // Add episodic memory — relevant past conversations
-    if (query) {
+    if (memoryMode && query) {
       try {
         const relatedEpisodes = episodeStore.retrieve(query, 3);
         if (relatedEpisodes.length > 0) {
@@ -357,11 +365,30 @@ export async function buildDynamicSystemContext(query?: string): Promise<string>
       } catch { /* memory is best-effort */ }
     }
 
+    // Add persistent memory — JiuTian memory bridge
+    if (memoryMode && query) {
+      try {
+        const jtResult = await jiutianMemory.retrieveMemories(query);
+        const jtFacts = jtResult.hard_facts || [];
+        const jtMems = jtResult.memories || [];
+        if (jtFacts.length > 0 || jtMems.length > 0) {
+          const lines: string[] = [];
+          for (const f of jtFacts.slice(0, 4)) lines.push(`- ${f}`);
+          for (const m of jtMems.slice(0, 2)) lines.push(`- [偏好] ${m}`);
+          if (lines.length > 0) {
+            context += `\n## 持久记忆（九天）\n${lines.join('\n')}\n`;
+          }
+        }
+      } catch { /* jiutian bridge is best-effort */ }
+    }
+
     // Add consolidated facts (top 5)
-    try {
-      const factsCtx = formatConsolidatedFactsContext(5);
-      if (factsCtx) context += factsCtx;
-    } catch { /* facts are best-effort */ }
+    if (memoryMode) {
+      try {
+        const factsCtx = formatConsolidatedFactsContext(5);
+        if (factsCtx) context += factsCtx;
+      } catch { /* facts are best-effort */ }
+    }
 
     // Add strategy recommendations if risk is detected
     if (briefing.criticalAlerts.length > 0 || briefing.healthScore < 70) {

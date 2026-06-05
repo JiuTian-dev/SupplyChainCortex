@@ -26,6 +26,7 @@ import {
 import type { ChatMessage } from './ChatPanel.helpers';
 import { ClaimLabel, parseClaimsFromText, type ClaimData, type ClaimVerdict, type FeedbackClaimsMap } from './ClaimLabel';
 import { ActionCard, type ConfirmationCardData } from './ActionCard';
+import { SettingsSheet } from '@/components/shared/SettingsSheet';
 
 // ─── Quick Actions ─────────────────────────────────────────────────
 
@@ -217,7 +218,10 @@ function estimateTokens(text: string): number {
 
 // ─── Main ChatPanel ──────────────────────────────────────────────────
 
-export function ChatPanel() {
+export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
+  settingsOpen?: boolean;
+  onSettingsOpenChange?: (open: boolean) => void;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -233,7 +237,10 @@ export function ChatPanel() {
   const [selectedProvider, setSelectedProvider] = useState('deepseek');
   const [selectedModel, setSelectedModel] = useState('deepseek-v4-flash');
 
-  // ─── Feature 2: Web Search Toggle ───────────────────────────────────
+  // ─── Feature 2: Memory Mode Toggle ───────────────────────────────────
+  const [memoryMode, setMemoryMode] = useState(true);
+
+  // ─── Feature 3: Web Search Toggle ───────────────────────────────────
   const [webSearchEnabled, setWebSearchEnabled] = useState<boolean | undefined>(undefined);
 
   // ─── Feature 3: Thinking Process Panel ──────────────────────────────
@@ -398,6 +405,7 @@ export function ChatPanel() {
           provider: selectedProvider,
           model: selectedModel,
           webSearch: webSearchEnabled,
+          memoryMode: memoryMode,
           history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
         }),
         signal: controller.signal,
@@ -694,48 +702,7 @@ export function ChatPanel() {
               </div>
             )}
 
-            <div className="flex items-center gap-2 relative">
-              {/* Feature 1: Provider/Model Selector */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="h-9 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 shrink-0">
-                    {selectedProvider === 'deepseek' ? 'DS' : selectedProvider === 'openai' ? 'GPT' : 'CL'}
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuLabel className="text-xs">模型</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => { setSelectedProvider('deepseek'); setSelectedModel('deepseek-v4-flash'); }} className="text-xs">
-                    DeepSeek V4 Flash
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setSelectedProvider('openai'); setSelectedModel('gpt-4o'); }} className="text-xs">
-                    OpenAI GPT-4o
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setSelectedProvider('anthropic'); setSelectedModel('claude-sonnet-4-6'); }} className="text-xs">
-                    Anthropic Claude Sonnet 4.6
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => { setSelectedProvider('ollama'); setShowSettings(true); }} className="text-xs">
-                    本地模型 (Ollama)...
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Feature 2: Web Search Toggle */}
-              <button
-                onClick={() => setWebSearchEnabled(prev => prev === undefined ? true : prev === true ? false : undefined)}
-                className={`h-9 w-9 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                  webSearchEnabled === true
-                    ? 'bg-blue-50 border-blue-300 text-blue-600 dark:bg-blue-950 dark:border-blue-700 dark:text-blue-400'
-                    : webSearchEnabled === false
-                      ? 'bg-zinc-50 border-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:border-zinc-700'
-                      : 'border-zinc-200 text-zinc-400 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                }`}
-                title={webSearchEnabled === true ? '已启用联网搜索' : webSearchEnabled === false ? '已禁用联网搜索' : '自动决定是否搜索'}
-              >
-                <Globe className="h-4 w-4" />
-              </button>
-
+            <div className="flex items-center gap-2">
               {/* File upload */}
               <input
                 ref={fileInputRef}
@@ -758,8 +725,8 @@ export function ChatPanel() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="h-9 w-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                title="上传文件 (txt, csv, md, json)"
+                className="h-11 w-11 rounded-xl border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="上传文件"
               >
                 <Paperclip className="h-4 w-4" />
               </button>
@@ -783,90 +750,6 @@ export function ChatPanel() {
               >
                 <Send className="h-4 w-4" />
               </Button>
-
-              {/* Feature 7: Settings / API Key */}
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="h-9 w-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-
-              {/* Settings popover */}
-              {showSettings && (
-                <div className="absolute bottom-full right-0 mb-2 w-72 p-4 rounded-xl border bg-white dark:bg-zinc-900 shadow-xl z-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-semibold">设置</h3>
-                    <button onClick={() => setShowSettings(false)}><X className="h-3 w-3" /></button>
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] text-zinc-500 mb-1 block">API Key</label>
-                      <div className="flex gap-1">
-                        <input
-                          type={showApiKey ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={e => setApiKey(e.target.value)}
-                          placeholder="sk-..."
-                          className="flex-1 h-8 text-xs px-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
-                        />
-                        <button onClick={() => setShowApiKey(!showApiKey)} className="h-8 w-8 rounded-lg border flex items-center justify-center text-xs">
-                          {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-zinc-400 mt-1">留空使用环境变量</p>
-                    </div>
-                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-3">
-                      <label className="text-[10px] text-zinc-500 mb-2 block">本地模型 (Ollama)</label>
-                      {ollamaStatus === 'found' && ollamaModels.length > 0 ? (
-                        <div className="space-y-1 mb-2">
-                          {ollamaModels.map(m => (
-                            <button
-                              key={m.name}
-                              onClick={() => { setSelectedProvider('ollama'); setSelectedModel(m.name); setOllamaStatus('idle'); }}
-                              className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between"
-                            >
-                              <span className="font-mono text-[11px]">{m.name}</span>
-                              <span className="text-[10px] text-zinc-400">{m.size}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : ollamaStatus === 'scanning' ? (
-                        <p className="text-xs text-zinc-400 flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          扫描中...
-                        </p>
-                      ) : ollamaStatus === 'error' ? (
-                        <p className="text-xs text-red-500">未检测到 Ollama 服务</p>
-                      ) : null}
-                      <button
-                        onClick={async () => {
-                          setScanningOllama(true);
-                          setOllamaStatus('scanning');
-                          try {
-                            const models = await fetchOllamaModels('http://localhost:11434');
-                            const formatted = models.map(m => ({
-                              name: m.name,
-                              size: fmtBytes(m.size),
-                            }));
-                            setOllamaModels(formatted);
-                            setOllamaStatus(formatted.length > 0 ? 'found' : 'error');
-                          } catch {
-                            setOllamaStatus('error');
-                          } finally {
-                            setScanningOllama(false);
-                          }
-                        }}
-                        disabled={scanningOllama}
-                        className="w-full text-xs py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                      >
-                        {ollamaStatus === 'found' ? '重新扫描' : '扫描本地 Ollama'}
-                      </button>
-                      <p className="text-[10px] text-zinc-400 mt-1">需要安装 Ollama 并在本地运行</p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -952,6 +835,22 @@ export function ChatPanel() {
             </button>
           )}
         </div>
+      )}
+
+      {onSettingsOpenChange && (
+        <SettingsSheet
+          open={settingsOpen ?? false}
+          onOpenChange={onSettingsOpenChange}
+          memoryMode={memoryMode}
+          onMemoryModeChange={setMemoryMode}
+          webSearchMode={webSearchEnabled}
+          onWebSearchModeChange={setWebSearchEnabled}
+          provider={selectedProvider}
+          model={selectedModel}
+          onProviderChange={(p, m) => { setSelectedProvider(p as 'deepseek' | 'openai' | 'anthropic' | 'ollama'); setSelectedModel(m); }}
+          apiKey={apiKey}
+          onApiKeyChange={setApiKey}
+        />
       )}
     </div>
   );

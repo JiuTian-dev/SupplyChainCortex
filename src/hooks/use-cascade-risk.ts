@@ -32,7 +32,7 @@ export function useCascadeRisk(scenario = 'auto'): CascadeRiskQueryResult {
         ? combineSignals(signal, abortController.signal)
         : abortController.signal;
 
-      const res = await fetch(`/api/cascade-risk?scenario=${scenario}`, {
+      const res = await fetch(`/api/cascade-risk?scenario=${scenario}&includeCausal=true`, {
         signal: combinedSignal,
       });
       if (!res.ok) throw new Error(`Cascade risk HTTP ${res.status}`);

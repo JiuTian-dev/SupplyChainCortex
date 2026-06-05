@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2, Inbox } from 'lucide-react';
 
 interface TraceItem {
   id: string;
@@ -69,13 +69,16 @@ export function TraceList({ selectedId, onSelect }: {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-0 h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm">决策历史</h3>
-        <Button variant="ghost" size="icon" onClick={fetchTraces} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">{traces.length} 条</span>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchTraces} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Intent filter */}
@@ -124,7 +127,24 @@ export function TraceList({ selectedId, onSelect }: {
             </div>
           ))}
           {traces.length === 0 && !loading && (
-            <p className="text-center text-xs text-muted-foreground py-8">暂无决策记录</p>
+            <div className="text-center py-12 space-y-3">
+              <Inbox className="h-8 w-8 mx-auto text-muted-foreground/40" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">暂无决策记录</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">在 Chat 中提问后，决策追踪会自动出现在这里</p>
+              </div>
+            </div>
+          )}
+          {loading && traces.length === 0 && (
+            <div className="space-y-2 py-2">
+              {[1,2,3].map(i => (
+                <div key={i} className="border rounded-md p-2 animate-pulse space-y-2">
+                  <div className="flex justify-between"><div className="h-3 bg-muted rounded w-16" /><div className="h-3 bg-muted rounded w-10" /></div>
+                  <div className="h-3 bg-muted rounded w-3/4" />
+                  <div className="flex gap-2"><div className="h-2 bg-muted rounded w-12" /><div className="h-2 bg-muted rounded w-12" /></div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

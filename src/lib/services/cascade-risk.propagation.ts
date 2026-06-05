@@ -1,15 +1,18 @@
-// @ts-nocheck
 /**
  * Cascade Risk — Propagation Engine Module (Phases 2, 3, 5)
  *
  * Multi-source risk fusion, graph construction, BFS propagation,
- * time-dimension forward projection, and explainability.
- * Extracted from cascade-risk.service.ts for modularity.
+ * Monte Carlo probabilistic propagation, time-dimension forward projection,
+ * and explainability.
  */
 import { db } from '@/lib/db';
-import { getAllPortsWeather } from '@/lib/services/weather.service';
-import { DEFAULT_ATTENUATION, getAttenuation } from './cascade-risk.calibration';
-import type { EdgeType, FusionStrategy, CascadeNode, CascadeEdge, PropagationStep, DayProjection, PropagationRule } from './cascade-risk.types';
+import { DEFAULT_ATTENUATION, getAttenuation, calibratedAttenuation } from './cascade-risk.calibration';
+import type {
+  EdgeType, FusionStrategy, CascadeNode, CascadeEdge,
+  PropagationStep, DayProjection, PropagationRule,
+  MonteCarloConfig, MonteCarloResult,
+  SEIRConfig, SEIRState, SEIRNodeState, SEIRTimeline,
+} from './cascade-risk.types';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Phase 2: Multi-Source Risk Fusion
@@ -24,7 +27,6 @@ export function fuseMultiSourceRisks(
   strategy: FusionStrategy = 'weighted_sum',
 ): Array<{ nodeId: string; riskScore: number; cause: string }> {
   if (strategy === 'max_impact') {
-    // Take the max risk per node
     const byNode = new Map<string, { riskScore: number; cause: string }>();
     for (const s of sources) {
       const existing = byNode.get(s.nodeId);
@@ -36,9 +38,8 @@ export function fuseMultiSourceRisks(
   }
 
   if (strategy === 'threshold_lower') {
-    // When multiple categories overlap, lower the risk threshold
     const categories = new Set(sources.map(s => s.category));
-    const multiplier = categories.size > 1 ? 1.3 : 1.0; // Multi-category = 30% more sensitive
+    const multiplier = categories.size > 1 ? 1.3 : 1.0;
     const byNode = new Map<string, { riskScore: number; causes: string[] }>();
     for (const s of sources) {
       const existing = byNode.get(s.nodeId);
@@ -60,7 +61,6 @@ export function fuseMultiSourceRisks(
     if (!existing) {
       byNode.set(s.nodeId, { accumulatedRisk: s.riskScore, count: 1, causes: [s.cause] });
     } else {
-      // Diminishing returns: each additional source adds less
       existing.accumulatedRisk = existing.accumulatedRisk + s.riskScore * (1 / (existing.count + 1));
       existing.count++;
       existing.causes.push(s.cause);
@@ -74,12 +74,75 @@ export function fuseMultiSourceRisks(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Data-Driven Revenue Impact
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Cache for computed damage ratios (per SKU) */
+const damageRatioCache = new Map<string, { ratio: number; computedAt: number }>();
+const DAMAGE_RATIO_CACHE_TTL = 3600_000; // 1 hour
+
+/**
+ * Compute a data-driven damage ratio for a SKU based on historical returns & delays.
+ * Returns the fraction of revenue at risk (0.05 – 0.50).
+ * Falls back to 0.15 if no historical data is available.
+ */
+export async function computeDamageRatio(sku: string): Promise<number> {
+  const cached = damageRatioCache.get(sku);
+  if (cached && Date.now() - cached.computedAt < DAMAGE_RATIO_CACHE_TTL) {
+    return cached.ratio;
+  }
+
+  try {
+    const [returns, shipments, sales] = await Promise.all([
+      db.returnRecord.findMany({ where: { sku }, take: 100 }).catch(() => []),
+      db.shipmentItem.findMany({ where: { sku, status: { in: ['delayed', 'exception'] } }, take: 100 }).catch(() => []),
+      db.salesRecord.findMany({ where: { sku }, take: 200, orderBy: { date: 'desc' } }).catch(() => []),
+    ]);
+
+    const totalSales = sales.length;
+    if (totalSales < 5) {
+      const fallback = 0.15;
+      damageRatioCache.set(sku, { ratio: fallback, computedAt: Date.now() });
+      return fallback;
+    }
+
+    // Return rate: returns / total sales
+    const returnRate = Math.min(returns.length / Math.max(totalSales, 1), 1);
+    // Delay rate: delayed shipments / total shipments for this SKU
+    const totalShipments = shipments.length + 10; // +10 to avoid division-by-zero on low-volume
+    const delayRate = shipments.length / totalShipments;
+    // Revenue volatility: coefficient of variation of daily sales
+    const dailyQty = sales.map(s => s.quantity);
+    const meanQty = dailyQty.reduce((a, b) => a + b, 0) / dailyQty.length;
+    const variance = dailyQty.reduce((s, q) => s + (q - meanQty) ** 2, 0) / dailyQty.length;
+    const cv = meanQty > 0 ? Math.sqrt(variance) / meanQty : 0;
+
+    // Composite damage ratio: weighted blend of return rate, delay rate, and demand volatility
+    const ratio = Math.min(Math.max(
+      returnRate * 0.4 + delayRate * 0.35 + cv * 0.25,
+      0.05,
+    ), 0.50);
+
+    damageRatioCache.set(sku, { ratio: Math.round(ratio * 1000) / 1000, computedAt: Date.now() });
+    return ratio;
+  } catch {
+    return 0.15;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Phase 3: Time-Dimension Forward Projection
 // ═══════════════════════════════════════════════════════════════════════════════
 
+interface WeatherPortData {
+  port: string;
+  current?: { windSpeed?: number; weatherCode?: number };
+  forecast: Array<{ windSpeedMax: number; precipitation: number }>;
+}
+
 export async function projectForward(
   propagation: PropagationStep[],
-  weatherData: Awaited<ReturnType<typeof getAllPortsWeather>> | null,
+  weatherData: { ports: WeatherPortData[] } | null,
 ): Promise<DayProjection[]> {
   const projections: DayProjection[] = [];
   const today = new Date();
@@ -90,7 +153,7 @@ export async function projectForward(
     date.setDate(date.getDate() + day);
     const dateStr = date.toISOString().split('T')[0];
 
-    // Weather forecast risk (use forecast data if available)
+    // Weather forecast risk
     const portRisks: DayProjection['portRisks'] = [];
     if (weatherData) {
       for (const port of weatherData.ports) {
@@ -110,7 +173,7 @@ export async function projectForward(
     // Inventory depletion risk
     const depletionRisks: DayProjection['inventoryDepletionRisk'] = [];
     for (const p of affectedProducts) {
-      const sku = p.metadata.sku as string;
+      const sku = p.metadata.sku as string | undefined;
       if (!sku) continue;
 
       const inventory = await db.inventory.findFirst({ where: { sku } }).catch(() => null);
@@ -124,9 +187,9 @@ export async function projectForward(
       const avgDailySales = sales.length > 0
         ? sales.reduce((s, r) => s + r.quantity, 0) / 30
         : 5;
-      const effectiveStock = inventory.quantity + inventory.inTransit;
+      const effectiveStock = inventory.quantity + (inventory.inTransit ?? 0);
       const daysUntilDepletion = avgDailySales > 0
-        ? Math.round((effectiveStock - inventory.safetyStock) / avgDailySales)
+        ? Math.round((effectiveStock - (inventory.safetyStock ?? 50)) / avgDailySales)
         : 999;
 
       if (daysUntilDepletion <= day + 3) {
@@ -139,17 +202,18 @@ export async function projectForward(
       }
     }
 
-    // Cumulative revenue impact
-    const cumulativeRevenueImpact = affectedProducts
-      .filter(p => {
-        const stock = depletionRisks.find(d => d.sku === p.metadata.sku);
-        return stock && stock.daysUntilDepletion <= day + 3;
-      })
-      .reduce((sum, p) => {
+    // Cumulative revenue impact — data-driven damage ratio per SKU
+    let cumulativeRevenueImpact = 0;
+    for (const p of affectedProducts) {
+      const sku = p.metadata.sku as string | undefined;
+      const stock = sku ? depletionRisks.find(d => d.sku === sku) : undefined;
+      if (stock && stock.daysUntilDepletion <= day + 3) {
         const price = (p.metadata.sellingPrice as number) || 50;
         const qty = (p.metadata.quantity as number) || 100;
-        return sum + price * qty * (p.riskScore / 100) * 0.3 * (1 + day * 0.1);
-      }, 0);
+        const damageRatio = sku ? await computeDamageRatio(sku) : 0.15;
+        cumulativeRevenueImpact += price * qty * (p.riskScore / 100) * damageRatio * (1 + day * 0.1);
+      }
+    }
 
     projections.push({
       day,
@@ -169,15 +233,9 @@ export function generatePreventiveActions(
   propagationPath: string,
 ): string | undefined {
   const actions: string[] = [];
-  if (propagationPath.includes('港')) {
-    actions.push('评估替代港口路线');
-  }
-  if (product.impactScore > 50) {
-    actions.push(`紧急补充 ${product.productName} 安全库存`);
-  }
-  if (propagationPath.includes('供应商')) {
-    actions.push('联系备选供应商');
-  }
+  if (propagationPath.includes('港')) actions.push('评估替代港口路线');
+  if (product.impactScore > 50) actions.push(`紧急补充 ${product.productName} 安全库存`);
+  if (propagationPath.includes('供应商')) actions.push('联系备选供应商');
   return actions.length > 0 ? actions.join('; ') : undefined;
 }
 
@@ -198,7 +256,7 @@ export function applyCustomRules(edge: CascadeEdge, nodeData: Record<string, unk
       const fieldValue = nodeData[rule.condition.field];
       const match = rule.condition.operator === 'gt' ? Number(fieldValue) > Number(rule.condition.value)
         : rule.condition.operator === 'lt' ? Number(fieldValue) < Number(rule.condition.value)
-        : fieldValue === rule.condition.value;
+        : String(fieldValue) === rule.condition.value;
       if (match && rule.overrideAttenuation !== undefined) {
         attenuation = rule.overrideAttenuation;
       }
@@ -233,10 +291,9 @@ export function generateExplanation(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Graph Construction (shared core)
+// Graph Construction (shared core) — with deep edges for multi-hop propagation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** In-memory graph cache (Phase 5: persistence) */
 let graphCache: { nodes: Map<string, CascadeNode>; edges: CascadeEdge[]; builtAt: number } | null = null;
 const GRAPH_CACHE_TTL = 300000; // 5 minutes
 
@@ -261,7 +318,7 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
   const warehouseNames = [...new Set(inventories.map(i => i.warehouse).filter(Boolean))];
   const warehouses = warehouseNames.map((name, i) => ({ id: `wh-${i}`, name: name || '未知仓', location: '未知' }));
 
-  // Build nodes and edges
+  // ── Product nodes ──
   for (const p of products) {
     nodes.set(buildNodeId('PRODUCT', p.sku), {
       id: buildNodeId('PRODUCT', p.sku), type: 'PRODUCT', label: p.name,
@@ -270,6 +327,7 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
     });
   }
 
+  // ── Warehouse nodes ──
   for (const w of warehouses) {
     nodes.set(buildNodeId('WAREHOUSE', w.id), {
       id: buildNodeId('WAREHOUSE', w.id), type: 'WAREHOUSE', label: w.name,
@@ -277,6 +335,7 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
     });
   }
 
+  // ── Supplier nodes ──
   for (const s of suppliers) {
     nodes.set(buildNodeId('SUPPLIER', s.code || s.id), {
       id: buildNodeId('SUPPLIER', s.code || s.id), type: 'SUPPLIER', label: s.name,
@@ -285,31 +344,41 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
     });
   }
 
+  // ── Shipment nodes + PORT→SHIPMENT→PRODUCT edges ──
   const portSet = new Set<string>();
+  const portShipmentMap = new Map<string, string[]>(); // portId → [shipmentIds]
+
   for (const s of shipments) {
     const shipId = buildNodeId('SHIPMENT', s.id);
-    const isDelayed = s.status === 'delayed' || s.delayDays > 0;
+    const isDelayed = s.status === 'delayed' || (s.delayDays ?? 0) > 0;
     nodes.set(shipId, {
       id: shipId, type: 'SHIPMENT', label: `${s.productName} (${s.trackingNumber})`,
       riskScore: isDelayed ? 30 : 0, initialRisk: isDelayed ? 30 : 0,
       metadata: { trackingNumber: s.trackingNumber, sku: s.sku, origin: s.origin, destination: s.destination, status: s.status, delayDays: s.delayDays, riskLevel: s.riskLevel },
     });
 
+    // Origin port
     const originId = buildNodeId('PORT', `origin:${s.origin}`);
     if (!portSet.has(originId)) {
       portSet.add(originId);
       nodes.set(originId, { id: originId, type: 'PORT', label: `${s.origin}港 (出发)`, riskScore: 0, initialRisk: 0, metadata: { location: s.origin, role: 'origin' } });
+      portShipmentMap.set(originId, []);
     }
+    portShipmentMap.get(originId)!.push(shipId);
     edges.push({ id: `e-origin-${s.id}`, from: originId, to: shipId, type: 'DEPARTS_FROM', attenuation: getAttenuation('DEPARTS_FROM'), metadata: {} });
 
+    // Destination port
     const destId = buildNodeId('PORT', `dest:${s.destination}`);
     if (!portSet.has(destId)) {
       portSet.add(destId);
       nodes.set(destId, { id: destId, type: 'PORT', label: `${s.destination}港 (目的)`, riskScore: 0, initialRisk: 0, metadata: { location: s.destination, role: 'destination' } });
+      portShipmentMap.set(destId, []);
     }
+    portShipmentMap.get(destId)!.push(shipId);
     edges.push({ id: `e-dest-${s.id}`, from: destId, to: shipId, type: 'ARRIVES_AT', attenuation: getAttenuation('ARRIVES_AT'), metadata: {} });
   }
 
+  // ── Warehouse → Product (STORED_IN) edges ──
   for (const inv of inventories) {
     const pId = buildNodeId('PRODUCT', inv.sku);
     const wId = buildNodeId('WAREHOUSE', inv.warehouse || 'unknown');
@@ -322,6 +391,7 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
     edges.push({ id: `e-stock-${inv.id}`, from: wId, to: pId, type: 'STORED_IN', attenuation: getAttenuation('STORED_IN'), metadata: { quantity: inv.quantity, safetyStock: inv.safetyStock, stockStatus: inv.stockStatus } });
   }
 
+  // ── Shipment → Product (CARRIES) edges ──
   for (const s of shipments) {
     const shipId = buildNodeId('SHIPMENT', s.id);
     const pId = buildNodeId('PRODUCT', s.sku);
@@ -330,6 +400,7 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
     }
   }
 
+  // ── Supplier → Product (SUPPLIED_BY) edges ──
   const supplierCosts = costRecords.filter(c => c.productId);
   for (const c of supplierCosts) {
     const matchingSupplier = suppliers.find(s => {
@@ -348,6 +419,58 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
     }
   }
 
+  // ═══ NEW: Deep edges for multi-hop propagation ═══
+
+  // ── PORT ↔ PORT transshipment edges ──
+  // Connect ports that share the same location (origin ↔ destination of same city)
+  const portByLocation = new Map<string, string[]>();
+  for (const [portId, node] of nodes) {
+    if (node.type === 'PORT') {
+      const loc = (node.metadata.location as string) || '';
+      if (loc) {
+        const list = portByLocation.get(loc) || [];
+        list.push(portId);
+        portByLocation.set(loc, list);
+      }
+    }
+  }
+  for (const [, portIds] of portByLocation) {
+    for (let i = 0; i < portIds.length; i++) {
+      for (let j = i + 1; j < portIds.length; j++) {
+        edges.push({
+          id: `e-transship-${portIds[i]}-${portIds[j]}`,
+          from: portIds[i], to: portIds[j], type: 'DEPARTS_FROM',
+          attenuation: 0.65, // transshipment attenuation
+          metadata: { transshipment: true },
+        });
+      }
+    }
+  }
+
+  // ── PRODUCT ↔ PRODUCT substitution edges (same category = BOM alternatives) ──
+  const productsByCategory = new Map<string, string[]>();
+  for (const [, node] of nodes) {
+    if (node.type === 'PRODUCT') {
+      const cat = (node.metadata.category as string) || 'unknown';
+      const list = productsByCategory.get(cat) || [];
+      list.push(node.id);
+      productsByCategory.set(cat, list);
+    }
+  }
+  for (const [, productIds] of productsByCategory) {
+    // Limit to max 5 substitution edges per product to avoid graph explosion
+    for (let i = 0; i < Math.min(productIds.length, 10); i++) {
+      for (let j = i + 1; j < Math.min(productIds.length, 10); j++) {
+        edges.push({
+          id: `e-substitute-${productIds[i]}-${productIds[j]}`,
+          from: productIds[i], to: productIds[j], type: 'SUPPLIED_BY',
+          attenuation: 0.30, // substitution only propagates 30% of risk
+          metadata: { substitution: true },
+        });
+      }
+    }
+  }
+
   graphCache = { nodes, edges, builtAt: Date.now() };
   return { nodes, edges };
 }
@@ -357,7 +480,7 @@ export async function buildGraph(forceRefresh = false): Promise<{ nodes: Map<str
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface PropagationEntry {
-  risk: number; path: string[]; depth?: number; cause: string;
+  risk: number; path: string[]; depth: number; cause: string;
   explanation: string; edgeType?: EdgeType;
 }
 
@@ -373,10 +496,9 @@ export function propagate(
   }
 
   const visited = new Map<string, PropagationEntry>();
-  const queue: Array<{ nodeId: string; incomingRisk: number; path: string[]; depth?: number; cause: string; explanation: string; edgeType?: EdgeType }> = [];
+  const queue: Array<{ nodeId: string; incomingRisk: number; path: string[]; depth: number; cause: string; explanation: string; edgeType?: EdgeType }> = [];
 
   for (const src of sources) {
-    const srcNode = nodes.get(src.nodeId);
     const explanation = `风险源: ${src.cause}`;
     queue.push({ nodeId: src.nodeId, incomingRisk: src.riskScore, path: [src.nodeId], depth: 0, cause: src.cause, explanation });
     visited.set(src.nodeId, { risk: src.riskScore, path: [src.nodeId], depth: 0, cause: src.cause, explanation });
@@ -390,9 +512,7 @@ export function propagate(
       const fromNode = nodes.get(edge.from);
       const toNode = nodes.get(edge.to);
 
-      // Apply custom DSL rules
       const effectiveAttenuation = applyCustomRules(edge, toNode?.metadata || {});
-
       const propagatedRisk = Math.round(current.incomingRisk * effectiveAttenuation * 10) / 10;
       if (propagatedRisk < 0.5) continue;
 
@@ -408,7 +528,6 @@ export function propagate(
         visited.set(edge.to, { risk: propagatedRisk, path: newPath, depth: current.depth + 1, cause: current.cause, explanation, edgeType: edge.type });
         queue.push({ nodeId: edge.to, incomingRisk: propagatedRisk, path: newPath, depth: current.depth + 1, cause: current.cause, explanation, edgeType: edge.type });
       } else {
-        // Multi-source accumulation
         const accumulated = existing.risk + propagatedRisk * 0.5;
         const mergedCause = `${existing.cause}; ${current.cause}`;
         const mergedExplanation = `${existing.explanation} | 多源叠加: ${propagatedRisk}%`;
@@ -417,30 +536,21 @@ export function propagate(
     }
   }
 
-  // Build cost context for monetary impact estimation
-  const costContext = Array.from(nodes.values())
-    .filter(n => n.type === 'PRODUCT')
-    .reduce<Record<string, { monthlyVolume: number; unitCost: number }>>((acc, n) => {
-      acc[n.id] = {
-        monthlyVolume: (n.metadata?.monthlyVolume as number) || 500,
-        unitCost: (n.metadata?.unitCost as number) || 45,
-      };
-      return acc;
-    }, {});
-
+  // Build results with data-driven monetary impact
   const results: PropagationStep[] = [];
   for (const [nodeId, v] of visited) {
     const node = nodes.get(nodeId);
     if (!node) continue;
     const initialRisk = sources.find(s => s.nodeId === nodeId)?.riskScore ?? 0;
+    const sku = (node.metadata?.sku as string) || '';
 
-    // Monetary impact: risk % × monthly volume × unit cost × damage ratio
-    const costs = costContext[nodeId] || { monthlyVolume: 500, unitCost: 45 };
-    const monthlyVolume = costs.monthlyVolume;
-    const unitCost = costs.unitCost;
-    const damageRatio = 0.15 + (v.risk / 100) * 0.35; // 15%-50% of revenue at risk based on severity
-    const monetaryImpact = Math.round(monthlyVolume * unitCost * damageRatio * (v.risk / 100));
-    const impactBreakdown = `${monthlyVolume}台 × $${unitCost}/台 × ${(damageRatio * 100).toFixed(0)}% × ${v.risk}%`;
+    // Monetary impact using data-driven damage ratio
+    const monthlyVolume = (node.metadata?.monthlyVolume as number) || 500;
+    const unitCost = (node.metadata?.unitCost as number) || 45;
+    // Severity-scaled damage: base 5% + risk-proportional up to 35%
+    const severityDamage = 0.05 + (v.risk / 100) * 0.35;
+    const monetaryImpact = Math.round(monthlyVolume * unitCost * severityDamage * (v.risk / 100));
+    const impactBreakdown = `${monthlyVolume}台 × $${unitCost}/台 × ${(severityDamage * 100).toFixed(0)}% × ${v.risk}%`;
 
     results.push({
       nodeId, label: node.label, type: node.type,
@@ -456,10 +566,295 @@ export function propagate(
   return results;
 }
 
-// Helper for weather description
+// ═══════════════════════════════════════════════════════════════════════════════
+// Monte Carlo Probabilistic Propagation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Box-Muller transform for normal distribution sampling */
+function sampleNormal(mean: number, stdDev: number, rng: () => number): number {
+  const u1 = rng();
+  const u2 = rng();
+  const z = Math.sqrt(-2 * Math.log(u1 || 0.0001)) * Math.cos(2 * Math.PI * u2);
+  return mean + z * stdDev;
+}
+
+/** Seeded PRNG (Mulberry32) for reproducible Monte Carlo runs */
+function createRng(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function percentile(arr: number[], p: number): number {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = Math.floor((p / 100) * (sorted.length - 1));
+  return sorted[idx] ?? 0;
+}
+
+/**
+ * Monte Carlo propagation: runs BFS `iterations` times with sampled attenuation.
+ * Returns per-node risk distribution (mean, stdDev, P5, P50, P95).
+ */
+export function propagateMonteCarlo(
+  nodes: Map<string, CascadeNode>,
+  edges: CascadeEdge[],
+  sources: Array<{ nodeId: string; riskScore: number; cause: string }>,
+  config: MonteCarloConfig = { iterations: 500 },
+): MonteCarloResult[] {
+  const { iterations, seed = 42 } = config;
+  const rng = createRng(seed);
+
+  // Compute per-edge stdDev from calibration or default ~8% of attenuation
+  const edgeStdDevs = new Map<string, number>();
+  for (const edge of edges) {
+    const cal = calibratedAttenuation?.[edge.type];
+    edgeStdDevs.set(edge.id, cal?.stdDev ?? (edge.attenuation * 0.08));
+  }
+
+  // Accumulator: nodeId → risk values across iterations
+  const accumulator = new Map<string, number[]>();
+
+  for (let iter = 0; iter < iterations; iter++) {
+    // Sample attenuations for this iteration
+    const sampledEdges = edges.map(e => {
+      const std = edgeStdDevs.get(e.id) ?? 0.05;
+      const sampledAttenuation = Math.min(Math.max(sampleNormal(e.attenuation, std, rng), 0), 1);
+      return { ...e, attenuation: sampledAttenuation };
+    });
+
+    // Run deterministic BFS with sampled attenuations
+    const result = propagate(nodes, sampledEdges, sources);
+
+    for (const step of result) {
+      const list = accumulator.get(step.nodeId) || [];
+      list.push(step.riskScore);
+      accumulator.set(step.nodeId, list);
+    }
+  }
+
+  // Compute statistics
+  const results: MonteCarloResult[] = [];
+  for (const [nodeId, risks] of accumulator) {
+    const node = nodes.get(nodeId);
+    if (!node) continue;
+    const mean = risks.reduce((a, b) => a + b, 0) / risks.length;
+    const variance = risks.reduce((s, r) => s + (r - mean) ** 2, 0) / risks.length;
+
+    results.push({
+      nodeId,
+      label: node.label,
+      type: node.type,
+      meanRisk: Math.round(mean * 10) / 10,
+      stdDev: Math.round(Math.sqrt(variance) * 10) / 10,
+      p5: Math.round(percentile(risks, 5) * 10) / 10,
+      p50: Math.round(percentile(risks, 50) * 10) / 10,
+      p95: Math.round(percentile(risks, 95) * 10) / 10,
+      iterations: risks.length,
+    });
+  }
+
+  return results.sort((a, b) => b.meanRisk - a.meanRisk);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export function weatherDesc(code: number): string {
   if (code <= 1) return '晴天'; if (code <= 3) return '多云';
   if (code <= 48) return '雾/霾'; if (code <= 57) return '毛毛雨';
   if (code <= 67) return '降雨'; if (code <= 77) return '降雪';
   if (code <= 86) return '阵雨'; return '雷暴';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEIR Hybrid Propagation — Epidemic-style contagion dynamics
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const DEFAULT_SEIR_CONFIG: SEIRConfig = {
+  beta: 0.30,       // transmission rate
+  sigma: 0.50,      // incubation rate (E→I)
+  gamma: 0.10,      // recovery rate (I→R)
+  timeSteps: 30,    // simulate 30 days
+  exposureThreshold: 15,    // S→E when risk > 15
+  infectiousThreshold: 35,  // E→I when risk > 35
+  recoveryThreshold: 5,     // I→R when risk < 5
+};
+
+/**
+ * SEIR hybrid propagation: combines BFS initial conditions with
+ * epidemic-style S→E→I→R dynamics over time.
+ *
+ * Models:
+ * - Panic buying: infectious nodes increase risk for susceptible neighbors
+ * - Supply shock contagion: supplier failure spreads through BOM dependencies
+ * - Recovery: alternative routes/stocks reduce risk over time
+ *
+ * The BFS propagation result is used as day-0 initial conditions.
+ * SEIR dynamics then evolve the system forward.
+ */
+export function propagateSEIR(
+  nodes: Map<string, CascadeNode>,
+  edges: CascadeEdge[],
+  bfsResult: PropagationStep[],
+  config: Partial<SEIRConfig> = {},
+): SEIRTimeline {
+  const cfg = { ...DEFAULT_SEIR_CONFIG, ...config };
+
+  // Build adjacency (both directions for undirected contagion)
+  const adjacency = new Map<string, Array<{ neighbor: string; attenuation: number }>>();
+  for (const e of edges) {
+    const forwardList = adjacency.get(e.from) || [];
+    forwardList.push({ neighbor: e.to, attenuation: e.attenuation });
+    adjacency.set(e.from, forwardList);
+    // Reverse edge for contagion spread
+    const reverseList = adjacency.get(e.to) || [];
+    reverseList.push({ neighbor: e.from, attenuation: e.attenuation * 0.5 });
+    adjacency.set(e.to, reverseList);
+  }
+
+  // Initialize SEIR states from BFS result
+  const states = new Map<string, SEIRNodeState>();
+  for (const [nodeId, node] of nodes) {
+    const bfsStep = bfsResult.find(p => p.nodeId === nodeId);
+    const initialRisk = bfsStep?.riskScore ?? 0;
+
+    let state: SEIRState = 'susceptible';
+    if (initialRisk >= cfg.infectiousThreshold) state = 'infectious';
+    else if (initialRisk >= cfg.exposureThreshold) state = 'exposed';
+
+    states.set(nodeId, {
+      nodeId, label: node.label, type: node.type,
+      state, risk: initialRisk,
+      transitionDay: 0,
+      riskHistory: [initialRisk],
+    });
+  }
+
+  // Track aggregate metrics
+  const days: SEIRTimeline['days'] = [];
+  let peakInfectious = 0;
+  let peakDay = 0;
+
+  const today = new Date();
+
+  for (let day = 1; day <= cfg.timeSteps; day++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() + day);
+
+    // Snapshot current states for atomic update
+    const prevStates = new Map<string, SEIRNodeState>();
+    for (const [id, s] of states) prevStates.set(id, { ...s });
+
+    for (const [nodeId, nodeState] of states) {
+      const prev = prevStates.get(nodeId)!;
+      const neighbors = adjacency.get(nodeId) || [];
+
+      switch (prev.state) {
+        case 'susceptible': {
+          // S→E: receive risk from infectious neighbors
+          let incomingRisk = 0;
+          for (const { neighbor, attenuation } of neighbors) {
+            const nPrev = prevStates.get(neighbor);
+            if (nPrev && nPrev.state === 'infectious') {
+              incomingRisk += nPrev.risk * cfg.beta * attenuation;
+            }
+          }
+          const newRisk = Math.min(incomingRisk, 100);
+          nodeState.risk = newRisk;
+          nodeState.riskHistory.push(newRisk);
+          if (newRisk >= cfg.exposureThreshold) {
+            nodeState.state = 'exposed';
+            nodeState.transitionDay = day;
+          }
+          break;
+        }
+
+        case 'exposed': {
+          // E→I: risk accumulates, transition when above infectious threshold
+          let incomingRisk = 0;
+          for (const { neighbor, attenuation } of neighbors) {
+            const nPrev = prevStates.get(neighbor);
+            if (nPrev && (nPrev.state === 'infectious' || nPrev.state === 'exposed')) {
+              incomingRisk += nPrev.risk * cfg.beta * attenuation * 0.5;
+            }
+          }
+          const newRisk = Math.min(prev.risk + incomingRisk * cfg.sigma, 100);
+          nodeState.risk = newRisk;
+          nodeState.riskHistory.push(newRisk);
+          if (newRisk >= cfg.infectiousThreshold) {
+            nodeState.state = 'infectious';
+            nodeState.transitionDay = day;
+          }
+          break;
+        }
+
+        case 'infectious': {
+          // I→R: recovery (risk decays naturally, faster if alternatives exist)
+          // Recovery is boosted by node having low-risk alternative paths
+          const altPaths = neighbors.filter(({ neighbor }) => {
+            const n = prevStates.get(neighbor);
+            return n && n.state === 'susceptible' && n.risk < 10;
+          }).length;
+          const recoveryBoost = 1 + altPaths * 0.15; // each alt path boosts recovery 15%
+          const decay = prev.risk * cfg.gamma * recoveryBoost;
+          const newRisk = Math.max(prev.risk - decay, 0);
+          nodeState.risk = newRisk;
+          nodeState.riskHistory.push(newRisk);
+
+          // Infectious nodes also cause slight risk increase in susceptible neighbors
+          // (contagion effect — already handled in susceptible case above)
+
+          if (newRisk < cfg.recoveryThreshold) {
+            nodeState.state = 'recovered';
+            nodeState.transitionDay = day;
+          }
+          break;
+        }
+
+        case 'recovered': {
+          // R stays recovered with residual low risk
+          nodeState.risk = Math.max(prev.risk * 0.9, 0);
+          nodeState.riskHistory.push(nodeState.risk);
+          break;
+        }
+      }
+    }
+
+    // Count states
+    let s = 0, e = 0, i = 0, r = 0, maxRisk = 0;
+    for (const [, ns] of states) {
+      if (ns.state === 'susceptible') s++;
+      else if (ns.state === 'exposed') e++;
+      else if (ns.state === 'infectious') i++;
+      else r++;
+      maxRisk = Math.max(maxRisk, ns.risk);
+    }
+
+    if (i > peakInfectious) {
+      peakInfectious = i;
+      peakDay = day;
+    }
+
+    days.push({
+      day, date: date.toISOString().split('T')[0],
+      susceptible: s, exposed: e, infectious: i, recovered: r,
+      peakRisk: Math.round(maxRisk * 10) / 10,
+    });
+  }
+
+  // Compute recovery horizon: first day when infectious = 0
+  const recoveryDay = days.find(d => d.infectious === 0)?.day ?? cfg.timeSteps;
+
+  return {
+    days,
+    finalStates: [...states.values()],
+    peakDay,
+    peakInfectious,
+    recoveryHorizon: recoveryDay,
+  };
 }

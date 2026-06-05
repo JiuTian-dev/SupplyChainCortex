@@ -37,19 +37,16 @@ const H_GAP = 130;
 const V_OFFSET = 70;
 
 export function CausalGraph({ steps, expandedStep, onExpand, onReplayNode, activeReplayNode }: CausalGraphProps) {
-  // Deduplicate steps by state (show each state once, with tool counts)
-  const seen = new Set<string>();
-  const nodes = steps.filter(s => {
-    if (seen.has(s.state)) return false;
-    seen.add(s.state);
-    return true;
-  });
+  // Show ALL steps in order (no dedup — FSM may revisit states like execute→observe→execute)
+  const nodes = steps;
 
   const totalWidth = Math.max(300, nodes.length * H_GAP + 40);
+  const svgHeight = 170;
 
   return (
     <div>
-      <svg width="100%" height="170" viewBox={`0 0 ${totalWidth} 170`} className="overflow-visible">
+      <div className="overflow-x-auto">
+        <svg width="100%" height={svgHeight} viewBox={`0 0 ${totalWidth} ${svgHeight}`} className="overflow-visible min-w-[300px]">
         {/* Edges */}
         {nodes.map((node, i) => {
           if (i === nodes.length - 1 || !node.nextState) return null;
@@ -155,13 +152,24 @@ export function CausalGraph({ steps, expandedStep, onExpand, onReplayNode, activ
             </g>
           );
         })}
-      </svg>
+        {/* Step index labels */}
+        {nodes.map((node, i) => {
+          const cx = 40 + i * H_GAP;
+          return (
+            <text key={`idx-${i}`} x={cx} y={V_OFFSET + NODE_RADIUS + 32} textAnchor="middle" fontSize={9} fill="#999">
+              Step {node.stepIndex}
+            </text>
+          );
+        })}
+        </svg>
+      </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-3 mt-2 text-[10px] text-muted-foreground">
         <span>🟢 工具调用数</span>
         <span>🟡 声明数量</span>
         <span className="text-blue-500">⏪ 点击展开节点后可回放</span>
+        <span className="text-muted-foreground/60">共 {nodes.length} 步</span>
       </div>
     </div>
   );

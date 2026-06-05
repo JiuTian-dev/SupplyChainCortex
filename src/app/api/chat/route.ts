@@ -12,6 +12,7 @@ import { getAuth } from '@/lib/auth-helpers';
 import { getDefaultModel, type ChatMessage } from '@/lib/services/ai-providers.service';
 import { buildDynamicSystemContext, rememberConversationTurn } from '@/lib/engine/context-builder';
 import { episodeStore } from '@/lib/engine/episode-store';
+import { jiutianMemory } from '@/lib/engine/memory-adapter';
 import { enforceMARC } from '@/lib/services/marc-validator';
 import { createFSMContext, runAgent } from '@/lib/agent/fsm';
 import { type ProviderId, getAdapter } from '@/lib/agent/adapter-factory';
@@ -31,6 +32,7 @@ async function handleStream(
   history: ChatMessage[],
   providerId: ProviderId,
   model: string,
+  memoryMode: boolean,
   fsmConfig?: Partial<FSMConfig>,
 ): Promise<Response> {
   const encoder = new TextEncoder();
@@ -44,7 +46,7 @@ async function handleStream(
       try {
         const adapter = getAdapter(providerId, model);
         enqueue('thinking', { status: 'context' });
-        const dynamicContext = await buildDynamicSystemContext(message);
+        const dynamicContext = await buildDynamicSystemContext(message, memoryMode);
         const userConfigCtx = '\n## 用户配置\n- 分析周期: 30天';
 
         const ctx = createFSMContext({
@@ -115,11 +117,12 @@ async function handleNonStream(
   history: ChatMessage[],
   providerId: ProviderId,
   model: string,
+  memoryMode: boolean,
   fsmConfig?: Partial<FSMConfig>,
 ): Promise<NextResponse> {
   try {
     const adapter = getAdapter(providerId, model);
-    const dynamicContext = await buildDynamicSystemContext(message);
+    const dynamicContext = await buildDynamicSystemContext(message, memoryMode);
     const userConfigCtx = '\n## 用户配置\n- 分析周期: 30天';
 
     const ctx = createFSMContext({
@@ -151,10 +154,14 @@ async function handleNonStream(
     }
 
     if (fullResponse.trim()) {
-      rememberConversationTurn(message, fullResponse);
-      try {
-        episodeStore.record({ userQuery: message, agentResponse: fullResponse, toolsUsed });
-      } catch { /* non-blocking */ }
+      if (memoryMode) {
+        rememberConversationTurn(message, fullResponse);
+        try {
+          episodeStore.record({ userQuery: message, agentResponse: fullResponse, toolsUsed });
+        } catch { /* non-blocking */ }
+        // Persistent memory — JiuTian bridge (dual-write, non-blocking)
+        jiutianMemory.record(message, fullResponse).catch(() => {});
+      }
     }
 
     return NextResponse.json({
@@ -190,6 +197,7 @@ async function handlePost(request: NextRequest) {
   const providerId = (body.provider as ProviderId) || 'deepseek';
   const model = (body.model as string) || getDefaultModel(providerId);
   const history = (body.history as ChatMessage[]) || [];
+  const memoryMode = body.memoryMode !== false; // default true
 
   if (!message) {
     return apiError('请输入消息内容');
@@ -215,9 +223,9 @@ async function handlePost(request: NextRequest) {
   }
 
   if (stream) {
-    return handleStream(message, recentHistory, providerId, model);
+    return handleStream(message, recentHistory, providerId, model, memoryMode);
   }
-  return handleNonStream(message, recentHistory, providerId, model);
+  return handleNonStream(message, recentHistory, providerId, model, memoryMode);
 }
 
 export const POST = withChatRateLimit(withErrorHandler(handlePost as unknown as Parameters<typeof withErrorHandler>[0]));

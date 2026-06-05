@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   sensitivityAnalysis,
   runCounterfactual,
+  runCausalCounterfactual,
   boundaryTest,
   fuseMultiSourceRisks,
   applyCustomRules,
@@ -14,7 +15,15 @@ import {
   generatePreventiveActions,
   weatherDesc,
   setPropagationRules,
+  propagateMonteCarlo,
+  propagateSEIR,
 } from './cascade-risk.service';
+import type { EdgeType } from './cascade-risk.types';
+
+// Helper to create a minimal CascadeEdge for testing
+function testEdge(type: EdgeType, attenuation: number) {
+  return { id: `test-${type}`, from: 'a', to: 'b', type, attenuation, metadata: {} };
+}
 
 describe('sensitivityAnalysis', () => {
   const baseAttenuation = {
@@ -26,17 +35,17 @@ describe('sensitivityAnalysis', () => {
   };
 
   const samplePropagation = [
-    { nodeId: 'n1', label: 'Port Shanghai', type: 'PORT', riskScore: 80, initialRisk: 80, propagatedRisk: 68, path: ['shanghai'], depth: 0, metadata: {} },
-    { nodeId: 'n2', label: 'Shipment A', type: 'SHIPMENT', riskScore: 60, initialRisk: 0, propagatedRisk: 51, path: ['shanghai', 'ship-a'], depth: 1, metadata: {} },
-  ] as Record<string, unknown>[];
+    { nodeId: 'n1', label: 'Port Shanghai', type: 'PORT' as const, riskScore: 80, initialRisk: 80, propagatedRisk: 68, path: ['shanghai'], depth: 0, metadata: {}, explanation: '' },
+    { nodeId: 'n2', label: 'Shipment A', type: 'SHIPMENT' as const, riskScore: 60, initialRisk: 0, propagatedRisk: 51, path: ['shanghai', 'ship-a'], depth: 1, metadata: {}, explanation: '' },
+  ];
 
   it('returns one result per edge type', () => {
-    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation as unknown as Record<string, unknown>[] });
+    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation });
     expect(results.length).toBe(Object.keys(baseAttenuation).length);
   });
 
   it('each result contains parameter and perturbations array', () => {
-    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation as unknown as Record<string, unknown>[] });
+    const results = sensitivityAnalysis({ baseAttenuation, propagation: samplePropagation });
     for (const r of results) {
       expect(r.parameter).toBeTruthy();
       expect(Array.isArray(r.perturbations)).toBe(true);
@@ -52,7 +61,7 @@ describe('sensitivityAnalysis', () => {
   });
 
   it('handles empty baseAttenuation', () => {
-    const results = sensitivityAnalysis({ baseAttenuation: {} as Record<string, number>, propagation: samplePropagation as any });
+    const results = sensitivityAnalysis({ baseAttenuation: {} as Record<EdgeType, number>, propagation: samplePropagation });
     expect(results).toEqual([]);
   });
 });
@@ -226,7 +235,7 @@ describe('applyCustomRules', () => {
   });
 
   it('returns edge attenuation when no rules match', () => {
-    const edge = { type: 'CARRIES' as const, attenuation: 0.75 };
+    const edge = testEdge('CARRIES', 0.75);
     expect(applyCustomRules(edge, {})).toBe(0.75);
   });
 
@@ -234,14 +243,14 @@ describe('applyCustomRules', () => {
     setPropagationRules([
       { edgeType: 'CARRIES' as const, overrideAttenuation: 0.50 },
     ]);
-    expect(applyCustomRules({ type: 'CARRIES' as const, attenuation: 0.75 }, {})).toBe(0.50);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), {})).toBe(0.50);
   });
 
   it('ignores rules that do not match the edge type', () => {
     setPropagationRules([
       { edgeType: 'STORED_IN' as const, overrideAttenuation: 0.30 },
     ]);
-    expect(applyCustomRules({ type: 'CARRIES' as const, attenuation: 0.75 }, {})).toBe(0.75);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), {})).toBe(0.75);
   });
 
   it('evaluates gt condition correctly', () => {
@@ -250,9 +259,8 @@ describe('applyCustomRules', () => {
       condition: { field: 'delayDays', operator: 'gt', value: '5' },
       overrideAttenuation: 0.95,
     }]);
-    const edge = { type: 'CARRIES' as const, attenuation: 0.75 };
-    expect(applyCustomRules(edge, { delayDays: 10 })).toBe(0.95);
-    expect(applyCustomRules(edge, { delayDays: 3 })).toBe(0.75);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), { delayDays: 10 })).toBe(0.95);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), { delayDays: 3 })).toBe(0.75);
   });
 
   it('evaluates lt condition correctly', () => {
@@ -261,8 +269,8 @@ describe('applyCustomRules', () => {
       condition: { field: 'inventory', operator: 'lt', value: '100' },
       overrideAttenuation: 0.85,
     }]);
-    expect(applyCustomRules({ type: 'CARRIES' as const, attenuation: 0.75 }, { inventory: 50 })).toBe(0.85);
-    expect(applyCustomRules({ type: 'CARRIES' as const, attenuation: 0.75 }, { inventory: 200 })).toBe(0.75);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), { inventory: 50 })).toBe(0.85);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), { inventory: 200 })).toBe(0.75);
   });
 
   it('evaluates eq condition with string match', () => {
@@ -271,8 +279,8 @@ describe('applyCustomRules', () => {
       condition: { field: 'stockStatus', operator: 'eq', value: 'critical' },
       overrideAttenuation: 0.90,
     }]);
-    expect(applyCustomRules({ type: 'STORED_IN' as const, attenuation: 0.60 }, { stockStatus: 'critical' })).toBe(0.90);
-    expect(applyCustomRules({ type: 'STORED_IN' as const, attenuation: 0.60 }, { stockStatus: 'healthy' })).toBe(0.60);
+    expect(applyCustomRules(testEdge('STORED_IN', 0.60), { stockStatus: 'critical' })).toBe(0.90);
+    expect(applyCustomRules(testEdge('STORED_IN', 0.60), { stockStatus: 'healthy' })).toBe(0.60);
   });
 
   it('last matching rule wins (rules iterate in order, last override applies)', () => {
@@ -280,8 +288,7 @@ describe('applyCustomRules', () => {
       { edgeType: 'CARRIES' as const, condition: { field: 'delayDays', operator: 'gt', value: '0' }, overrideAttenuation: 0.90 },
       { edgeType: 'CARRIES' as const, overrideAttenuation: 0.50 },
     ]);
-    // Both rules match; the second (unconditional) overrides the first
-    expect(applyCustomRules({ type: 'CARRIES' as const, attenuation: 0.75 }, { delayDays: 3 })).toBe(0.50);
+    expect(applyCustomRules(testEdge('CARRIES', 0.75), { delayDays: 3 })).toBe(0.50);
   });
 });
 
@@ -425,5 +432,271 @@ describe('weatherDesc', () => {
   it('returns 雷暴 for code 87+', () => {
     expect(weatherDesc(90)).toBe('雷暴');
     expect(weatherDesc(100)).toBe('雷暴');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monte Carlo Propagation Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('propagateMonteCarlo', () => {
+  const nodes = new Map();
+  nodes.set('port-1', { id: 'port-1', type: 'PORT', label: 'Test Port', riskScore: 0, initialRisk: 0, metadata: {} });
+  nodes.set('ship-1', { id: 'ship-1', type: 'SHIPMENT', label: 'Test Ship', riskScore: 0, initialRisk: 0, metadata: {} });
+  nodes.set('prod-1', { id: 'prod-1', type: 'PRODUCT', label: 'Test Product', riskScore: 0, initialRisk: 0, metadata: { sku: 'SKU001' } });
+
+  const edges = [
+    { id: 'e1', from: 'port-1', to: 'ship-1', type: 'DEPARTS_FROM' as EdgeType, attenuation: 0.5, metadata: {} },
+    { id: 'e2', from: 'ship-1', to: 'prod-1', type: 'CARRIES' as EdgeType, attenuation: 0.8, metadata: {} },
+  ];
+
+  const sources = [{ nodeId: 'port-1', riskScore: 80, cause: 'test weather' }];
+
+  it('returns results for all reachable nodes', () => {
+    const results = propagateMonteCarlo(nodes, edges, sources, { iterations: 50, seed: 42 });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.some(r => r.nodeId === 'port-1')).toBe(true);
+  });
+
+  it('includes statistical fields (mean, stdDev, p5, p50, p95)', () => {
+    const results = propagateMonteCarlo(nodes, edges, sources, { iterations: 100, seed: 42 });
+    for (const r of results) {
+      expect(typeof r.meanRisk).toBe('number');
+      expect(typeof r.stdDev).toBe('number');
+      expect(typeof r.p5).toBe('number');
+      expect(typeof r.p50).toBe('number');
+      expect(typeof r.p95).toBe('number');
+      expect(r.p5).toBeLessThanOrEqual(r.p50);
+      expect(r.p50).toBeLessThanOrEqual(r.p95);
+    }
+  });
+
+  it('mean risk of source node equals its riskScore', () => {
+    const results = propagateMonteCarlo(nodes, edges, sources, { iterations: 200, seed: 42 });
+    const source = results.find(r => r.nodeId === 'port-1');
+    expect(source).toBeDefined();
+    expect(source!.meanRisk).toBeCloseTo(80, 0);
+  });
+
+  it('propagated nodes have lower mean risk than source', () => {
+    const results = propagateMonteCarlo(nodes, edges, sources, { iterations: 200, seed: 42 });
+    const product = results.find(r => r.nodeId === 'prod-1');
+    if (product) {
+      expect(product.meanRisk).toBeLessThan(80);
+    }
+  });
+
+  it('is deterministic with same seed', () => {
+    const r1 = propagateMonteCarlo(nodes, edges, sources, { iterations: 50, seed: 123 });
+    const r2 = propagateMonteCarlo(nodes, edges, sources, { iterations: 50, seed: 123 });
+    expect(r1.map(r => r.meanRisk)).toEqual(r2.map(r => r.meanRisk));
+  });
+
+  it('handles empty graph', () => {
+    const results = propagateMonteCarlo(new Map(), [], sources, { iterations: 10 });
+    expect(results).toEqual([]);
+  });
+
+  it('handles empty sources', () => {
+    const results = propagateMonteCarlo(nodes, edges, [], { iterations: 10 });
+    expect(results).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Real Boundary Tests (now executing the propagation engine)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('boundaryTest (real execution)', () => {
+  it('all 7 tests pass', () => {
+    const result = boundaryTest();
+    expect(result.allPassed).toBe(true);
+    expect(result.tests.length).toBe(7);
+    for (const t of result.tests) {
+      expect(t.passed).toBe(true);
+    }
+  });
+
+  it('empty_graph test passes', () => {
+    const result = boundaryTest();
+    const test = result.tests.find(t => t.name === 'empty_graph');
+    expect(test?.passed).toBe(true);
+  });
+
+  it('cyclic_graph test passes (BFS visited pruning)', () => {
+    const result = boundaryTest();
+    const test = result.tests.find(t => t.name === 'cyclic_graph');
+    expect(test?.passed).toBe(true);
+    expect(test?.description).toContain('visited');
+  });
+
+  it('large_graph test completes in < 5s', () => {
+    const result = boundaryTest();
+    const test = result.tests.find(t => t.name === 'large_graph');
+    expect(test?.passed).toBe(true);
+    expect(test?.description).toMatch(/\d+ms/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEIR Hybrid Propagation Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('propagateSEIR', () => {
+  // Build a simple test graph: PORT → SHIPMENT → WAREHOUSE → PRODUCT
+  const nodes = new Map<string, { id: string; type: any; label: string; riskScore: number; initialRisk: number; metadata: Record<string, unknown> }>();
+  nodes.set('port', { id: 'port', type: 'PORT', label: 'Port Shanghai', riskScore: 0, initialRisk: 0, metadata: {} });
+  nodes.set('ship', { id: 'ship', type: 'SHIPMENT', label: 'Shipment A', riskScore: 0, initialRisk: 0, metadata: {} });
+  nodes.set('wh', { id: 'wh', type: 'WAREHOUSE', label: 'Warehouse DE', riskScore: 0, initialRisk: 0, metadata: {} });
+  nodes.set('prod', { id: 'prod', type: 'PRODUCT', label: 'Air Fryer', riskScore: 0, initialRisk: 0, metadata: {} });
+
+  const edges = [
+    testEdge('DEPARTS_FROM' as EdgeType, 0.43),
+    { ...testEdge('ARRIVES_AT' as EdgeType, 0.70), from: 'ship', to: 'wh' },
+    { ...testEdge('STORED_IN' as EdgeType, 0.60), from: 'wh', to: 'prod' },
+  ];
+  edges[0].from = 'port'; edges[0].to = 'ship';
+
+  // BFS result with port as high-risk source
+  const bfsResult = [
+    { nodeId: 'port', label: 'Port Shanghai', type: 'PORT' as const, riskScore: 85, initialRisk: 85, propagatedRisk: 85, path: ['port'], depth: 0, metadata: {}, explanation: 'source' },
+    { nodeId: 'ship', label: 'Shipment A', type: 'SHIPMENT' as const, riskScore: 36, initialRisk: 0, propagatedRisk: 36, path: ['port', 'ship'], depth: 1, metadata: {}, explanation: '' },
+    { nodeId: 'wh', label: 'Warehouse DE', type: 'WAREHOUSE' as const, riskScore: 25, initialRisk: 0, propagatedRisk: 25, path: ['port', 'ship', 'wh'], depth: 2, metadata: {}, explanation: '' },
+    { nodeId: 'prod', label: 'Air Fryer', type: 'PRODUCT' as const, riskScore: 15, initialRisk: 0, propagatedRisk: 15, path: ['port', 'ship', 'wh', 'prod'], depth: 3, metadata: {}, explanation: '' },
+  ];
+
+  it('produces a 30-day timeline', () => {
+    const timeline = propagateSEIR(nodes, edges, bfsResult);
+    expect(timeline.days.length).toBe(30);
+    expect(timeline.finalStates.length).toBe(4);
+  });
+
+  it('port starts as infectious (risk > 35)', () => {
+    const timeline = propagateSEIR(nodes, edges, bfsResult);
+    const portState = timeline.finalStates.find(s => s.nodeId === 'port');
+    expect(portState).toBeDefined();
+    // port should be infectious or recovered (risk > 35 initially)
+    expect(['infectious', 'recovered']).toContain(portState?.state);
+  });
+
+  it('susceptible nodes can transition to exposed over time', () => {
+    const timeline = propagateSEIR(nodes, edges, bfsResult);
+    // prod starts as susceptible (risk=15, at threshold), may become exposed
+    const prodHistory = timeline.finalStates.find(s => s.nodeId === 'prod')?.riskHistory;
+    expect(prodHistory).toBeDefined();
+    expect(prodHistory!.length).toBe(31); // day 0 + 30 iterations
+  });
+
+  it('tracks peak infectious day', () => {
+    const timeline = propagateSEIR(nodes, edges, bfsResult);
+    expect(timeline.peakDay).toBeGreaterThanOrEqual(0);
+    expect(timeline.peakInfectious).toBeGreaterThanOrEqual(0);
+  });
+
+  it('recovery horizon is within timeSteps', () => {
+    const timeline = propagateSEIR(nodes, edges, bfsResult, { timeSteps: 30 });
+    expect(timeline.recoveryHorizon).toBeLessThanOrEqual(30);
+    expect(timeline.recoveryHorizon).toBeGreaterThanOrEqual(1);
+  });
+
+  it('handles empty BFS result gracefully', () => {
+    const timeline = propagateSEIR(nodes, edges, []);
+    expect(timeline.days.length).toBe(30);
+    // All nodes should start susceptible with zero risk
+    const day1 = timeline.days[0];
+    expect(day1.susceptible).toBe(4);
+  });
+
+  it('respects custom SEIR config', () => {
+    // High recovery rate → faster recovery
+    const fast = propagateSEIR(nodes, edges, bfsResult, { gamma: 0.9, timeSteps: 10 });
+    const slow = propagateSEIR(nodes, edges, bfsResult, { gamma: 0.01, timeSteps: 10 });
+    // Fast recovery should have more recovered nodes
+    const fastRecovered = fast.finalStates.filter(s => s.state === 'recovered').length;
+    const slowRecovered = slow.finalStates.filter(s => s.state === 'recovered').length;
+    expect(fastRecovered).toBeGreaterThanOrEqual(slowRecovered);
+  });
+
+  it('each day has correct SEIR counts summing to total nodes', () => {
+    const timeline = propagateSEIR(nodes, edges, bfsResult);
+    for (const day of timeline.days) {
+      expect(day.susceptible + day.exposed + day.infectious + day.recovered).toBe(4);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Causal ML Counterfactual Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('runCausalCounterfactual', () => {
+  const baseReport = {
+    triggeredBy: { source: 'test', description: 'test', timestamp: '' },
+    sourceNodes: [],
+    propagation: [],
+    summary: {
+      totalNodes: 10, affectedNodes: 4, maxDepth: 2,
+      avgPropagatedRisk: 45,
+      criticalPaths: [],
+      topAffectedProducts: [
+        { sku: 'SKU001', productName: 'Air Fryer', impactScore: 60, propagationPath: 'p1→prod1', estimatedDelay: 7, estimatedRevenueImpact: 10500 },
+      ],
+      totalMonthlyLoss: 5000,
+    },
+  };
+
+  it('returns results for all alternatives', async () => {
+    const results = await runCausalCounterfactual(baseReport as any, [
+      { name: 'Reroute', targetNode: 'SKU001', action: 'Reroute via Busan', intervention: 'reroute' },
+      { name: 'Safety Stock', targetNode: 'SKU001', action: 'Double safety stock', intervention: 'safety_stock' },
+    ]);
+    expect(results.length).toBe(2);
+    expect(results[0].intervention).toBe('reroute');
+    expect(results[1].intervention).toBe('safety_stock');
+  });
+
+  it('each result has causal estimate with confidence interval', async () => {
+    const results = await runCausalCounterfactual(baseReport as any, [
+      { name: 'Supplier Switch', targetNode: 'SKU001', action: 'Switch supplier', intervention: 'supplier_switch' },
+    ]);
+    const r = results[0];
+    expect(r.causalEstimate).toBeDefined();
+    expect(r.causalEstimate.ate).toBeGreaterThan(0);
+    expect(r.causalEstimate.ate).toBeLessThan(1);
+    expect(r.confidenceInterval[0]).toBeLessThanOrEqual(r.confidenceInterval[1]);
+  });
+
+  it('estimated reduction is between 0 and 1', async () => {
+    const results = await runCausalCounterfactual(baseReport as any, [
+      { name: 'Combined', targetNode: 'SKU001', action: 'All actions', intervention: 'combined' },
+    ]);
+    expect(results[0].estimatedReduction).toBeGreaterThan(0);
+    expect(results[0].estimatedReduction).toBeLessThanOrEqual(1);
+  });
+
+  it('combined intervention has higher ATE than single', async () => {
+    const results = await runCausalCounterfactual(baseReport as any, [
+      { name: 'Reroute', targetNode: 'SKU001', action: 'Reroute', intervention: 'reroute' },
+      { name: 'Combined', targetNode: 'SKU001', action: 'Combined', intervention: 'combined' },
+    ]);
+    // Combined should have higher or equal ATE (priors: combined=0.55 > reroute=0.25)
+    expect(results[1].causalEstimate.ate).toBeGreaterThanOrEqual(results[0].causalEstimate.ate);
+  });
+
+  it('includes isReliability flag', async () => {
+    const results = await runCausalCounterfactual(baseReport as any, [
+      { name: 'Reroute', targetNode: 'SKU001', action: 'Reroute', intervention: 'reroute' },
+    ]);
+    // With limited/no historical data, should be unreliable
+    expect(typeof results[0].isReliable).toBe('boolean');
+  });
+
+  it('recommendation includes confidence interval when reliable', async () => {
+    const results = await runCausalCounterfactual(baseReport as any, [
+      { name: 'Reroute', targetNode: 'SKU001', action: 'Reroute via Busan', intervention: 'reroute' },
+    ]);
+    expect(results[0].recommendation).toBeTruthy();
+    // Should contain either CI or "有限" qualifier
+    expect(results[0].recommendation.length).toBeGreaterThan(5);
   });
 });

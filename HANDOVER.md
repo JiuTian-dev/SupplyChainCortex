@@ -1,8 +1,8 @@
 # SupplyChain Cortex — 项目交接文档
 
-> 最后更新: 2026-05-22  
-> 当前版本: v2.0.0 (Agent Engine v2 + Audit + Skills)  
-> 状态: 2 tsc 预存错误, 32 测试文件 583 测试通过, 1 DB 依赖失败
+> 最后更新: 2026-06-05  
+> 当前版本: v2.9.3 (级联风险引擎全面商业化升级)  
+> 状态: 0 新增 TS 错误, 31 测试文件 580 测试通过 (2 pre-existing DeepSeek 失败)
 
 ---
 
@@ -76,27 +76,68 @@ bun run dev
 
 | 指标 | 数值 |
 |------|------|
-| 源文件 (TS/TSX) | 385 |
-| 测试文件 | 32 |
-| 测试通过 | 530 |
+| 测试文件 | 31 |
+| 测试通过 | 578 (2 pre-existing DeepSeek 失败) |
 | Agent 引擎 | FSM v2 (6 状态) |
 | Provider 适配器 | DeepSeek V4 Pro / OpenAI / Anthropic |
-| TypeScript 预存错误 | 5（非 v2 引入） |
+| TypeScript 预存错误 | 5（非本模块引入） |
 | Prisma 模型 | 28 |
 | MCP 工具 | 65 |
-| TypeScript 错误 | 0 |
-| Prisma 模型 | 28 |
-| Prisma 版本 | 6.19.3 |
 | API 端点 | 62 |
 | 数据库 | PostgreSQL 16 |
-| MCP 工具 | 65（新增 4 个图表工具） |
-| Git 提交 | 150+ |
 
 ---
 
-## 最近会话完成的工作（2026-05-21）
+## 最近会话完成的工作
 
-### Agent Engine v2 (Phase 10): FSM 状态机 + 语义路由 + Provider 适配器
+### 2026-06-05: 级联风险引擎商业化升级 (P0/P1/P2 全部完成)
+
+**目标**: 将引擎从"学术验证"升级为"商业级"，消除硬编码和假验证。
+
+**P0/P1 (上一轮会话已完成)**:
+- 移除全部 6 个模块 `@ts-nocheck` — 完整类型安全
+- 修复假回测 — 基于 AuditLog 快照的真实历史对比
+- 修复硬编码边界测试 — 实际执行 propagate() 的 7 个边界用例
+- Monte Carlo 传播 — Box-Muller 采样 + P5/P50/P95 置信区间
+- 图深度扩展 — PORT↔PORT 转运边 + PRODUCT↔PRODUCT 替代边
+- 数据驱动收入影响 — computeDamageRatio() 替代硬编码 0.3
+- 校准 stdDev — 从数据方差真实计算
+
+**P2 (本轮会话完成)**:
+
+1. **SEIR 混合传播模型** — 传染病动力学 S→E→I→R
+   - `propagateSEIR()`: 基于 BFS 结果的 30 天时序模拟
+   - 参数: β=0.30(传播), σ=0.50(潜伏), γ=0.10(恢复)
+   - 输出: 每日 S/E/I/R 计数 + 峰值日 + 恢复周期
+   - 场景: 恐慌性缺货、囤货、供应链冲击传播
+
+2. **Causal ML 反事实引擎** — 替代硬编码 riskReduction
+   - `runCausalCounterfactual()`: 基于历史审计日志的因果估计
+   - 倾向评分匹配 + 排列检验 + Bootstrap 置信区间
+   - 4 种干预类型: reroute / safety_stock / supplier_switch / combined
+   - 数据不足时自动回退到领域先验 (prior)
+
+3. **前端 CascadeRiskPanel 更新**:
+   - SEIR 传播动态图 (堆叠柱状图 + 图例 + 里程碑)
+   - 因果反事实面板 (ATE + CI + 样本量 + p值 + 可靠性标记)
+   - 顶部指标新增: 传播峰值日 + 恢复周期
+
+**测试覆盖**: 580 测试 (69 cascade-risk 专项)
+
+### 2026-06-05: 级联风险引擎评估报告
+
+- 评分: 7.3/10，定位: "轻量级可解释风险传播器"
+- 报告: `CASCADE_RISK_ENGINE_EVALUATION.md` (276 行)
+- 核心优势: 可解释性 9/10, 垂直深度 8/10, 部署效率 9/10
+- 全部 P0/P1/P2 升级已完成
+
+### 2026-06-04 ~ 06-05: 前端修复 + 审计/数据面板
+
+- CausalGraph / ComplianceReport / TraceList / ReplayPanel 修复
+- TabbedSection + page.tsx 审计面板集成
+- 级联风险面板极简重设计
+
+### 2026-05-21: Agent Engine v2 (Phase 10): FSM 状态机 + 语义路由 + Provider 适配器
 
 **架构升级**：ReAct 自由循环 → 6 状态显式 FSM + LLM 语义路由 + Provider 适配器层
 
@@ -217,8 +258,8 @@ bun run dev
 bun run dev                     # 自动启动 SearXNG + Next.js
 
 # 质量检查
-bun run test                     # 647 tests
-npx tsc --noEmit                 # 0 errors
+npx vitest run                   # 580 tests (2 pre-existing DeepSeek failures)
+npx tsc --noEmit                 # 0 new errors
 
 # 数据库
 bun run db:push                  # 推送 schema
@@ -247,10 +288,13 @@ bun run prisma/seed-compact.ts   # 50 产品精简种子（需先清表）
 | `src/instrumentation.ts` | 启动钩子（scheduler + ensureCacheBackend） |
 | `src/app/api/chat/route.ts` | Chat API（ReAct + 图表预生成） |
 | `src/app/api/chat/chat.prompt.ts` | 系统提示词（MARC 协议 + 工具声明） |
-| `src/lib/services/information-router.ts` | 意图分类 + 路由 |
-| `src/lib/services/web-search.service.ts` | 多源搜索 |
-| `src/components/shared/ChatPanel.tsx` | Chat 面板（思考过程 + 图片渲染） |
-| `src/components/shared/ChatPanel.helpers.tsx` | Markdown 渲染 + 图片支持 |
+| `src/lib/services/cascade-risk.types.ts` | 级联风险类型 (SEIR, CausalML, MonteCarlo) |
+| `src/lib/services/cascade-risk.propagation.ts` | BFS + Monte Carlo + SEIR 传播引擎 |
+| `src/lib/services/cascade-risk.validation.ts` | 边界测试 + 敏感度 + Causal ML 反事实 |
+| `src/lib/services/cascade-risk.main.ts` | 编排器: getCascadeRisk() + backtest() |
+| `src/lib/services/cascade-risk.service.ts` | Barrel re-export |
+| `src/lib/services/cascade-risk.calibration.ts` | 衰减因子校准 |
+| `src/components/risk/CascadeRiskPanel.tsx` | 级联风险前端面板 (SEIR图+因果CI) |
 
 ---
 

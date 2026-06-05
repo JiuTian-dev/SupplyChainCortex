@@ -45,6 +45,15 @@ const STATE_LABELS: Record<string, string> = {
   observe: '观察', decide: '决策', synthesize: '合成',
 };
 
+const INTENT_LABELS: Record<string, string> = {
+  supply_chain_data: '供应链数据',
+  supply_chain_knowledge: '专业知识',
+  news_event: '新闻事件',
+  general_knowledge: '通用知识',
+  opinion_recommendation: '意见推荐',
+  chat_greeting: '闲聊',
+};
+
 const STATE_COLORS: Record<string, string> = {
   classify: '#8b5cf6', plan: '#3b82f6', execute: '#10b981',
   observe: '#f59e0b', decide: '#ef4444', synthesize: '#06b6d4',
@@ -70,7 +79,24 @@ export function TraceDetail({ traceId }: { traceId: string }) {
       .then(d => { if (d.success) setTrace(d.data); });
   }, [traceId]);
 
-  if (!trace) return <div className="p-8 text-center text-muted-foreground">加载中...</div>;
+  if (!trace) {
+    return (
+      <div className="p-8 space-y-4 animate-pulse">
+        <div className="h-6 bg-muted rounded w-3/4" />
+        <div className="flex gap-2">
+          <div className="h-4 bg-muted rounded w-20" />
+          <div className="h-4 bg-muted rounded w-16" />
+          <div className="h-4 bg-muted rounded w-16" />
+        </div>
+        <div className="h-40 bg-muted/30 rounded-lg" />
+        <div className="space-y-2">
+          <div className="h-16 bg-muted rounded-lg" />
+          <div className="h-16 bg-muted rounded-lg" />
+          <div className="h-16 bg-muted rounded-lg" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-auto">
@@ -78,7 +104,7 @@ export function TraceDetail({ traceId }: { traceId: string }) {
       <div className="mb-4">
         <h2 className="text-lg font-semibold mb-1">{trace.userQuery}</h2>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">{trace.intent}</Badge>
+          <Badge variant="secondary">{INTENT_LABELS[trace.intent] || trace.intent}</Badge>
           <span>置信度: {(trace.confidence * 100).toFixed(0)}%</span>
           <span>耗时: {(trace.durationMs / 1000).toFixed(1)}s</span>
           <span>工具: {trace.toolsUsed.join(', ') || '无'}</span>

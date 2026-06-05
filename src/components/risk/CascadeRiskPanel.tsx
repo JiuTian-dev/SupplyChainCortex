@@ -3,10 +3,9 @@
 import { useState, useMemo } from 'react';
 import { useCascadeRisk } from '@/hooks/use-cascade-risk';
 import {
-  Network, AlertTriangle, TrendingDown, Clock, DollarSign,
-  ChevronDown, RefreshCw, GitBranch, TrendingUp, ArrowRight, Beaker,
+  AlertTriangle, Clock, DollarSign,
+  RefreshCw, ArrowRight, Activity,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,268 +50,398 @@ interface CounterfactualResult {
   recommendation: string;
 }
 
+interface CausalCF {
+  scenario: string;
+  intervention: string;
+  estimatedReduction: number;
+  confidenceInterval: [number, number];
+  causalEstimate: {
+    ate: number;
+    sampleSize: number;
+    pValue: number;
+    explanation: string;
+  };
+  improvement: number;
+  recommendation: string;
+  isReliable: boolean;
+}
+
+interface SEIRDay {
+  day: number;
+  date: string;
+  susceptible: number;
+  exposed: number;
+  infectious: number;
+  recovered: number;
+  peakRisk: number;
+}
+
+interface SEIRTimeline {
+  days: SEIRDay[];
+  peakDay: number;
+  peakInfectious: number;
+  recoveryHorizon: number;
+}
+
+interface SEIRSummary {
+  peakDay: number;
+  peakInfectious: number;
+  recoveryHorizon: number;
+  finalSusceptible: number;
+  finalRecovered: number;
+}
+
 interface CascadeReport {
   triggeredBy: { source: string; description: string; timestamp: string };
   sourceNodes: SourceNode[];
   propagation: PropagationItem[];
   forwardProjection?: DayProjection[];
   counterfactuals?: CounterfactualResult[];
+  causalCounterfactuals?: CausalCF[];
+  seirTimeline?: SEIRTimeline;
   summary: {
     totalNodes: number; affectedNodes: number; maxDepth: number;
     avgPropagatedRisk: number; criticalPaths: CriticalPath[];
     topAffectedProducts: TopProduct[];
+    seirSummary?: SEIRSummary;
   };
 }
 
-function riskColor(score: number): string {
-  if (score >= 70) return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30';
-  if (score >= 40) return 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30';
-  if (score >= 15) return 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30';
-  return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function riskDot(score: number): string {
+  if (score >= 70) return 'bg-red-500';
+  if (score >= 40) return 'bg-orange-400';
+  if (score >= 15) return 'bg-yellow-400';
+  return 'bg-emerald-400';
 }
 
-function riskBarColor(score: number): string {
-  if (score >= 70) return 'bg-red-500';
-  if (score >= 40) return 'bg-orange-500';
-  if (score >= 15) return 'bg-yellow-500';
-  return 'bg-green-500';
+function riskText(score: number): string {
+  if (score >= 70) return 'text-red-600 dark:text-red-400';
+  if (score >= 40) return 'text-orange-600 dark:text-orange-400';
+  return 'text-muted-foreground';
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function CascadeRiskPanel() {
   const [scenario, setScenario] = useState('auto');
-  const [showDetails, setShowDetails] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data: report, isLoading: loading, error, refetch } = useCascadeRisk(scenario);
 
-  const productRisks = useMemo(() =>
-    (report?.propagation || []).filter((p: PropagationItem) => p.type === 'PRODUCT' && p.propagatedRisk > 0),
+  const productCount = useMemo(() =>
+    (report?.propagation || []).filter((p: PropagationItem) => p.type === 'PRODUCT' && p.propagatedRisk > 0).length,
     [report?.propagation]
   );
+
+  const toggle = (key: string) => setExpanded(prev => prev === key ? null : key);
 
   // ── Loading ──
   if (loading && !report) {
     return (
-      <Card className="card-dashboard border-purple-200 dark:border-purple-900">
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-64" />
-          <Skeleton className="h-3 w-96 mt-1" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-48 w-full rounded-lg" />
-        </CardContent>
-      </Card>
+      <div className="space-y-4 p-1">
+        <Skeleton className="h-4 w-48" />
+        <div className="flex gap-6"><Skeleton className="h-8 w-16" /><Skeleton className="h-8 w-16" /><Skeleton className="h-8 w-16" /></div>
+        <Skeleton className="h-32 w-full rounded-lg" />
+      </div>
     );
   }
 
-  // ── Error ──
   if (error && !report) {
     return (
-      <Card className="card-dashboard border-purple-200 dark:border-purple-900">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Network className="h-4 w-4 text-purple-500" />
-            级联风险传播分析
-          </CardTitle>
-          <CardDescription>数据加载失败</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />重试
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
+        <AlertTriangle className="h-4 w-4 text-red-400" />
+        <span>级联风险分析加载失败</span>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => refetch()}>重试</Button>
+      </div>
     );
   }
 
   if (!report) return null;
 
-  const { summary, triggeredBy, sourceNodes, propagation } = report;
+  const { summary, sourceNodes, propagation } = report;
 
   return (
-    <Card className="card-dashboard border-purple-200 dark:border-purple-900">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex-1">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Network className="h-4 w-4 text-purple-500" />
-              级联风险传播分析
-            </CardTitle>
-            <CardDescription>
-              {triggeredBy.description} | {summary.affectedNodes}/{summary.totalNodes} 节点受影响 | 最大传播深度 {summary.maxDepth}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={scenario} onValueChange={(v) => setScenario(v)}>
-              <SelectTrigger className="h-7 text-xs w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">自动检测</SelectItem>
-                <SelectItem value="weather_disruption">天气中断</SelectItem>
-                <SelectItem value="port_congestion">港口拥堵</SelectItem>
-                <SelectItem value="exchange_shock">汇率冲击</SelectItem>
-                <SelectItem value="supplier_failure">供应商故障</SelectItem>
-                <SelectItem value="commodity_shock">原材料波动</SelectItem>
-                <SelectItem value="cbam_enforcement">CBAM 碳关税</SelectItem>
-                <SelectItem value="competitor_pressure">竞品价格挤压</SelectItem>
-              </SelectContent>
-            </Select>
-            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => refetch()} />
-          </div>
+    <div className="space-y-6">
+      {/* ── Header: scenario + refresh ── */}
+      <div className="flex items-center justify-between">
+        <Select value={scenario} onValueChange={setScenario}>
+          <SelectTrigger className="h-8 w-[160px] text-sm font-medium bg-transparent border-0 shadow-none px-0 hover:bg-accent/50">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">自动检测</SelectItem>
+            <SelectItem value="weather_disruption">天气中断</SelectItem>
+            <SelectItem value="port_congestion">港口拥堵</SelectItem>
+            <SelectItem value="exchange_shock">汇率冲击</SelectItem>
+            <SelectItem value="supplier_failure">供应商故障</SelectItem>
+            <SelectItem value="commodity_shock">原材料波动</SelectItem>
+            <SelectItem value="cbam_enforcement">CBAM 碳关税</SelectItem>
+            <SelectItem value="competitor_pressure">竞品价格挤压</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => refetch()}>
+          <RefreshCw className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* ── Key Metrics — inline, no cards ── */}
+      <div className="flex items-end gap-6">
+        <div>
+          <p className="text-[11px] text-muted-foreground tracking-wide uppercase">受影响</p>
+          <p className="text-2xl font-light tracking-tight">
+            {summary.affectedNodes}<span className="text-sm text-muted-foreground font-normal">/{summary.totalNodes}</span>
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Source Nodes */}
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-muted-foreground self-center">触发源:</span>
+        <div>
+          <p className="text-[11px] text-muted-foreground tracking-wide uppercase">传播深度</p>
+          <p className="text-2xl font-light tracking-tight">{summary.maxDepth}<span className="text-sm text-muted-foreground font-normal"> 层</span></p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground tracking-wide uppercase">平均风险</p>
+          <p className={`text-2xl font-light tracking-tight ${riskText(summary.avgPropagatedRisk)}`}>
+            {summary.avgPropagatedRisk}%
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground tracking-wide uppercase">产品</p>
+          <p className="text-2xl font-light tracking-tight">{productCount}</p>
+        </div>
+        {summary.seirSummary && (
+          <>
+            <div>
+              <p className="text-[11px] text-muted-foreground tracking-wide uppercase">传播峰值</p>
+              <p className="text-2xl font-light tracking-tight">
+                D+<span className="tabular-nums">{summary.seirSummary.peakDay}</span>
+                <span className="text-sm text-muted-foreground font-normal"> ({summary.seirSummary.peakInfectious}节点)</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground tracking-wide uppercase">恢复周期</p>
+              <p className="text-2xl font-light tracking-tight">
+                {summary.seirSummary.recoveryHorizon}<span className="text-sm text-muted-foreground font-normal"> 天</span>
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Trigger Sources — minimal chips ── */}
+      {sourceNodes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
           {sourceNodes.map((s: SourceNode) => (
-            <Badge key={s.id} variant="outline" className={`text-[10px] gap-1 ${riskColor(s.riskScore)}`}>
-              <AlertTriangle className="h-2.5 w-2.5" />
-              {s.label}: {s.riskScore}%
-            </Badge>
+            <span
+              key={s.id}
+              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors hover:bg-accent/50"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${riskDot(s.riskScore)}`} />
+              {s.label}
+              <span className={`font-medium ${riskText(s.riskScore)}`}>{s.riskScore}%</span>
+            </span>
           ))}
         </div>
+      )}
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="rounded-lg border p-2.5 text-center">
-            <p className="text-[10px] text-muted-foreground">受影响节点</p>
-            <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{summary.affectedNodes}</p>
-          </div>
-          <div className="rounded-lg border p-2.5 text-center">
-            <p className="text-[10px] text-muted-foreground">最大深度</p>
-            <p className="text-lg font-bold">{summary.maxDepth} 层</p>
-          </div>
-          <div className="rounded-lg border p-2.5 text-center">
-            <p className="text-[10px] text-muted-foreground">平均风险</p>
-            <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{summary.avgPropagatedRisk}%</p>
-          </div>
-          <div className="rounded-lg border p-2.5 text-center">
-            <p className="text-[10px] text-muted-foreground">受影响产品</p>
-            <p className="text-lg font-bold text-red-600 dark:text-red-400">{productRisks.length}</p>
-          </div>
-        </div>
+      {/* ── Divider ── */}
+      <div className="border-t" />
 
-        {/* Detail toggle */}
-        <Button variant="ghost" size="sm" className="w-full h-7 text-xs" onClick={() => setShowDetails(!showDetails)}>
-          {showDetails ? '收起详细分析' : '展开风险传播详情'}
-          <ChevronDown className={`h-3 w-3 ml-1 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
-        </Button>
+      {/* ── Accordion Sections ── */}
+      <div className="space-y-0 divide-y">
+        {/* Propagation Graph */}
+        {propagation.length > 0 && (
+          <Section title="传播路径" count={propagation.length} open={expanded === 'graph'} onToggle={() => toggle('graph')}>
+            <RiskPropagationGraph
+              sourceNodes={sourceNodes}
+              propagation={propagation}
+              maxDepth={summary.maxDepth}
+            />
+          </Section>
+        )}
 
-        {showDetails && (<>
-        {/* Risk Propagation Graph */}
-        <div className="rounded-lg border p-3 bg-muted/10">
-          <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-            <TrendingDown className="h-3 w-3 text-purple-500" />
-            风险传播图 ({propagation.length} 节点, 最大深度 {summary.maxDepth})
-          </h4>
-          <RiskPropagationGraph
-            sourceNodes={sourceNodes}
-            propagation={propagation}
-            maxDepth={summary.maxDepth}
-          />
-        </div>
-
-        {/* Top Affected Products */}
+        {/* Top Products */}
         {summary.topAffectedProducts.length > 0 && (
-          <div className="rounded-lg border p-3 bg-red-50/30 dark:bg-red-950/10">
-            <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-              <AlertTriangle className="h-3 w-3 text-red-500" />
-              受影响产品排名 (Top {summary.topAffectedProducts.length})
-            </h4>
-            <div className="space-y-2">
+          <Section title="受影响产品" count={summary.topAffectedProducts.length} open={expanded === 'products'} onToggle={() => toggle('products')}>
+            <div className="space-y-1.5">
               {summary.topAffectedProducts.map((p: TopProduct, i: number) => (
-                <div key={p.sku} className="flex items-center gap-3 bg-card rounded-md p-2.5 border">
-                  <span className="text-lg font-bold text-muted-foreground/40">#{i + 1}</span>
+                <div key={p.sku} className="flex items-center gap-3 py-2 group">
+                  <span className="w-5 text-right text-xs text-muted-foreground/50 font-medium">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{p.productName}</p>
-                    <p className="text-[10px] text-muted-foreground truncate" title={p.propagationPath}>
-                      传播路径: {p.propagationPath}
+                    <p className="text-sm font-medium truncate">{p.productName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{p.propagationPath}</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{p.estimatedDelay}d</span>
+                    <span className="flex items-center gap-1 font-medium text-red-500"><DollarSign className="h-3 w-3" />{p.estimatedRevenueImpact.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Causal ML Counterfactuals (data-driven) */}
+        {report.causalCounterfactuals && report.causalCounterfactuals.length > 0 && (
+          <Section title="因果反事实" count={report.causalCounterfactuals.length} open={expanded === 'causal'} onToggle={() => toggle('causal')}>
+            <div className="space-y-2">
+              {report.causalCounterfactuals.map((cf: CausalCF, i: number) => (
+                <div key={i} className="flex items-start gap-2.5 py-2 text-sm">
+                  <span className="font-medium text-sm w-20 shrink-0">{cf.scenario}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-muted-foreground truncate">{cf.recommendation}</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      ATE={cf.causalEstimate.ate.toFixed(2)} | n={cf.causalEstimate.sampleSize} | p={cf.causalEstimate.pValue.toFixed(3)}
+                      {cf.isReliable && <span className="ml-1 text-emerald-500">✓可靠</span>}
                     </p>
                   </div>
-                  <div className="text-right shrink-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3 text-orange-500" />
-                      <span className="text-xs">延误 {p.estimatedDelay} 天</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-3 w-3 text-red-500" />
-                      <span className="text-xs font-bold text-red-600">${p.estimatedRevenueImpact.toLocaleString()}</span>
-                    </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      -{cf.improvement}%
+                    </span>
+                    <p className="text-[9px] text-muted-foreground/50 tabular-nums">
+                      [{(cf.confidenceInterval[0] * 100).toFixed(0)}-{(cf.confidenceInterval[1] * 100).toFixed(0)}%]
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Section>
         )}
-        </>)}
 
-        {/* Counterfactuals */}
+        {/* Counterfactuals (legacy) */}
         {report.counterfactuals && report.counterfactuals.length > 0 && (
-          <div className="rounded-lg border p-3 bg-emerald-50/30 dark:bg-emerald-950/10">
-            <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-              <GitBranch className="h-3 w-3 text-emerald-500" />
-              反事实分析：如果采取不同措施？
-            </h4>
-            <div className="space-y-2">
+          <Section title="反事实推演" count={report.counterfactuals.length} open={expanded === 'counter'} onToggle={() => toggle('counter')}>
+            <div className="space-y-1.5">
               {report.counterfactuals.map((cf: CounterfactualResult, i: number) => (
-                <div key={i} className="flex items-center gap-3 bg-card rounded-md p-2 border text-xs">
-                  <span className="font-medium w-24 shrink-0">{cf.scenario}</span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground flex-1 truncate">{cf.recommendation}</span>
-                  <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px] shrink-0">
+                <div key={i} className="flex items-center gap-2.5 py-2 text-sm">
+                  <span className="font-medium text-sm w-20 shrink-0">{cf.scenario}</span>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                  <span className="text-sm text-muted-foreground flex-1 truncate">{cf.recommendation}</span>
+                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0">
                     -{cf.improvement}%
-                  </Badge>
+                  </span>
                 </div>
               ))}
             </div>
-          </div>
+          </Section>
         )}
 
-        {/* 7-Day Forward Projection */}
+        {/* 7-Day Projection */}
         {report.forwardProjection && report.forwardProjection.length > 0 && (
-          <div className="rounded-lg border p-3 bg-blue-50/30 dark:bg-blue-950/10">
-            <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-              <TrendingUp className="h-3 w-3 text-blue-500" />
-              7 天风险预测
-            </h4>
-            <div className="overflow-x-auto">
-              <div className="flex gap-2 min-w-[500px]">
-                {report.forwardProjection.map((day: DayProjection, i: number) => {
-                  const depletionCritical = day.inventoryDepletionRisk.filter((d: { sku: string; productName: string; daysUntilDepletion: number; riskLevel: string }) => d.riskLevel === 'critical').length;
-                  const depletionWarning = day.inventoryDepletionRisk.filter((d: { sku: string; productName: string; daysUntilDepletion: number; riskLevel: string }) => d.riskLevel === 'warning').length;
+          <Section title="7 天预测" open={expanded === 'forecast'} onToggle={() => toggle('forecast')}>
+            <div className="flex gap-1">
+              {report.forwardProjection.map((day: DayProjection, i: number) => {
+                const critical = day.inventoryDepletionRisk.filter((d: { riskLevel: string }) => d.riskLevel === 'critical').length;
+                const warning = day.inventoryDepletionRisk.filter((d: { riskLevel: string }) => d.riskLevel === 'warning').length;
+                const revenue = day.cumulativeRevenueImpact;
+                return (
+                  <div
+                    key={i}
+                    className="flex-1 min-w-[56px] text-center py-3 rounded-lg border transition-colors hover:bg-accent/30"
+                  >
+                    <p className="text-[10px] text-muted-foreground mb-1">
+                      {i === 0 ? '今天' : i === 1 ? '明天' : `D+${i}`}
+                    </p>
+                    <div className="flex items-center justify-center gap-0.5 mb-1">
+                      {critical > 0 && <span className="w-2 h-2 rounded-full bg-red-500" />}
+                      {warning > 0 && !critical && <span className="w-2 h-2 rounded-full bg-yellow-400" />}
+                      {!critical && !warning && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
+                    </div>
+                    <p className="text-[10px] font-medium tabular-nums">
+                      ${(revenue / 1000).toFixed(0)}k
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
+        {/* SEIR Epidemic Timeline */}
+        {report.seirTimeline && report.seirTimeline.days.length > 0 && (
+          <Section title="SEIR 传播动态" open={expanded === 'seir'} onToggle={() => toggle('seir')}>
+            <div className="space-y-3">
+              {/* Mini bar chart of SEIR states over time */}
+              <div className="flex items-end gap-px h-16">
+                {report.seirTimeline.days.map((d: SEIRDay, i: number) => {
+                  const total = d.susceptible + d.exposed + d.infectious + d.recovered;
+                  const iRatio = total > 0 ? d.infectious / total : 0;
+                  const eRatio = total > 0 ? d.exposed / total : 0;
+                  const rRatio = total > 0 ? d.recovered / total : 0;
                   return (
-                    <div key={i} className={`flex-1 rounded-lg border p-2 text-center min-w-[70px] ${
-                      depletionCritical > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20'
-                      : depletionWarning > 0 ? 'border-yellow-300 bg-yellow-50/50 dark:border-yellow-800 dark:bg-yellow-950/20'
-                      : 'border-border bg-card'
-                    }`}>
-                      <p className="text-[9px] text-muted-foreground">
-                        {i === 0 ? '今天' : i === 1 ? '明天' : `D+${i}`}
-                      </p>
-                      <p className="text-[10px] font-bold">
-                        {depletionCritical > 0 ? `🔴 ${depletionCritical}` : depletionWarning > 0 ? `🟡 ${depletionWarning}` : '✓'}
-                      </p>
-                      <p className="text-[8px] text-muted-foreground mt-0.5">
-                        风险 ${(day.cumulativeRevenueImpact / 1000).toFixed(0)}k
-                      </p>
+                    <div
+                      key={i}
+                      className="flex-1 min-w-[3px] max-w-[12px] flex flex-col-reverse rounded-t-sm overflow-hidden transition-opacity hover:opacity-100 opacity-80"
+                      title={`D+${d.day}: S=${d.susceptible} E=${d.exposed} I=${d.infectious} R=${d.recovered}`}
+                      style={{ height: '100%' }}
+                    >
+                      <div className="bg-emerald-400/70" style={{ height: `${rRatio * 100}%` }} />
+                      <div className="bg-red-500/80" style={{ height: `${iRatio * 100}%` }} />
+                      <div className="bg-orange-400/60" style={{ height: `${eRatio * 100}%` }} />
+                      <div className="bg-blue-200/30 flex-1" />
                     </div>
                   );
                 })}
               </div>
+              {/* Legend */}
+              <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-200/60" />易感</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-orange-400/60" />暴露</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-500/80" />传播中</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400/70" />恢复</span>
+              </div>
+              {/* Key milestones */}
+              <div className="flex gap-6 text-[10px] text-muted-foreground">
+                <span>峰值: <strong className="text-foreground">D-{report.seirTimeline.peakDay}</strong> ({report.seirTimeline.peakInfectious}节点)</span>
+                <span>恢复: <strong className="text-foreground">D-{report.seirTimeline.recoveryHorizon}</strong></span>
+              </div>
             </div>
-          </div>
+          </Section>
         )}
+      </div>
+    </div>
+  );
+}
 
-        {/* Legend — concise */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground px-1">
-          <span>衰减系数: DEPARTS {0.43} · CARRIES {0.95} · ARRIVES {0.70} · STORED {0.60}</span>
-          <span className="hidden sm:inline">|</span>
-          <span>融合策略: weighted_sum · 截止阈值: 0.5%</span>
-        </div>
-      </CardContent>
-    </Card>
+// ─── Section Component ─────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count?: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="py-3">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 w-full text-left group"
+      >
+        <span className="text-sm font-medium">{title}</span>
+        {count !== undefined && (
+          <span className="text-[10px] text-muted-foreground/60 tabular-nums">{count}</span>
+        )}
+        <span className={`ml-auto text-muted-foreground/40 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </span>
+      </button>
+      <div
+        className="overflow-hidden transition-all duration-300 ease-out"
+        style={{
+          maxHeight: open ? '2000px' : '0px',
+          opacity: open ? 1 : 0,
+          marginTop: open ? '12px' : '0px',
+        }}
+      >
+        {children}
+      </div>
+    </div>
   );
 }

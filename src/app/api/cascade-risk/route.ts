@@ -24,6 +24,7 @@ import {
   backtest,
   sensitivityAnalysis,
   boundaryTest,
+  propagateSEIR,
 } from '@/lib/services/cascade-risk.service';
 import { runDeepCounterfactual } from '@/lib/engine';
 import type { CounterfactualQuery } from '@/lib/engine';
@@ -96,6 +97,11 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       if (!includeCausal && report) {
         delete (report as any).causalEdges;
         delete (report as any).causalSummary;
+      }
+      // Strip SEIR timeline if causal not requested (large payload)
+      if (!includeCausal && report) {
+        delete (report as any).seirTimeline;
+        delete (report as any).causalCounterfactuals;
       }
 
       return NextResponse.json({ success: true, ...report });

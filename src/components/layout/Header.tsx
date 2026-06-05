@@ -5,14 +5,13 @@ import { useTheme } from 'next-themes';
 import {
   Search,
   RefreshCw,
-  Timer,
-  WifiOff,
   Sun,
   Moon,
   Bell,
   Settings2,
   Download,
   Upload,
+  Wrench,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
@@ -52,6 +52,10 @@ export interface HeaderProps {
   riskPanelRef?: React.RefObject<HTMLDivElement | null>;
   /** Notes count */
   unresolvedNotesCount?: number;
+  /** Callback to open settings sheet */
+  onOpenSettings?: () => void;
+  /** Callback to open tools panel */
+  onOpenTools?: () => void;
   /** Callback to open notes dialog */
   onOpenNotes?: () => void;
   /** Callback to open CSV import dialog */
@@ -69,6 +73,8 @@ export function Header({
   riskData,
   riskPanelRef,
   unresolvedNotesCount = 0,
+  onOpenSettings,
+  onOpenTools,
   onOpenNotes,
   onOpenCSVImport,
   userMenu,
@@ -380,373 +386,70 @@ export function Header({
               SupplyChain Cortex
             </h1>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Notes center */}
-            {onOpenNotes && (
-              <TooltipProvider>
-                <UITooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="relative hover:bg-accent transition-colors duration-150"
-                      onClick={onOpenNotes}
-                      aria-label="备注中心"
-                    >
-                      <Settings2 className="h-3.5 w-3.5" />
-                      {unresolvedNotesCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-violet-500 text-white text-[9px] font-bold flex items-center justify-center">
-                          {unresolvedNotesCount > 9
-                            ? '9+'
-                            : unresolvedNotesCount}
-                        </span>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    备注中心 ({unresolvedNotesCount} 未解决)
-                  </TooltipContent>
-                </UITooltip>
-              </TooltipProvider>
-            )}
-
-            {/* Notification bell with shake animation */}
+          <div className="flex items-center gap-1.5">
+            {/* Notification bell */}
             <TooltipProvider>
               <UITooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="relative hover:bg-accent transition-colors duration-150"
+                  <button
+                    className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors relative"
                     aria-label="通知中心"
                     onClick={() => setNotificationOpen(!notificationOpen)}
                   >
                     {unreadCount > 0 ? (
                       <Bell key={`bell-${bellShakeKey}`} className="h-3.5 w-3.5 text-orange-500" />
                     ) : (
-                      <Bell className="h-3.5 w-3.5" />
+                      <Bell className="h-3.5 w-3.5 text-zinc-500" />
                     )}
-                    {/* Red dot badge with pop animation */}
                     {unreadCount > 0 && (
-                      <span
-                        key={`dot-${unreadCount}`}
-                        className={`absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center notification-red-dot ${
-                          badgePop ? 'badge-pop-anim' : ''
-                        }`}
-                      >
+                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}
-                  </Button>
+                  </button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>通知中心 ({unreadCount} 未读)</p>
-                  <p className="text-xs text-muted-foreground">
-                    快捷键: <span className="kbd-key">Ctrl</span>+<span className="kbd-key">N</span>
-                  </p>
-                </TooltipContent>
+                <TooltipContent>通知中心{unreadCount > 0 ? ` (${unreadCount} 未读)` : ''}</TooltipContent>
               </UITooltip>
             </TooltipProvider>
 
-            {/* Global search button */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="hover:bg-accent transition-colors duration-150"
-                    onClick={() => setGlobalSearchOpen(true)}
-                    aria-label="全局搜索"
-                  >
-                    <Search className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>全局搜索</TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* Auto-refresh countdown with next refresh time tooltip */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className="text-xs gap-1.5 cursor-default tabular-nums"
-                    aria-label={`自动刷新倒计时 ${refreshCountdown}秒`}
-                  >
-                    <Timer className="h-2.5 w-2.5" />
-                    {wsConnected ? (
-                      <span className="text-green-600 dark:text-green-400">实时</span>
-                    ) : (
-                      <span key={refreshCountdown} className={`countdown-number ${countdownChanged ? 'changing' : ''}`}>{refreshCountdown}</span>
-                    )}
-                    {!wsConnected && <span>s</span>}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{wsConnected ? 'SSE 实时推送已连接，无需轮询' : `下次自动刷新: ${refreshCountdown}秒`}</p>
-                  <p className="text-xs text-muted-foreground">
-                    上次同步: {lastSyncTime.toLocaleTimeString('zh-CN')}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    预计刷新: {new Date(Date.now() + refreshCountdown * 1000).toLocaleTimeString('zh-CN')}
-                  </p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* MCP online indicator with gradient shift animation */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className="text-xs gap-1 cursor-pointer"
-                  >
-                    <div
-                      className={`w-1.5 h-1.5 rounded-full mcp-pulse-dot ${
-                        isRefreshing
-                          ? 'text-yellow-500'
-                          : wsConnected
-                            ? 'text-green-500'
-                            : 'text-green-500'
-                      }`}
-                      style={{ color: isRefreshing ? '#eab308' : '#22c55e' }}
-                    />
-                    <span>{isRefreshing ? '同步中' : 'MCP 在线'}</span>
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>MCP Server 状态正常</p>
-                  <p className="text-xs text-muted-foreground">
-                    传输协议: stdio | 工具数: 16
-                  </p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* Risk Indicator */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs gap-1 cursor-pointer transition-all duration-300 ${
-                      riskData
-                        ? riskData.overallRisk < 30
-                          ? 'border-green-400 dark:border-green-600 bg-green-50/50 dark:bg-green-950/20'
-                          : riskData.overallRisk < 60
-                            ? 'border-yellow-400 dark:border-yellow-600 bg-yellow-50/50 dark:bg-yellow-950/20'
-                            : 'border-red-400 dark:border-red-600 bg-red-50/50 dark:bg-red-950/20'
-                        : 'border-muted bg-muted/20'
-                    }`}
-                    onClick={() => {
-                      setActiveTab('dashboard');
-                      setTimeout(() => {
-                        riskPanelRef?.current?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'center',
-                        });
-                      }, 300);
-                    }}
-                  >
-                    {riskData ? (
-                      <span className="flex items-center gap-1">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            riskData.overallRisk < 30
-                              ? 'bg-green-500'
-                              : riskData.overallRisk < 60
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500 animate-pulse'
-                          }`}
-                        />
-                        风险 {riskData.overallRisk}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
-                        风险 --
-                      </span>
-                    )}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="font-medium">
-                    {riskData
-                      ? `供应链风险评分: ${riskData.overallRisk}/100`
-                      : '风险数据加载中...'}
-                  </p>
-                  {riskData && (
-                    <p className="text-xs text-muted-foreground">
-                      点击查看风险监控面板
-                    </p>
-                  )}
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* SSE connection indicator with reconnect action */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs gap-1.5 cursor-pointer transition-all duration-300 ${
-                      wsConnected
-                        ? 'border-green-400 dark:border-green-600 bg-green-50/50 dark:bg-green-950/20'
-                        : 'border-red-300 dark:border-red-700 bg-red-50/30 dark:bg-red-950/10'
-                    }`}
-                    onClick={() => {
-                      if (!wsConnected) {
-                        requestReconnect();
-                      }
-                    }}
-                  >
-                    {wsConnected ? (
-                      <span className="flex items-center gap-1">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                        </span>
-                        实时
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <WifiOff className="h-2.5 w-2.5 text-red-500 dark:text-red-400" />
-                        离线
-                      </span>
-                    )}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="font-medium">
-                    {wsConnected
-                      ? 'SSE 实时推送已连接'
-                      : 'SSE 连接断开，点击重连'}
-                  </p>
-                  {!wsConnected && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      点击此徽章手动重连
-                    </p>
-                  )}
-                  <div className="mt-1.5 text-xs text-muted-foreground space-y-0.5">
-                    <p>推送事件:</p>
-                    <p>· dashboard-update (30s)</p>
-                    <p>· notification (45s)</p>
-                    <p>· inventory-alert (60s)</p>
-                    <p>· shipment-update (20s)</p>
-                    <p>· data-update (60s)</p>
-                  </div>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* Alert rules settings */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="hover:bg-accent transition-colors duration-150"
-                    onClick={() => setAlertRulesOpen(true)}
-                    aria-label="预警规则设置"
-                  >
-                    <Settings2 className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>预警规则设置</TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* Export dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="批量导出" disabled={exporting}>
-                  <Download className={`h-3.5 w-3.5 ${exporting ? 'animate-pulse' : ''}`} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="export-dropdown-content">
-                {onOpenCSVImport && (
-                  <DropdownMenuItem onClick={onOpenCSVImport} disabled={exporting}>
-                    <Upload className="h-3.5 w-3.5 mr-2" />
-                    数据导入
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={handleExportFull} disabled={exporting}>
-                  导出全部数据
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportInventory} disabled={exporting}>
-                  导出库存数据
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportCost} disabled={exporting}>
-                  导出成本数据
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportLogistics} disabled={exporting}>
-                  导出物流数据
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportSales} disabled={exporting}>
-                  导出销售数据
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Refresh */}
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="hover:bg-accent transition-colors duration-150"
-                    onClick={onRefresh}
-                    disabled={isRefreshing}
-                    aria-label="刷新数据"
-                  >
-                    <RefreshCw
-                      className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>刷新数据</TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-
-            {/* User menu / Auth */}
-            <HealthDot />
-            {userMenu}
-
-            {/* Dark mode toggle */}
-            {mounted && (
+            {/* Tools panel */}
+            {onOpenTools && (
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="hover:bg-accent transition-colors duration-150"
-                      onClick={() =>
-                        setTheme(theme === 'dark' ? 'light' : 'dark')
-                      }
-                      aria-label={
-                        theme === 'dark' ? '切换亮色模式' : '切换暗色模式'
-                      }
+                    <button
+                      className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      onClick={onOpenTools}
+                      aria-label="工具箱"
                     >
-                      {theme === 'dark' ? (
-                        <Sun className="h-3.5 w-3.5" />
-                      ) : (
-                        <Moon className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
+                      <Wrench className="h-4 w-4 text-zinc-500" />
+                    </button>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    {theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
-                  </TooltipContent>
+                  <TooltipContent>工具箱</TooltipContent>
                 </UITooltip>
               </TooltipProvider>
             )}
+
+            {/* Settings gear */}
+            {onOpenSettings && (
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      onClick={onOpenSettings}
+                      aria-label="设置"
+                    >
+                      <Settings2 className="h-4 w-4 text-zinc-500" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>设置</TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            )}
+
+            <HealthDot />
+            {userMenu}
           </div>
         </div>
       </div>

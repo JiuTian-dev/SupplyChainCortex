@@ -69,9 +69,9 @@ export function TabbedSection({ panels, activeTab, onTabChange }: TabbedSectionP
 
   return (
     <Tabs value={effectiveTab} onValueChange={onTabChange}>
-      <TabsList className="mb-4 h-auto" style={{ display: 'grid', gridTemplateColumns: `repeat(${panels.length}, minmax(0, 1fr))` }}>
+      <TabsList className="mb-4 h-auto w-full flex-nowrap overflow-x-auto p-1">
         {panels.map(panel => (
-          <TabsTrigger key={panel.id} value={panel.id} className="flex items-center gap-1.5 text-xs h-8 px-2">
+          <TabsTrigger key={panel.id} value={panel.id} className="flex items-center gap-1.5 text-xs h-8 px-2.5 shrink-0 flex-none">
             <panel.icon className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden sm:inline truncate">{panel.label}</span>
           </TabsTrigger>

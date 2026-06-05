@@ -21,6 +21,11 @@ interface ReplayDiff {
   replayedConfidence: number;
 }
 
+const STATE_LABELS: Record<string, string> = {
+  classify: '分类', plan: '规划', execute: '执行',
+  observe: '观察', decide: '决策', synthesize: '合成',
+};
+
 export function ReplayPanel({ traceId, steps, prefillNode, onClearPrefill }: {
   traceId: string;
   steps: TraceStep[];
@@ -97,9 +102,12 @@ export function ReplayPanel({ traceId, steps, prefillNode, onClearPrefill }: {
       </p>
 
       {/* Available tools */}
+      {executeSteps.length === 0 && (
+        <p className="text-xs text-muted-foreground italic py-2">此决策流程中没有工具调用步骤，无法进行回放。</p>
+      )}
       {executeSteps.map(step => (
         <div key={step.stepIndex} className="border rounded-lg p-3">
-          <p className="text-xs font-semibold mb-2">Step {step.stepIndex} — {step.state}</p>
+          <p className="text-xs font-semibold mb-2">Step {step.stepIndex} — {STATE_LABELS[step.state] || step.state}</p>
           {step.toolCalls.map((tc, i) => (
             <div key={i} className="flex items-center justify-between mb-1">
               <span className="text-xs font-mono">{tc.toolName}</span>

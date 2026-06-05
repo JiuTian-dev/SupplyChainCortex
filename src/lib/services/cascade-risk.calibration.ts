@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Cascade Risk — Calibration Module (Phase 1)
  *
@@ -54,6 +53,8 @@ export async function calibrateAttenuationFactors(): Promise<{
   const results: CalibrationResult[] = [];
   let totalSamples = 0;
   let totalConfidence = 0;
+  // Track per-edge stdDev for Monte Carlo propagation
+  const edgeStdDevs = new Map<EdgeType, number>();
 
   // Query historical data: delayed shipments → actual product stock impact
   const delayedShipments = await db.shipmentItem.findMany({
@@ -89,6 +90,8 @@ export async function calibrateAttenuationFactors(): Promise<{
           calibrated = ratios.reduce((a, b) => a + b, 0) / ratios.length;
           calibrated = Math.min(Math.max(calibrated, 0.3), 0.95); // clamp
           const variance = ratios.reduce((s, r) => s + (r - calibrated) ** 2, 0) / ratios.length;
+          const realStdDev = Math.sqrt(variance);
+          edgeStdDevs.set(edgeType, realStdDev);
           confidence = Math.min(1 / (1 + variance), 0.99);
           sampleSize = samples.length;
         }
@@ -131,15 +134,21 @@ export async function calibrateAttenuationFactors(): Promise<{
     }
 
     const improvement = Math.round(Math.abs(calibrated - original) / original * 1000) / 10;
-    results.push({ edgeType, originalAttenuation: original, calibratedAttenuation: Math.round(calibrated * 1000) / 1000, confidence: Math.round(confidence * 100) / 100, sampleSize, improvement });
+    const stdDev = edgeStdDevs.get(edgeType) ?? (calibrated * 0.08); // ~8% relative uncertainty as fallback
+    results.push({ edgeType, originalAttenuation: original, calibratedAttenuation: Math.round(calibrated * 1000) / 1000, confidence: Math.round(confidence * 100) / 100, sampleSize, improvement, stdDev: Math.round(stdDev * 1000) / 1000 });
     totalSamples += sampleSize;
     totalConfidence += confidence;
   }
 
-  // Store calibration results
+  // Store calibration results with real stdDev from data
   calibratedAttenuation = {} as Record<EdgeType, { mean: number; stdDev: number; confidence: number; sampleSize: number }>;
   for (const r of results) {
-    calibratedAttenuation[r.edgeType] = { mean: r.calibratedAttenuation, stdDev: 0.05, confidence: r.confidence, sampleSize: r.sampleSize };
+    calibratedAttenuation[r.edgeType] = {
+      mean: r.calibratedAttenuation,
+      stdDev: r.stdDev,
+      confidence: r.confidence,
+      sampleSize: r.sampleSize,
+    };
   }
 
   return {

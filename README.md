@@ -1,6 +1,6 @@
 # SupplyChain Cortex v2.0
 
-**An AI Agent that analyzes your supply chain. 74 specialized tools. 8 SOP skills. Full audit trail.**
+**An AI Agent that analyzes your supply chain. 74 specialized tools. 8 SOP skills. Persistent memory. Full audit trail.**
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-0%20errors%20(new)-blue)](https://www.typescriptlang.org/)
@@ -8,8 +8,9 @@
 [![MCP Tools](https://img.shields.io/badge/MCP%20tools-74-blueviolet)]()
 [![Agent](https://img.shields.io/badge/Agent-FSM%20v2-orange)]()
 [![Skills](https://img.shields.io/badge/Skills-8%20SOPs-purple)]()
+[![Memory](https://img.shields.io/badge/Memory-JiuTian%20persistent-green)]()
 
-**Ask questions. Agent analyzes data across inventory, cost, supplier, logistics, and risk. Every decision is traced and replayable.**
+**Ask questions. Agent analyzes data across inventory, cost, supplier, logistics, and risk. Every decision is traced and replayable. Now remembers you across sessions.**
 
 ---
 
@@ -24,6 +25,45 @@ You type: "库存健康检查" (check inventory health). The Agent:
 5. Persists the entire decision trace (auditable, replayable)
 
 **Not a dashboard. Not a chatbot. An Agent that does supply chain analysis.**
+
+---
+
+## UI (2026-05-27 重构)
+
+极简大厂风格 — 设置和工具箱收入右侧滑出面板。
+
+```
+Header:   [SC] [Chat] [审计] [数据]           [🔔] [🔧] [⚙] [👤]
+                                             通知  工具  设置  用户
+
+输入区:                            [📎] [__________输入__________] [发送]
+```
+
+- **🔧 工具箱**：全局搜索(Cmd+K)、导出数据、数据导入、MCP/SSE 状态、刷新、备注中心
+- **⚙ 设置**：记忆开关、模型选择、联网搜索、外观主题、API Key
+
+---
+
+## 记忆系统
+
+集成 [九天记忆模块](https://github.com) — 6 Phase 全栈持久记忆。
+
+| 能力 | 实现 |
+|------|------|
+| 分层存储 | SQLite 硬事实 + Qdrant 语义 + Mem0 软偏好 |
+| 跨会话持久 | 对话记忆和偏好不因重启丢失 |
+| 记忆/干净模式 | 设置面板一键切换，干净模式不引用不记录 |
+| 衰老淘汰 | TTL 自动过期 + strength 衰减 + LLM 仲裁 |
+| 动态检索路由 | BM25 置信度决定是否启动语义检索 |
+| Reranker 精排 | bge-reranker-v2-m3 Cross-Encoder |
+
+**启动记忆桥接**（另开终端）：
+```bash
+cd mini-services/memory-bridge
+python server.py --port 8765
+```
+
+桥接未启动时自动降级到内存版 `episodeStore`，零影响。
 
 ---
 

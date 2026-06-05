@@ -10,6 +10,8 @@ import { Header } from '@/components/layout/Header';
 import { OfflineBanner, ErrorReportProvider } from '@/components/error';
 import { UserMenu } from '@/components/auth/UserMenu';
 import { ScrollToTop } from '@/components/shared/ScrollToTop';
+import { ToolsPanel } from '@/components/shared/ToolsPanel';
+import { GlobalSearch } from '@/components/shared/GlobalSearch';
 
 // Core — Chat is the main interface
 import { ChatPanel } from '@/components/shared/ChatPanel';
@@ -17,6 +19,7 @@ import { ChatPanel } from '@/components/shared/ChatPanel';
 // Stores & hooks
 import { useAuthStore } from '@/stores/auth-store';
 import { useConnectionStore } from '@/stores/connection-store';
+import { useDashboardUIStore } from '@/stores/useDashboardUIStore';
 import { useSSE } from '@/hooks/use-sse';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { useWebVitals } from '@/hooks/use-web-vitals';
@@ -65,6 +68,15 @@ function HomePageContent() {
   const [csvImportOpen, setCSVImportOpen] = useState(false);
   const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+
+  // ToolsPanel state from stores
+  const wsConnected = useConnectionStore((s) => s.wsConnected);
+  const requestReconnect = useConnectionStore((s) => s.requestReconnect);
+  const refreshCountdown = useDashboardUIStore((s) => s.refreshCountdown);
+  const isRefreshing = useDashboardUIStore((s) => s.isRefreshing);
+  const setGlobalSearchOpen = useDashboardUIStore((s) => s.setGlobalSearchOpen);
 
   const legacyPanels = PANEL_REGISTRY.filter(p => p.category === 'ops');
 
@@ -74,6 +86,8 @@ function HomePageContent() {
         <OfflineBanner />
         <Header
           onRefresh={refreshAll}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenTools={() => setToolsOpen(true)}
           onOpenNotes={() => { setNotesSku(undefined); setNotesOpen(true); }}
           onOpenCSVImport={() => setCSVImportOpen(true)}
           userMenu={
@@ -120,7 +134,9 @@ function HomePageContent() {
 
         {/* Main content */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          {viewMode === 'chat' && <ChatPanel />}
+          {viewMode === 'chat' && (
+            <ChatPanel settingsOpen={settingsOpen} onSettingsOpenChange={setSettingsOpen} />
+          )}
           {viewMode === 'audit' && (
             <div className="flex-1 overflow-auto">
               <AuditTab />
@@ -138,7 +154,36 @@ function HomePageContent() {
         </main>
 
         {/* Overlays */}
-        <NotificationCenter onNavigate={() => {}} onViewInventoryDetail={async () => {}} />
+        <GlobalSearch
+          onSelectResult={() => {}}
+          onViewDetail={(sku) => { setProductDetailSku(sku); setProductDetailOpen(true); }}
+        />
+        <ToolsPanel
+          open={toolsOpen}
+          onOpenChange={setToolsOpen}
+          wsConnected={wsConnected}
+          isRefreshing={isRefreshing}
+          refreshCountdown={refreshCountdown}
+          riskScore={null}
+          onSearch={() => { setToolsOpen(false); setGlobalSearchOpen(true); }}
+          onRefresh={refreshAll}
+          onExport={() => { setToolsOpen(false); window.open('/api/export?module=all&format=csv', '_blank'); }}
+          onImport={() => setCSVImportOpen(true)}
+          onReconnect={requestReconnect}
+          onOpenNotes={() => { setToolsOpen(false); setNotesSku(undefined); setNotesOpen(true); }}
+          notesCount={0}
+        />
+        <NotificationCenter
+          onNavigate={(tab, sku) => {
+            setViewMode('legacy');
+            setLegacyTab(tab);
+            if (sku) setProductDetailSku(sku);
+          }}
+          onViewInventoryDetail={async (sku) => {
+            setProductDetailSku(sku);
+            setProductDetailOpen(true);
+          }}
+        />
         <ProductDetailSheet sku={productDetailSku || ''} open={productDetailOpen} onOpenChange={setProductDetailOpen} />
         <NotesPanel open={notesOpen} onOpenChange={setNotesOpen} initialSku={notesSku} />
         <CSVImportDialog open={csvImportOpen} onOpenChange={setCSVImportOpen} />
