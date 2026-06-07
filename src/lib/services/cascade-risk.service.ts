@@ -17,5 +17,10 @@ export {
   generateExplanation, generatePreventiveActions, weatherDesc,
   propagateMonteCarlo, computeDamageRatio, propagateSEIR,
 } from './cascade-risk.propagation';
-export { backtest, getCascadeRisk } from './cascade-risk.main';
+export {
+  backtest,
+  getCascadeRisk,
+  buildCounterfactualAuditSnapshot,
+  buildPassportAlternatives,
+} from './cascade-risk.main';
 export { runCounterfactual, runCausalCounterfactual, sensitivityAnalysis, boundaryTest } from './cascade-risk.validation';

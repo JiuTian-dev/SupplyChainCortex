@@ -14,6 +14,7 @@ import {
   withFallback, withPromiseTimeout,
   createPassport, provenanceEntry, degradedProvenance, unavailableProvenance, computeConfidence,
 } from '@/lib/engine';
+import type { AlternativeOption } from '@/lib/engine/passport';
 import { buildCausalEdges, generateCausalSummary } from '@/lib/engine/causal-reasoning';
 import { calibrateAttenuationFactors, calibratedAttenuation } from './cascade-risk.calibration';
 import {
@@ -48,6 +49,44 @@ interface WeatherPort {
 type ScenarioType = 'weather_disruption' | 'exchange_shock' | 'supplier_failure'
   | 'port_congestion' | 'tariff_escalation' | 'cbam_enforcement'
   | 'commodity_shock' | 'competitor_pressure' | 'auto';
+
+export function buildCounterfactualAuditSnapshot(report: Pick<CascadeReport, 'counterfactuals' | 'causalCounterfactuals'>) {
+  return {
+    counterfactuals: (report.counterfactuals ?? []).slice(0, 4).map((cf) => ({
+      scenario: cf.scenario,
+      improvement: cf.improvement,
+      affectedProducts: cf.alternativeImpact.affectedProducts,
+      totalRisk: cf.alternativeImpact.totalRisk,
+    })),
+    causalCounterfactuals: (report.causalCounterfactuals ?? []).slice(0, 4).map((cf) => ({
+      scenario: cf.scenario,
+      intervention: cf.intervention,
+      estimatedReduction: cf.estimatedReduction,
+      confidenceInterval: cf.confidenceInterval,
+      isReliable: cf.isReliable,
+      sampleSize: cf.causalEstimate.sampleSize,
+      pValue: cf.causalEstimate.pValue,
+    })),
+  };
+}
+
+export function buildPassportAlternatives(report: Pick<CascadeReport, 'counterfactuals' | 'causalCounterfactuals'>): AlternativeOption[] {
+  if ((report.causalCounterfactuals ?? []).length > 0) {
+    return (report.causalCounterfactuals ?? []).map((cf) => ({
+      action: cf.scenario || '替代方案',
+      expectedImpact: `风险降低 ${(cf.estimatedReduction * 100).toFixed(1)}%`,
+      confidence: cf.estimatedReduction,
+      tradeoffs: cf.isReliable ? [] : ['历史样本有限，结论偏先验'],
+    }));
+  }
+
+  return (report.counterfactuals ?? []).map((cf) => ({
+    action: cf.scenario || '替代方案',
+    expectedImpact: `风险降低 ${cf.improvement}%`,
+    confidence: cf.improvement / 100,
+    tradeoffs: [],
+  }));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main API — All phases integrated
@@ -464,33 +503,6 @@ export async function getCascadeRisk(options?: {
     },
   };
 
-  // Audit trail
-  const computedOverallRisk = anomalySources.length > 0
-    ? anomalySources.reduce((sum, n) => sum + n.riskScore, 0) / anomalySources.length : 0;
-  try {
-    await db.auditLog.create({
-      data: {
-        action: 'ANALYZE', entity: 'cascade-risk', userId: 'system', userName: '级联引擎',
-        severity: computedOverallRisk > 70 ? 'important' : (computedOverallRisk > 40 ? 'warning' : 'info'),
-        details: {
-          scenario, overallRisk: computedOverallRisk,
-          affectedNodes: propagation.length,
-          totalMonthlyLoss: propagation.reduce((s, p) => s + (p.monetaryImpact || 0), 0),
-          maxDepth, degradedSources,
-          sourceCategories: anomalySources.map(s => s.category),
-          // Store snapshot for backtest
-          snapshot: {
-            affectedNodes: affectedNodes.length,
-            avgPropagatedRisk: avgRisk,
-            totalMonthlyLoss: propagation.reduce((s, p) => s + (p.monetaryImpact || 0), 0),
-            topRisks: topAffectedProducts.slice(0, 3).map(p => ({ sku: p.sku, risk: p.impactScore })),
-          },
-          timestamp: new Date().toISOString(),
-        },
-      },
-    });
-  } catch { /* Audit log is non-critical */ }
-
   // Counterfactuals — Causal ML (data-driven) with legacy fallback
   if (includeCounterfactuals && topAffectedProducts.length > 0) {
     const affectedSku = topAffectedProducts[0].sku;
@@ -517,6 +529,33 @@ export async function getCascadeRisk(options?: {
     ]);
   }
 
+  // Audit trail
+  const computedOverallRisk = anomalySources.length > 0
+    ? anomalySources.reduce((sum, n) => sum + n.riskScore, 0) / anomalySources.length : 0;
+  try {
+    await db.auditLog.create({
+      data: {
+        action: 'ANALYZE', entity: 'cascade-risk', userId: 'system', userName: '级联引擎',
+        severity: computedOverallRisk > 70 ? 'important' : (computedOverallRisk > 40 ? 'warning' : 'info'),
+        details: {
+          scenario, overallRisk: computedOverallRisk,
+          affectedNodes: propagation.length,
+          totalMonthlyLoss: propagation.reduce((s, p) => s + (p.monetaryImpact || 0), 0),
+          maxDepth, degradedSources,
+          sourceCategories: anomalySources.map(s => s.category),
+          snapshot: {
+            affectedNodes: affectedNodes.length,
+            avgPropagatedRisk: avgRisk,
+            totalMonthlyLoss: propagation.reduce((s, p) => s + (p.monetaryImpact || 0), 0),
+            topRisks: topAffectedProducts.slice(0, 3).map(p => ({ sku: p.sku, risk: p.impactScore })),
+            ...buildCounterfactualAuditSnapshot(report),
+          },
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch { /* Audit log is non-critical */ }
+
   // Decision Passport
   const provenance = [
     ...(weatherResult
@@ -532,12 +571,7 @@ export async function getCascadeRisk(options?: {
 
   const totalDurationMs = Date.now() - startedAt;
 
-  const altActions = (report.counterfactuals ?? []).map(cf => ({
-    action: cf.scenario || '替代方案',
-    expectedImpact: `风险降低 ${cf.improvement}%`,
-    confidence: cf.improvement / 100,
-    tradeoffs: [] as string[],
-  }));
+  const altActions = buildPassportAlternatives(report);
 
   report.passport = createPassport({
     engine: 'cascade-risk',

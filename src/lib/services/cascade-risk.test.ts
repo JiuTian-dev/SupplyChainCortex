@@ -17,6 +17,8 @@ import {
   setPropagationRules,
   propagateMonteCarlo,
   propagateSEIR,
+  buildCounterfactualAuditSnapshot,
+  buildPassportAlternatives,
 } from './cascade-risk.service';
 import type { EdgeType } from './cascade-risk.types';
 
@@ -698,5 +700,114 @@ describe('runCausalCounterfactual', () => {
     expect(results[0].recommendation).toBeTruthy();
     // Should contain either CI or "有限" qualifier
     expect(results[0].recommendation.length).toBeGreaterThan(5);
+  });
+});
+
+describe('buildCounterfactualAuditSnapshot', () => {
+  it('includes both legacy and causal counterfactual summaries', () => {
+    const snapshot = buildCounterfactualAuditSnapshot({
+      counterfactuals: [
+        {
+          scenario: '替代路线',
+          originalImpact: { affectedProducts: 4, totalRisk: 80 },
+          alternativeImpact: { affectedProducts: 2, totalRisk: 50 },
+          improvement: 37.5,
+          recommendation: '可立即执行',
+        },
+      ],
+      causalCounterfactuals: [
+        {
+          scenario: '组合方案',
+          intervention: 'combined',
+          estimatedReduction: 0.55,
+          confidenceInterval: [0.45, 0.62],
+          causalEstimate: {
+            intervention: 'combined',
+            ate: 0.55,
+            confidenceInterval: [0.45, 0.62],
+            sampleSize: 12,
+            propensityScore: 0.4,
+            pValue: 0.03,
+            explanation: '历史样本支持',
+          },
+          originalImpact: { affectedProducts: 4, totalRisk: 80 },
+          alternativeImpact: { affectedProducts: 1, totalRisk: 36 },
+          improvement: 55,
+          recommendation: '优先采用',
+          isReliable: true,
+        },
+      ],
+    });
+
+    expect(snapshot.counterfactuals).toHaveLength(1);
+    expect(snapshot.causalCounterfactuals).toHaveLength(1);
+    expect(snapshot.causalCounterfactuals?.[0]).toMatchObject({
+      scenario: '组合方案',
+      intervention: 'combined',
+      estimatedReduction: 0.55,
+      isReliable: true,
+    });
+  });
+});
+
+describe('buildPassportAlternatives', () => {
+  it('prefers causal counterfactuals before legacy alternatives', () => {
+    const alternatives = buildPassportAlternatives({
+      counterfactuals: [
+        {
+          scenario: '旧方案',
+          originalImpact: { affectedProducts: 4, totalRisk: 80 },
+          alternativeImpact: { affectedProducts: 2, totalRisk: 60 },
+          improvement: 25,
+          recommendation: '备用',
+        },
+      ],
+      causalCounterfactuals: [
+        {
+          scenario: '新因果方案',
+          intervention: 'reroute',
+          estimatedReduction: 0.31,
+          confidenceInterval: [0.22, 0.36],
+          causalEstimate: {
+            intervention: 'reroute',
+            ate: 0.31,
+            confidenceInterval: [0.22, 0.36],
+            sampleSize: 9,
+            propensityScore: 0.5,
+            pValue: 0.05,
+            explanation: '有历史支持',
+          },
+          originalImpact: { affectedProducts: 4, totalRisk: 80 },
+          alternativeImpact: { affectedProducts: 3, totalRisk: 55 },
+          improvement: 31,
+          recommendation: '建议优先执行',
+          isReliable: false,
+        },
+      ],
+    });
+
+    expect(alternatives).toHaveLength(1);
+    expect(alternatives[0].action).toBe('新因果方案');
+    expect(alternatives[0].expectedImpact).toContain('31.0%');
+    expect(alternatives[0].tradeoffs).toContain('历史样本有限，结论偏先验');
+  });
+
+  it('falls back to legacy counterfactuals when causal data is absent', () => {
+    const alternatives = buildPassportAlternatives({
+      counterfactuals: [
+        {
+          scenario: '旧方案',
+          originalImpact: { affectedProducts: 4, totalRisk: 80 },
+          alternativeImpact: { affectedProducts: 2, totalRisk: 60 },
+          improvement: 25,
+          recommendation: '备用',
+        },
+      ],
+      causalCounterfactuals: [],
+    });
+
+    expect(alternatives).toHaveLength(1);
+    expect(alternatives[0].action).toBe('旧方案');
+    expect(alternatives[0].expectedImpact).toContain('25%');
   });
 });

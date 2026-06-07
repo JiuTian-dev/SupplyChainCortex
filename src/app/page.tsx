@@ -78,7 +78,8 @@ function HomePageContent() {
   const isRefreshing = useDashboardUIStore((s) => s.isRefreshing);
   const setGlobalSearchOpen = useDashboardUIStore((s) => s.setGlobalSearchOpen);
 
-  const legacyPanels = PANEL_REGISTRY.filter(p => p.category === 'ops');
+  // Include all panels except audit (which has its own dedicated view)
+  const legacyPanels = PANEL_REGISTRY.filter(p => p.id !== 'audit');
 
   return (
     <ErrorReportProvider>

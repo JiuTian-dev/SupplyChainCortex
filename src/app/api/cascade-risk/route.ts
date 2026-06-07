@@ -82,13 +82,23 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
       const includeCausal = searchParams.get('includeCausal') !== 'false';
       const forceCalibration = searchParams.get('forceCalibration') === 'true';
 
-      const validScenarios = ['weather_disruption', 'exchange_shock', 'supplier_failure', 'port_congestion', 'tariff_escalation', 'auto'];
+      const validScenarios = [
+        'weather_disruption',
+        'exchange_shock',
+        'supplier_failure',
+        'port_congestion',
+        'tariff_escalation',
+        'commodity_shock',
+        'cbam_enforcement',
+        'competitor_pressure',
+        'auto',
+      ] as const;
       if (!validScenarios.includes(scenario)) {
         throw new AppError(`无效场景: ${scenario}`, 400);
       }
 
       const report = await getCascadeRisk({
-        scenario: scenario as 'weather_disruption' | 'exchange_shock' | 'supplier_failure' | 'port_congestion' | 'auto',
+        scenario: scenario as Parameters<typeof getCascadeRisk>[0]['scenario'],
         sourcePort, sourceSupplier, fusionStrategy,
         includeForwardProjection, includeCounterfactuals, forceCalibration,
       });
@@ -98,9 +108,8 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
         delete (report as any).causalEdges;
         delete (report as any).causalSummary;
       }
-      // Strip SEIR timeline if causal not requested (large payload)
+      // Keep SEIR available; only causal payload should be removed by this flag.
       if (!includeCausal && report) {
-        delete (report as any).seirTimeline;
         delete (report as any).causalCounterfactuals;
       }
 

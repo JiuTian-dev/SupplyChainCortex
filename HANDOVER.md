@@ -1,8 +1,8 @@
 # SupplyChain Cortex — 项目交接文档
 
-> 最后更新: 2026-06-05  
+> 最后更新: 2026-06-07  
 > 当前版本: v2.9.3 (级联风险引擎全面商业化升级)  
-> 状态: 0 新增 TS 错误, 31 测试文件 580 测试通过 (2 pre-existing DeepSeek 失败)
+> 状态: 级联风险引擎收口已完成；新增 1 个路由测试文件，`cascade-risk` 相关 74 测试通过；`npx tsc --noEmit` 仍被 `.next/dev/types/routes.d.ts` 生成文件阻塞
 
 ---
 
@@ -57,11 +57,7 @@
 - 审计 Tab 已注册但不可见（DEFAULT_CONFIG 迁移代码未提交）
 - `src/lib/dashboard/config.ts` 和 `src/stores/dashboard-config-store.ts` 有未提交的 audit 修复
 
-### 未提交改动
-```
-M src/lib/dashboard/config.ts              — audit 加入 DEFAULT_CONFIG
-M src/stores/dashboard-config-store.ts     — localStorage 迁移 audit
-```
+### 未提交改动 （2026-06-07 级联风险收口 + 页面布局）
 
 ### 启动命令
 ```bash
@@ -76,19 +72,42 @@ bun run dev
 
 | 指标 | 数值 |
 |------|------|
-| 测试文件 | 31 |
-| 测试通过 | 578 (2 pre-existing DeepSeek 失败) |
+| 测试文件 | 32 |
+| 测试通过 | 583 (2 pre-existing DeepSeek 失败) |
+| cascade-risk 专项测试 | 74 |
 | Agent 引擎 | FSM v2 (6 状态) |
 | Provider 适配器 | DeepSeek V4 Pro / OpenAI / Anthropic |
-| TypeScript 预存错误 | 5（非本模块引入） |
+| TypeScript 预存错误 | 0 源码层；`.next/dev/types/routes.d.ts` 为 Next.js 生成文件语法错误 |
 | Prisma 模型 | 28 |
 | MCP 工具 | 65 |
-| API 端点 | 62 |
+| API 端点 | 63 |
 | 数据库 | PostgreSQL 16 |
 
 ---
 
 ## 最近会话完成的工作
+
+### 2026-06-07: 级联风险引擎收口（接口契约 + 审计闭环 + passport 主链）
+
+- **修复 API 场景白名单**：
+  - `/api/cascade-risk` 现接受 `commodity_shock` / `cbam_enforcement` / `competitor_pressure`
+  - 前端 `CascadeRiskPanel` 的场景下拉不再因 API 白名单滞后而触发 400
+- **修复响应裁剪逻辑**：
+  - `includeCausal=false` 时仅裁剪 `causalEdges` / `causalSummary` / `causalCounterfactuals`
+  - `seirTimeline` 不再被错误移除
+- **补齐 CausalML 审计闭环**：
+  - `src/lib/services/cascade-risk.main.ts` 新增 `buildCounterfactualAuditSnapshot()`
+  - 审计日志写入顺序后移到 counterfactual 生成之后
+  - `auditLog.details.snapshot` 现在会落库 legacy + causal counterfactual 摘要
+- **切换 passport alternatives 主数据源**：
+  - 新增 `buildPassportAlternatives()`
+  - `passport.alternatives` 现优先读取 `causalCounterfactuals`，无数据时再回退 `counterfactuals`
+- **新增测试**：
+  - `src/app/api/cascade-risk/route.test.ts`
+  - `src/lib/services/cascade-risk.test.ts` 补充 3 个收口测试
+- **验证结果**：
+  - `npx vitest run src/app/api/cascade-risk/route.test.ts src/lib/services/cascade-risk.test.ts` → 74 passed
+  - `npx tsc --noEmit` → `.next/dev/types/routes.d.ts(133,1)` 语法错误，属于生成文件问题，非本轮源码改动引入
 
 ### 2026-06-05: 级联风险引擎商业化升级 (P0/P1/P2 全部完成)
 
@@ -258,8 +277,9 @@ bun run dev
 bun run dev                     # 自动启动 SearXNG + Next.js
 
 # 质量检查
-npx vitest run                   # 580 tests (2 pre-existing DeepSeek failures)
-npx tsc --noEmit                 # 0 new errors
+npx vitest run src/app/api/cascade-risk/route.test.ts src/lib/services/cascade-risk.test.ts   # 74 cascade-risk tests
+npx vitest run                   # 583 tests (2 pre-existing DeepSeek failures)
+npx tsc --noEmit                 # src/ 层 0 错误
 
 # 数据库
 bun run db:push                  # 推送 schema
