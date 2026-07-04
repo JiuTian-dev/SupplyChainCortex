@@ -30,7 +30,7 @@ You type: "库存健康检查" (check inventory health). The Agent:
 5. **Synthesizes** a structured report with `[source][confidence]` tags (MARC protocol)
 6. **Persists** the entire decision trace (auditable, replayable)
 
-**Not a dashboard. Not a chatbot. An Agent that does supply chain analysis.**
+** An Agent that does supply chain analysis.**
 
 ---
 
