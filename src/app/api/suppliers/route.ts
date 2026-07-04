@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAuditLog } from "@/lib/services/audit.service";
 import { withErrorHandler, apiError, AppError } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getSuppliersList,
   getSupplierByCode,
@@ -14,6 +15,7 @@ import type { CreateSupplierData, SupplierRatingData } from "@/lib/services/supp
 
 // GET /api/suppliers - List all suppliers or get supplier detail
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action");
   const code = searchParams.get("code");
@@ -63,6 +65,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
 // POST /api/suppliers - Create a new supplier
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { code, name, contact, email, phone, region, category, leadTime, rating } = body;
 
@@ -96,6 +99,7 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
 
 // PUT /api/suppliers - Update a supplier
 export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { id, ...fields } = body;
 

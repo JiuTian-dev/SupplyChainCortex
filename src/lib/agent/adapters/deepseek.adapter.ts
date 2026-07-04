@@ -4,11 +4,11 @@ import type { MCPTool, MCPToolParameter } from '@/lib/mcp/tools';
 import type { ToolCall } from '../fsm-types';
 import { TOOL_DISPLAY_NAMES } from '../fsm-types';
 
-const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1';
+const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
 
 export class DeepSeekAdapter implements ProviderAdapter {
   readonly providerId = 'deepseek';
-  readonly defaultModel = 'deepseek-v4-flash';
+  readonly defaultModel = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
   private model: string;
 

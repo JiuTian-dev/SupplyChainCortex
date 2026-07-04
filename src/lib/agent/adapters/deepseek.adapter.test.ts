@@ -53,8 +53,8 @@ describe('DeepSeekAdapter', () => {
       expect(adapter.providerId).toBe('deepseek');
     });
 
-    it('defaultModel is deepseek-v4-pro', () => {
-      expect(adapter.defaultModel).toBe('deepseek-v4-pro');
+    it('defaultModel is deepseek-v4-flash', () => {
+      expect(adapter.defaultModel).toBe('deepseek-v4-flash');
     });
   });
 
@@ -76,7 +76,7 @@ describe('DeepSeekAdapter', () => {
     });
 
     it('returns default model when no explicit model', () => {
-      expect(adapter.resolveModel()).toBe('deepseek-v4-pro');
+      expect(adapter.resolveModel()).toBe('deepseek-v4-flash');
     });
   });
 });

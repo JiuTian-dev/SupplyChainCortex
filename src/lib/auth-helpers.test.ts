@@ -93,7 +93,7 @@ describe('Auth Helpers', () => {
           id: 'user-1',
           email: 'admin@supply-chain.com',
           name: 'Admin',
-          role: 'admin',
+          role: 'org_admin',
         },
       };
       mockGetServerSession.mockResolvedValue(mockSession);
@@ -112,7 +112,7 @@ describe('Auth Helpers', () => {
           id: 'user-3',
           email: 'manager@supply-chain.com',
           name: 'Manager',
-          role: 'manager',
+          role: 'team_admin',
         },
       };
       mockGetServerSession.mockResolvedValue(mockSession);
@@ -206,7 +206,7 @@ describe('Auth Helpers', () => {
           id: 'user-1',
           email: 'admin@supply-chain.com',
           name: 'Admin',
-          role: 'admin',
+          role: 'org_admin',
         },
       };
       mockGetServerSession.mockResolvedValue(mockSession);

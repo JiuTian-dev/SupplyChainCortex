@@ -1,5 +1,3 @@
-// SupplyChain Cortex — PostgreSQL Schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,72 +7,71 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== 产品 ====================
 model Product {
-  id           String   @id @default(uuid())
-  sku          String   @unique
+  id           String         @id @default(uuid())
+  sku          String         @unique
   name         String
   category     String
-  subCategory  String   @map("sub_category")
-  unitCost     Float    @map("unit_cost")
-  sellingPrice Float    @map("selling_price")
+  subCategory  String         @map("sub_category")
+  unitCost     Float          @map("unit_cost")
+  sellingPrice Float          @map("selling_price")
   weight       Float
-  origin       String   @default("CN")
-  abcClass     String   @default("C") @map("abc_class")
-  fsnClass     String   @default("N") @map("fsn_class")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  inventory    Inventory?
+  origin       String         @default("CN")
+  abcClass     String         @default("C") @map("abc_class")
+  fsnClass     String         @default("N") @map("fsn_class")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  tenantId     String?        @default("default") @map("tenant_id")
   cost         CostRecord?
-  shipments    ShipmentItem[]
+  inventory    Inventory?
   salesRecords SalesRecord[]
+  shipments    ShipmentItem[]
 
   @@index([category])
   @@index([subCategory])
   @@index([category, subCategory])
+  @@index([tenantId])
   @@map("products")
 }
 
-// ==================== 库存 ====================
 model Inventory {
-  id            String   @id @default(uuid())
-  productId     String   @unique @map("product_id")
-  sku           String
-  productName   String   @map("product_name")
-  warehouse     String
-  quantity      Int
-  safetyStock   Int      @map("safety_stock")
-  reorderPoint  Int      @map("reorder_point")
-  inTransit     Int      @default(0) @map("in_transit")
-  turnoverRate  Float    @default(0) @map("turnover_rate")
-  turnoverDays  Int      @default(0) @map("turnover_days")
-  stockStatus   String   @default("healthy") @map("stock_status") // healthy, warning, critical, overstock
-  lastSyncAt    DateTime @default(now()) @map("last_sync_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid())
+  productId    String   @unique @map("product_id")
+  sku          String
+  productName  String   @map("product_name")
+  warehouse    String
+  quantity     Int
+  safetyStock  Int      @map("safety_stock")
+  reorderPoint Int      @map("reorder_point")
+  inTransit    Int      @default(0) @map("in_transit")
+  turnoverRate Float    @default(0) @map("turnover_rate")
+  turnoverDays Int      @default(0) @map("turnover_days")
+  stockStatus  String   @default("healthy") @map("stock_status")
+  lastSyncAt   DateTime @default(now()) @map("last_sync_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenantId     String?  @default("default") @map("tenant_id")
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([sku])
   @@index([warehouse])
   @@index([stockStatus])
   @@index([warehouse, stockStatus])
+  @@index([tenantId])
   @@map("inventories")
 }
 
-// ==================== 销售记录 ====================
 model SalesRecord {
   id          String   @id @default(uuid())
   productId   String   @map("product_id")
   sku         String
   productName String   @map("product_name")
-  date        DateTime // YYYY-MM-DD
+  date        DateTime
   quantity    Int
   revenue     Float
-  platform    String   // Amazon, Shopify, Walmart, eBay
+  platform    String
   createdAt   DateTime @default(now()) @map("created_at")
-
+  tenantId    String?  @default("default") @map("tenant_id")
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
@@ -83,141 +80,145 @@ model SalesRecord {
   @@index([sku])
   @@index([productId, date])
   @@index([platform, date])
+  @@index([tenantId])
   @@map("sales_records")
 }
 
-// ==================== 物流货运 ====================
 model ShipmentItem {
-  id              String   @id @default(uuid())
-  trackingNumber  String   @unique @map("tracking_number")
-  productId       String   @map("product_id")
-  sku             String
-  productName     String   @map("product_name")
-  origin          String
-  destination     String
-  carrier         String
-  status          String   @default("pending") // pending, in_transit, customs, delivered, delayed, exception
-  eta             DateTime?
-  actualDelivery  DateTime?  @map("actual_delivery")
-  delayDays       Int      @default(0) @map("delay_days")
-  riskLevel       String   @default("low") @map("risk_level") // low, medium, high, critical
-  events          Json     @default("[]") // JSON array of logistics events
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid())
+  trackingNumber String    @unique @map("tracking_number")
+  productId      String    @map("product_id")
+  sku            String
+  productName    String    @map("product_name")
+  origin         String
+  destination    String
+  carrier        String
+  status         String    @default("pending")
+  eta            DateTime?
+  actualDelivery DateTime? @map("actual_delivery")
+  delayDays      Int       @default(0) @map("delay_days")
+  riskLevel      String    @default("low") @map("risk_level")
+  events         Json      @default("[]")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  tenantId       String?   @default("default") @map("tenant_id")
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([status])
   @@index([riskLevel])
   @@index([sku])
   @@index([status, riskLevel])
+  @@index([tenantId])
   @@map("shipment_items")
 }
 
-// ==================== 成本记录 ====================
 model CostRecord {
-  id            String   @id @default(uuid())
-  productId     String   @unique @map("product_id")
-  sku           String
-  productName   String   @map("product_name")
-  rawMaterial   Float    @map("raw_material")
-  labor         Float
-  logistics     Float
-  tariff        Float
-  platformFee   Float    @map("platform_fee")
-  exchangeRate  Float    @default(7.25) @map("exchange_rate")
-  destination   String   @default("US")
-  totalLanded   Float    @map("total_landed")
-  sellingPrice  Float    @map("selling_price")
-  grossMargin   Float    @map("gross_margin")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid())
+  productId    String   @unique @map("product_id")
+  sku          String
+  productName  String   @map("product_name")
+  rawMaterial  Float    @map("raw_material")
+  labor        Float
+  logistics    Float
+  tariff       Float
+  platformFee  Float    @map("platform_fee")
+  exchangeRate Float    @default(7.25) @map("exchange_rate")
+  destination  String   @default("US")
+  totalLanded  Float    @map("total_landed")
+  sellingPrice Float    @map("selling_price")
+  grossMargin  Float    @map("gross_margin")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenantId     String?  @default("default") @map("tenant_id")
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([sku])
+  @@index([tenantId])
   @@map("cost_records")
 }
 
-// ==================== 预警规则 ====================
 model AlertRule {
   id        String   @id @default(uuid())
   ruleId    String   @unique @map("rule_id")
   name      String
   field     String
-  operator  String   // <, >, <=, >=, ==
+  operator  String
   threshold Float
   unit      String
   enabled   Boolean  @default(true)
-  severity  String   @default("warning") // warning, critical
+  severity  String   @default("warning")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  tenantId  String?  @default("default") @map("tenant_id")
 
   @@index([enabled])
+  @@index([tenantId])
   @@map("alert_rules")
 }
 
-// ==================== 供应链事件 ====================
 model SupplyChainEvent {
   id          String   @id @default(uuid())
-  type        String   // 补货订单, 货运更新, 库存预警, 成本变更, 销售里程碑
+  type        String
   title       String
   description String
   icon        String   @default("📦")
   color       String   @default("#f97316")
-  severity    String   @default("info") // info, warning, critical
+  severity    String   @default("info")
   sku         String?
   isRead      Boolean  @default(false) @map("is_read")
   createdAt   DateTime @default(now()) @map("created_at")
+  tenantId    String?  @default("default") @map("tenant_id")
 
   @@index([type])
   @@index([sku])
   @@index([isRead])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("supply_chain_events")
 }
 
-// ==================== 补货订单 ====================
 model ReorderOrder {
   id          String   @id @default(uuid())
   sku         String
   productName String   @map("product_name")
   quantity    Int
   warehouse   String
-  priority    String   @default("常规") // 常规, 紧急
-  status      String   @default("pending") // pending, approved, shipped, delivered, cancelled
+  priority    String   @default("常规")
+  status      String   @default("pending")
   notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  tenantId    String?  @default("default") @map("tenant_id")
 
   @@index([sku])
   @@index([status])
   @@index([priority])
+  @@index([tenantId])
   @@map("reorder_orders")
 }
 
-// ==================== 供应链备注 ====================
 model SupplyChainNote {
-  id          String   @id @default(uuid())
-  sku         String
-  author      String   @default("系统用户")
-  content     String
-  category    String   @default("general") // general, inventory, cost, logistics, sales
-  priority    String   @default("normal")  // normal, important, urgent
-  isResolved  Boolean  @default(false) @map("is_resolved")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  sku        String
+  author     String   @default("系统用户")
+  content    String
+  category   String   @default("general")
+  priority   String   @default("normal")
+  isResolved Boolean  @default(false) @map("is_resolved")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  tenantId   String?  @default("default") @map("tenant_id")
 
   @@index([sku])
   @@index([category])
   @@index([priority])
   @@index([isResolved])
   @@index([isResolved, priority])
+  @@index([tenantId])
   @@map("supply_chain_notes")
 }
 
-// ==================== 供应商 ====================
 model Supplier {
   id            String   @id @default(uuid())
   code          String   @unique
@@ -226,34 +227,39 @@ model Supplier {
   email         String?
   phone         String?
   region        String
-  category      String   // 供应品类
-  leadTime      Int      @default(14) @map("lead_time") // 平均交货天数
-  rating        Float    @default(0) // 0-5 评分
-  ratingDetails Json?    @map("rating_details") // JSON: { deliveryScore, qualityScore, priceScore, communicationScore, comments, ratedAt }
-  status        String   @default("active") // active, suspended, inactive
+  category      String
+  leadTime      Int      @default(14) @map("lead_time")
+  rating        Float    @default(0)
+  ratingDetails Json?    @map("rating_details")
+  status        String   @default("active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
+  tenantId      String?  @default("default") @map("tenant_id")
 
   @@index([region])
   @@index([category])
   @@index([status])
+  @@index([tenantId])
   @@map("suppliers")
 }
 
-// ==================== 审计日志 ====================
 model AuditLog {
-  id        String   @id @default(uuid())
-  action    String   // CREATE, UPDATE, DELETE, IMPORT, EXPORT, ADJUST, TRANSFER, RATE, SIMULATE
-  entity    String   // product, inventory, shipment, note, supplier, reorder, alert_rule, cost
-  entityId  String?  @map("entity_id") // ID of the affected entity
-  sku       String?  // Related SKU if applicable
-  userId    String   @default("system") @map("user_id") // Who performed the action
-  userName  String   @default("系统用户") @map("user_name")
-  details   Json     // JSON object with action details
-  ipAddress String?  @map("ip_address") // Request IP (when available)
-  userAgent String?  @map("user_agent") // Request user agent
-  severity  String   @default("info") // info, warning, important
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  action       String
+  entity       String
+  entityId     String?  @map("entity_id")
+  sku          String?
+  userId       String   @default("system") @map("user_id")
+  userName     String   @default("系统用户") @map("user_name")
+  details      Json
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  severity     String   @default("info")
+  createdAt    DateTime @default(now()) @map("created_at")
+  contentHash  String   @default("pending-backfill") @map("content_hash")
+  previousHash String?  @map("previous_hash")
+  signature    String?  @map("signature")
+  tenantId     String?  @default("default") @map("tenant_id")
 
   @@index([action])
   @@index([entity])
@@ -262,27 +268,28 @@ model AuditLog {
   @@index([createdAt])
   @@index([entity, action])
   @@index([severity, createdAt])
+  @@index([tenantId])
   @@map("audit_logs")
 }
 
-// ==================== 用户与权限 ====================
 model User {
   id          String    @id @default(uuid())
   email       String    @unique
   name        String
-  password    String    // bcrypt hashed
-  role        String    @default("viewer") // admin, manager, viewer
+  password    String
+  role        String    @default("viewer")
   avatar      String?
   isActive    Boolean   @default(true) @map("is_active")
   lastLoginAt DateTime? @map("last_login_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
-
+  tenantId    String?   @default("default") @map("tenant_id")
   sessions    Session[]
 
   @@index([email])
   @@index([role])
   @@index([isActive])
+  @@index([tenantId])
   @@map("users")
 }
 
@@ -294,64 +301,64 @@ model Session {
   ipAddress String?  @map("ip_address")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
-
+  tenantId  String?  @default("default") @map("tenant_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
   @@index([expiresAt])
+  @@index([tenantId])
   @@map("sessions")
 }
 
-// ==================== 质量管理 ====================
-
-// 退货记录
 model ReturnRecord {
-  id            String   @id @default(uuid())
-  sku           String
-  productName   String   @map("product_name")
-  quantity      Int
-  reason        String
-  reasonDetail  String?  @map("reason_detail")
-  platform      String?
-  costImpact    Float    @default(0) @map("cost_impact")
-  status        String   @default("pending")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  sku          String
+  productName  String   @map("product_name")
+  quantity     Int
+  reason       String
+  reasonDetail String?  @map("reason_detail")
+  platform     String?
+  costImpact   Float    @default(0) @map("cost_impact")
+  status       String   @default("pending")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenantId     String?  @default("default") @map("tenant_id")
 
   @@index([sku])
   @@index([reason])
   @@index([platform])
   @@index([status])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("return_records")
 }
 
-// 缺陷记录
 model DefectRecord {
-  id              String    @id @default(uuid())
-  sku             String
-  productName     String    @map("product_name")
-  defectType      String    @map("defect_type")
-  severity        String    @default("minor")
-  quantity        Int       @default(1)
-  detectedAt      DateTime    @map("detected_at")
-  rootCause       String?   @map("root_cause")
-  correctiveAction String?  @map("corrective_action")
-  status          String    @default("open")
-  resolvedAt      DateTime? @map("resolved_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(uuid())
+  sku              String
+  productName      String    @map("product_name")
+  defectType       String    @map("defect_type")
+  severity         String    @default("minor")
+  quantity         Int       @default(1)
+  detectedAt       DateTime  @map("detected_at")
+  rootCause        String?   @map("root_cause")
+  correctiveAction String?   @map("corrective_action")
+  status           String    @default("open")
+  resolvedAt       DateTime? @map("resolved_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  tenantId         String?   @default("default") @map("tenant_id")
 
   @@index([sku])
   @@index([defectType])
   @@index([severity])
   @@index([status])
   @@index([detectedAt])
+  @@index([tenantId])
   @@map("defect_records")
 }
 
-// 质保成本记录
 model WarrantyCost {
   id           String   @id @default(uuid())
   sku          String
@@ -364,17 +371,16 @@ model WarrantyCost {
   status       String   @default("submitted")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  tenantId     String?  @default("default") @map("tenant_id")
 
   @@index([sku])
   @@index([category])
   @@index([status])
   @@index([claimDate])
+  @@index([tenantId])
   @@map("warranty_costs")
 }
 
-// ==================== 合规认证 ====================
-
-// 合规证书
 model ComplianceCert {
   id           String   @id @default(uuid())
   certName     String   @map("cert_name")
@@ -392,16 +398,17 @@ model ComplianceCert {
   reminderDays Int      @default(90) @map("reminder_days")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  tenantId     String?  @default("default") @map("tenant_id")
 
   @@index([certName])
   @@index([sku])
   @@index([status])
   @@index([expiryDate])
   @@index([category])
+  @@index([tenantId])
   @@map("compliance_certs")
 }
 
-// 法规变更
 model RegulationChange {
   id             String    @id @default(uuid())
   title          String
@@ -420,186 +427,324 @@ model RegulationChange {
   reviewedAt     DateTime? @map("reviewed_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
+  tenantId       String?   @default("default") @map("tenant_id")
 
   @@index([source])
   @@index([category])
   @@index([impactLevel])
   @@index([status])
   @@index([effectiveDate])
+  @@index([tenantId])
   @@map("regulation_changes")
 }
 
-// ==================== 关税引擎 ====================
-
-// HS编码映射：产品品类 -> HS编码
 model ProductHSCode {
   id          String   @id @default(uuid())
   category    String
   subCategory String?  @map("sub_category")
   hsCode      String   @map("hs_code")
   description String?
-  section     String?  // e.g. '301-list1', '301-list3', null = exempt
+  section     String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  tenantId    String?  @default("default") @map("tenant_id")
 
   @@index([category])
   @@index([subCategory])
   @@index([category, subCategory])
+  @@index([tenantId])
   @@map("product_hs_codes")
 }
 
-// 关税规则：国家 x HS编码 x 贸易协定 x 生效日期
 model TariffRule {
   id             String   @id @default(uuid())
   countryCode    String   @map("country_code")
   countryName    String   @map("country_name")
   hsCode         String   @map("hs_code")
   rate           Float
-  rateType       String   @map("rate_type")       // additional, MFN, FTA
-  tradeAgreement String?  @map("trade_agreement") // Section301-list1, WTO-MFN, RCEP-JP, etc.
+  rateType       String   @map("rate_type")
+  tradeAgreement String?  @map("trade_agreement")
   originCountry  String   @default("CN") @map("origin_country")
   isActive       Boolean  @default(true) @map("is_active")
-  effectiveFrom  String   @map("effective_from")  // YYYY-MM-DD
-  effectiveTo    String?  @map("effective_to")    // YYYY-MM-DD
-  priority       Int      @default(3)             // lower number = applied first
+  effectiveFrom  String   @map("effective_from")
+  effectiveTo    String?  @map("effective_to")
+  priority       Int      @default(3)
   notes          String?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  tenantId       String?  @default("default") @map("tenant_id")
 
   @@index([countryCode])
   @@index([hsCode])
   @@index([isActive])
   @@index([rate])
   @@index([countryCode, hsCode, originCountry])
+  @@index([tenantId])
   @@map("tariff_rules")
 }
 
-// ==================== 引擎决策日志 ====================
-
-// 引擎决策日志
 model DecisionLog {
   id              String   @id @default(uuid())
   auditId         String   @map("audit_id")
   engine          String
   action          String
-  input           String?  // JSON serialized
-  output          String?  // JSON serialized
+  input           String?
+  output          String?
   durationMs      Int      @map("duration_ms")
   cacheHit        Boolean  @default(false) @map("cache_hit")
-  degradedSources String?  @map("degraded_sources") // JSON array
-  errors          String?  // JSON serialized
+  degradedSources String?  @map("degraded_sources")
+  errors          String?
   version         String?
   createdAt       DateTime @default(now()) @map("created_at")
+  tenantId        String?  @default("default") @map("tenant_id")
 
   @@index([auditId])
   @@index([engine])
   @@index([action])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("decision_logs")
 }
 
-// 用户反馈日志
 model FeedbackLog {
   id            String    @id @default(uuid())
   auditId       String    @map("audit_id")
   engine        String
-  action        String    // accepted, rejected, modified, ignored, deferred
-  modifications String?   @map("modifications")  // JSON of modifications made by the user
+  action        String
+  modifications String?   @map("modifications")
   userNotes     String?   @map("user_notes")
   userId        String?   @map("user_id")
   suggestedAt   DateTime? @map("suggested_at")
   actedAt       DateTime  @map("acted_at")
-  tags          String?   // JSON array of tags
-  outcomeJson   String?   @map("outcome_json")   // structured outcome data
+  tags          String?
+  outcomeJson   String?   @map("outcome_json")
   createdAt     DateTime  @default(now()) @map("created_at")
+  tenantId      String?   @default("default") @map("tenant_id")
 
   @@index([auditId])
   @@index([engine])
   @@index([action])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("feedback_logs")
 }
 
-// 贝叶斯权重持久化
 model EngineWeight {
-  id            String   @id @default(uuid())
-  engine        String   @unique
-  version       String
-  sourcesJson   String   @map("sources_json")  // JSON array of SourceWeight[]
-  totalSamples  Int      @default(0) @map("total_samples")
-  calibratedAt  DateTime @map("calibrated_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  engine       String   @unique
+  version      String
+  sourcesJson  String   @map("sources_json")
+  totalSamples Int      @default(0) @map("total_samples")
+  calibratedAt DateTime @map("calibrated_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenantId     String?  @default("default") @map("tenant_id")
 
+  @@index([tenantId])
   @@map("engine_weights")
 }
 
-// ─── Decision Trace Models (Agent Engine v2 Audit) ───────────────────────
-
 model DecisionTrace {
-  id          String   @id @default(cuid())
-  auditId     String   @unique
-  userQuery   String
-  intent      String
-  confidence  Float
-  mode        String   @default("fsm-v2")
-  tier        Int?
-  durationMs  Int
-  toolsUsed   String[]
-  claimsCount Int      @default(0)
-  passport    Json
-  userId      String?
-  summary     String?
-  createdAt   DateTime @default(now())
-
-  steps TraceStep[]
+  id           String      @id @default(cuid())
+  auditId      String      @unique
+  userQuery    String
+  intent       String
+  confidence   Float
+  mode         String      @default("fsm-v2")
+  tier         Int?
+  durationMs   Int
+  toolsUsed    String[]
+  claimsCount  Int         @default(0)
+  passport     Json
+  userId       String?
+  summary      String?
+  createdAt    DateTime    @default(now())
+  contentHash  String      @default("pending-backfill") @map("content_hash")
+  previousHash String?     @map("previous_hash")
+  signature    String?     @map("signature")
+  tenantId     String?     @default("default") @map("tenant_id")
+  steps        TraceStep[]
 
   @@index([createdAt])
   @@index([intent])
+  @@index([tenantId])
 }
 
 model TraceStep {
-  id         String   @id @default(cuid())
+  id         String          @id @default(cuid())
   traceId    String
-  trace      DecisionTrace @relation(fields: [traceId], references: [id], onDelete: Cascade)
   stepIndex  Int
   state      String
   confidence Float?
   findings   String?
   nextState  String?
-  durationMs Int      @default(0)
-
-  toolCalls TraceToolCall[]
-  claims    TracedClaim[]
+  durationMs Int             @default(0)
+  tenantId   String?         @default("default") @map("tenant_id")
+  trace      DecisionTrace   @relation(fields: [traceId], references: [id], onDelete: Cascade)
+  toolCalls  TraceToolCall[]
+  claims     TracedClaim[]
 
   @@index([traceId])
   @@index([traceId, stepIndex])
+  @@index([tenantId])
 }
 
 model TraceToolCall {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   stepId    String
-  step      TraceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
   toolName  String
   params    Json
   result    Json?
   success   Boolean
   latencyMs Int
   error     String?
+  tenantId  String?   @default("default") @map("tenant_id")
+  step      TraceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@index([stepId])
+  @@index([tenantId])
 }
 
 model TracedClaim {
-  id          String @id @default(cuid())
-  stepId      String
-  step        TraceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  claimIndex  Int
-  text        String
-  source      String
-  confidence  String
+  id         String    @id @default(cuid())
+  stepId     String
+  claimIndex Int
+  text       String
+  source     String
+  confidence String
+  tenantId   String?   @default("default") @map("tenant_id")
+  step       TraceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@index([stepId])
   @@index([source])
   @@index([confidence])
+  @@index([tenantId])
+}
+
+model tenants {
+  id                 String   @id @default(uuid())
+  name               String
+  slug               String   @unique
+  plan               String   @default("starter")
+  status             String   @default("active")
+  stripeCustomerId   String?  @map("stripe_customer_id")
+  subscriptionStatus String?  @map("subscription_status")
+  billingEmail       String?  @map("billing_email")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now())
+}
+
+model KnowledgeDocument {
+  id         String   @id @default(uuid())
+  tenantId   String   @default("default") @map("tenant_id")
+  title      String
+  content    String
+  source     String?
+  domain     String   @default("general")
+  chunkCount Int      @default(0) @map("chunk_count")
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  chunks     KnowledgeChunk[]
+
+  @@index([tenantId])
+  @@index([domain])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id           String   @id @default(uuid())
+  tenantId     String   @default("default") @map("tenant_id")
+  documentId   String   @map("document_id")
+  content      String
+  embedding    String?
+  chunkIndex   Int      @map("chunk_index")
+  tokenCount   Int      @default(0) @map("token_count")
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now())
+  document     KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([documentId])
+  @@map("knowledge_chunks")
+}
+
+model KnowledgeEntity {
+  id          String   @id @default(uuid())
+  tenantId    String   @default("default") @map("tenant_id")
+  type        String
+  name        String
+  description String?
+  embedding   String?
+  metadata    Json     @default("{}")
+  externalId  String?  @map("external_id")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([externalId])
+  @@map("knowledge_entities")
+}
+
+model KnowledgeRelation {
+  id        String   @id @default(uuid())
+  tenantId  String   @default("default") @map("tenant_id")
+  sourceId  String   @map("source_id")
+  targetId  String   @map("target_id")
+  type      String
+  weight    Float    @default(0.5)
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([sourceId])
+  @@index([targetId])
+  @@index([type])
+  @@map("knowledge_relations")
+}
+
+model OrgSubscription {
+  id                    String    @id @default(uuid())
+  tenantId              String    @unique @map("tenant_id")
+  stripeSubscriptionId  String?   @map("stripe_subscription_id")
+  stripePriceId         String?   @map("stripe_price_id")
+  plan                  String    @default("free")
+  status                String    @default("active")
+  currentPeriodStart    DateTime? @map("current_period_start")
+  currentPeriodEnd      DateTime? @map("current_period_end")
+  cancelAtPeriodEnd     Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([stripeSubscriptionId])
+  @@map("org_subscriptions")
+}
+
+model UsageRecord {
+  id        String   @id @default(uuid())
+  tenantId  String   @default("default") @map("tenant_id")
+  resource  String
+  amount    Int      @default(0)
+  period    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@unique([tenantId, resource, period])
+  @@index([tenantId])
+  @@index([period])
+  @@map("usage_records")
+}
+
+model ChatConversation {
+  id        String   @id @default(uuid())
+  tenantId  String   @default("default") @map("tenant_id")
+  title     String   @default("新对话")
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("chat_conversations")
 }

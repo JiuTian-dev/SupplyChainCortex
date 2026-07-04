@@ -1,6 +1,26 @@
 /**
  * Supply Chain RAG (Retrieval-Augmented Generation) — Minimal Edition.
  *
+ * @deprecated 此文件已废弃，请使用 @/lib/knowledge/rag-pipeline。
+ * 此文件保留作为源代码备份与依赖无关的兜底检索路径。
+ * 迁移日期：2026-06-26
+ *
+ * 旧版特性：TF-IDF + 硬编码 KNOWLEDGE_BASE 数组（无向量检索）
+ * 新版特性：Prisma + pgvector + tenant 隔离 + 配置化 embedding provider
+ *
+ * 迁移状态：
+ * - Agent FSM (src/lib/agent/fsm.ts) 已迁移到 buildRagContext 直接调用。
+ * - knowledge/rag-pipeline.ts 已添加 retrieveKnowledge/augmentPrompt 兼容包装函数。
+ *
+ * 仍引用此文件的消费者（保留作为依赖无关的兜底/知识演化路径，待未来迁移）：
+ * - src/app/api/rag/route.ts — TF-IDF 兜底检索（无外部依赖，新版失败时回退）
+ *   + getRAGDomains/searchByDomain（领域列表/检索，新版无等价物）
+ * - src/app/api/engine-calibrate/route.ts — evolveFromFeedback/getKnowledgeHealth/
+ *   getChunksNeedingReview（知识演化与反馈评分，新版无等价物）
+ *
+ * 新代码请勿引用此文件的检索函数；如需向量检索请使用 @/lib/knowledge/rag-pipeline。
+ * 兼容性：knowledge/rag-pipeline.ts 已添加 retrieveKnowledge/augmentPrompt 异步兼容包装。
+ *
  * Self-contained keyword + TF-IDF retrieval. No external API required.
  * Knowledge base covers: tariff rules, trade agreements, shipping terms,
  * compliance requirements, supply chain best practices, production & QC,

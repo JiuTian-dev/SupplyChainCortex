@@ -55,10 +55,22 @@ export function SalesForecastEnhanced() {
 
     projections.forEach((d, idx) => {
       const fRev = Number(d.revenue || 0);
-      // HACK: client-side confidence heuristic — TODO: replace with API `forecast_demand` confidence interval data
-      const spread = 0.05 + (idx / Math.max(projections.length - 1, 1)) * 0.20;
-      const upper = Math.round(fRev * (1 + spread));
-      const lower = Math.round(fRev * (1 - spread));
+      // Use API-provided confidence interval (upperBound/lowerBound from
+      // generateSalesForecast — linear regression + 1.96*stdDev). Falls back to a
+      // widening heuristic only if the API response omits bounds.
+      // TODO: replace fallback with `forecast_demand` MCP tool bounds once wired to this view.
+      const apiUpper = d.upperBound != null ? Number(d.upperBound) : null;
+      const apiLower = d.lowerBound != null ? Number(d.lowerBound) : null;
+      let upper: number;
+      let lower: number;
+      if (apiUpper != null && apiLower != null && (apiUpper > 0 || apiLower > 0)) {
+        upper = Math.round(apiUpper);
+        lower = Math.round(apiLower);
+      } else {
+        const spread = 0.05 + (idx / Math.max(projections.length - 1, 1)) * 0.20;
+        upper = Math.round(fRev * (1 + spread));
+        lower = Math.round(fRev * (1 - spread));
+      }
       points.push({
         date: String(d.date).slice(5), historical: null as number | null,
         forecast: Math.round(fRev), upper, lower,

@@ -9,7 +9,7 @@ interface SectionErrorBoundaryProps {
 
 export function SectionErrorBoundary({ children, sectionName }: SectionErrorBoundaryProps) {
   return (
-    <GlobalErrorBoundary level="section">
+    <GlobalErrorBoundary level="section" sectionName={sectionName} autoRetry>
       {children}
     </GlobalErrorBoundary>
   );

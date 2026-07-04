@@ -17,7 +17,12 @@
 import { fetchSCFIWithCache, scfiToFreightRates } from '@/lib/sources/scfi-scraper';
 import { getPBOCMidpoints } from '@/lib/sources/pboc-exchange-rate';
 import { fetchDailyCommodities } from '@/lib/sources/alphavantage-commodities';
-import { db } from '@/lib/db';
+import type { PrismaClient } from '@prisma/client';
+
+async function getDb(): Promise<PrismaClient> {
+  const { db } = await import('@/lib/db');
+  return db as unknown as PrismaClient;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
@@ -42,6 +47,7 @@ async function jobSCFI(): Promise<JobResult> {
       );
     }
 
+    const db = await getDb();
     // Store freight rates into DB supply chain events for persistence
     await db.supplyChainEvent.create({
       data: {
@@ -70,6 +76,7 @@ async function jobPBOC(): Promise<JobResult> {
     const data = await getPBOCMidpoints();
     if (!data) return { job: 'PBOC', status: 'no_data', durationMs: Date.now() - start };
 
+    const db = await getDb();
     const usdMid = data.midpoints.find(m => m.currency === 'USD');
     if (usdMid) {
       await db.supplyChainEvent.create({
@@ -95,6 +102,7 @@ async function jobCommodities(): Promise<JobResult> {
     const data = await fetchDailyCommodities();
     if (data.length === 0) return { job: 'Commodities', status: 'no_data', durationMs: Date.now() - start };
 
+    const db = await getDb();
     const summary = data.map(d => `${d.name}: ${d.price} ${d.unit}`).join(', ');
     await db.supplyChainEvent.create({
       data: {
@@ -119,6 +127,7 @@ async function jobSCFIS(): Promise<JobResult> {
     const data = await fetchSCFISPrice();
     if (!data) return { job: 'SCFIS', status: 'no_data', durationMs: Date.now() - start };
 
+    const db = await getDb();
     await db.supplyChainEvent.create({
       data: {
         type: 'data_update',
@@ -142,6 +151,7 @@ async function jobCarbonPrice(): Promise<JobResult> {
     const data = await fetchCarbonPrice();
     if (!data) return { job: 'CarbonPrice', status: 'no_data', durationMs: Date.now() - start };
 
+    const db = await getDb();
     await db.supplyChainEvent.create({
       data: {
         type: 'data_update',
@@ -246,6 +256,7 @@ async function jobAlertCheck(): Promise<JobResult> {
 async function jobAutoBacktest(): Promise<JobResult> {
   const start = Date.now();
   try {
+    const db = await getDb();
     // Run backtest against actual shipment data from past 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
     const recentShipments = await db.shipmentItem.findMany({

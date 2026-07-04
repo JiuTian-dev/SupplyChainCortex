@@ -8,9 +8,12 @@
 
 import { NextResponse } from 'next/server';
 import { withErrorHandler, apiSuccess } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getConnectorHealth } from '@/lib/mcp/connector-health';
 
 const handleGET = async (): Promise<NextResponse> => {
+  await optionalRequireAuth();
   const connectors = await getConnectorHealth();
   return apiSuccess({
     connectors,
@@ -18,4 +21,4 @@ const handleGET = async (): Promise<NextResponse> => {
   });
 };
 
-export const GET = withErrorHandler(handleGET);
+export const GET = withApiRateLimit(withErrorHandler(handleGET));

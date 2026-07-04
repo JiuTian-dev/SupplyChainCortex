@@ -1,0 +1,27 @@
+# SupplyChain Cortex — Grafana Datasource Provisioning
+#
+# Auto-provisions Prometheus + Loki datasources on first boot.
+# Loaded from /etc/grafana/provisioning/datasources/ inside the Grafana container.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000

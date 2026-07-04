@@ -1,6 +1,6 @@
 import { withErrorHandler, apiSuccess } from '@/lib/api-utils';
 import { getAuth, requireAuth } from '@/lib/auth-helpers';
-import { getRolePermissions, ROLE_LABELS, ROLE_COLORS, type Role } from '@/lib/rbac';
+import { getRolePermissions, ROLE_LABELS, ROLE_COLORS, type Role } from '@/lib/auth/permissions';
 import { db } from '@/lib/db';
 
 /** Get current auth info - used by frontend to check session */

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Permission, Role } from '@/lib/rbac';
-import { ROLE_LABELS, ROLE_COLORS } from '@/lib/rbac';
+import type { Permission, Role } from '@/lib/auth/permissions';
+import { ROLE_LABELS, ROLE_COLORS } from '@/lib/auth/permissions';
 
 interface AuthUser {
   id: string;

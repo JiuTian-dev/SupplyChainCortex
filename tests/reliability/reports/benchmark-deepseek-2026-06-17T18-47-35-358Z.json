@@ -1,0 +1,354 @@
+{
+  "generatedAt": "2026-06-17T18:47:35.357Z",
+  "config": {
+    "provider": "deepseek",
+    "limit": 10,
+    "outputDir": "./tests/reliability/reports",
+    "concurrency": 3,
+    "maxRetries": 2,
+    "realApi": false,
+    "timeoutMs": 30000
+  },
+  "stats": {
+    "provider": "deepseek",
+    "totalCases": 10,
+    "passed": 2,
+    "failed": 8,
+    "successRate": 20,
+    "avgLatencyMs": 0,
+    "minLatencyMs": 0,
+    "maxLatencyMs": 1,
+    "p50LatencyMs": 0,
+    "p95LatencyMs": 1,
+    "failureDistribution": {
+      "totalFailures": 8,
+      "byCategory": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 1,
+        "MISSING_REQUIRED_PARAM": 3,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 2,
+        "HALLUCINATED_PARAM": 1,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 1,
+        "PARAM_MISMATCH": 0,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byCategoryPct": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 12.5,
+        "MISSING_REQUIRED_PARAM": 37.5,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 25,
+        "HALLUCINATED_PARAM": 12.5,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 12.5,
+        "PARAM_MISMATCH": 0,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byFamily": {
+        "crud": 8
+      },
+      "byDifficulty": {
+        "medium": 4,
+        "easy": 4
+      },
+      "dominantCategory": "MISSING_REQUIRED_PARAM"
+    },
+    "failureRecords": [
+      {
+        "caseId": "crud-inv-003",
+        "actualTool": "query_cost",
+        "expectedTool": "query_inventory",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_cost，期望 query_inventory",
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{}\"}}]}"
+      },
+      {
+        "caseId": "crud-inv-004",
+        "actualTool": "query_inventory",
+        "expectedTool": "query_inventory",
+        "category": "MISSING_REQUIRED_PARAM",
+        "message": "缺少必填参数: action",
+        "validationErrors": [
+          {
+            "category": "MISSING_REQUIRED_PARAM",
+            "param": "action",
+            "message": "缺少必填参数: action",
+            "expected": "string"
+          }
+        ],
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_inventory\",\"arguments\":\"{\\\"category\\\":\\\"厨房电器\\\",\\\"days\\\":120}\"}}]}"
+      },
+      {
+        "caseId": "crud-inv-005",
+        "actualTool": "query_inventory",
+        "expectedTool": "query_inventory",
+        "category": "INVALID_ENUM",
+        "message": "参数 \"action\" 的值 \"INVALID_FORECAST\" 不在允许的枚举列表中",
+        "validationErrors": [
+          {
+            "category": "INVALID_ENUM",
+            "param": "action",
+            "message": "参数 \"action\" 的值 \"INVALID_FORECAST\" 不在允许的枚举列表中",
+            "expected": "overview | list | forecast | risk | detail | slow_moving | reorder",
+            "actual": "INVALID_FORECAST"
+          }
+        ],
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_inventory\",\"arguments\":\"{\\\"action\\\":\\\"INVALID_FORECAST\\\"}\"}}]}"
+      },
+      {
+        "caseId": "crud-cost-001",
+        "actualTool": "query_cost",
+        "expectedTool": "query_cost",
+        "category": "MISSING_REQUIRED_PARAM",
+        "message": "缺少必填参数: action",
+        "validationErrors": [
+          {
+            "category": "MISSING_REQUIRED_PARAM",
+            "param": "action",
+            "message": "缺少必填参数: action",
+            "expected": "string"
+          }
+        ],
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{\\\"sku\\\":\\\"KA-RC4001\\\"}\"}}]}"
+      },
+      {
+        "caseId": "crud-cost-002",
+        "actualTool": "query_cost",
+        "expectedTool": "query_cost",
+        "category": "INVALID_ENUM",
+        "message": "参数 \"action\" 的值 \"INVALID_OPTIMIZATION\" 不在允许的枚举列表中",
+        "validationErrors": [
+          {
+            "category": "INVALID_ENUM",
+            "param": "action",
+            "message": "参数 \"action\" 的值 \"INVALID_OPTIMIZATION\" 不在允许的枚举列表中",
+            "expected": "overview | list | detail | benchmark | optimization | trend",
+            "actual": "INVALID_OPTIMIZATION"
+          }
+        ],
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{\\\"action\\\":\\\"INVALID_OPTIMIZATION\\\",\\\"category\\\":\\\"清洁电器\\\"}\"}}]}"
+      },
+      {
+        "caseId": "crud-cost-003",
+        "actualTool": "query_cost",
+        "expectedTool": "query_cost",
+        "category": "HALLUCINATED_PARAM",
+        "message": "参数 \"hallucinated_field\" 不在工具 schema 中（LLM 编造了不存在的参数）",
+        "validationErrors": [
+          {
+            "category": "HALLUCINATED_PARAM",
+            "param": "hallucinated_field",
+            "message": "参数 \"hallucinated_field\" 不在工具 schema 中（LLM 编造了不存在的参数）",
+            "actual": "fake_value"
+          }
+        ],
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{\\\"action\\\":\\\"trend\\\",\\\"months\\\":6,\\\"hallucinated_field\\\":\\\"fake_value\\\"}\"}}]}"
+      },
+      {
+        "caseId": "crud-cost-004",
+        "actualTool": "",
+        "expectedTool": "query_cost",
+        "category": "NO_TOOL_CALL",
+        "message": "LLM 未调用任何工具",
+        "rawOutput": ""
+      },
+      {
+        "caseId": "crud-sales-001",
+        "actualTool": "query_sales",
+        "expectedTool": "query_sales",
+        "category": "MISSING_REQUIRED_PARAM",
+        "message": "缺少必填参数: action",
+        "validationErrors": [
+          {
+            "category": "MISSING_REQUIRED_PARAM",
+            "param": "action",
+            "message": "缺少必填参数: action",
+            "expected": "string"
+          }
+        ],
+        "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_sales\",\"arguments\":\"{\\\"days\\\":30,\\\"platform\\\":\\\"Amazon\\\"}\"}}]}"
+      }
+    ],
+    "caseResults": [
+      {
+        "caseId": "crud-inv-001",
+        "passed": true,
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-inv-002",
+        "passed": true,
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-inv-003",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-003",
+          "actualTool": "query_cost",
+          "expectedTool": "query_inventory",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_cost，期望 query_inventory",
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{}\"}}]}"
+        },
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-inv-004",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-004",
+          "actualTool": "query_inventory",
+          "expectedTool": "query_inventory",
+          "category": "MISSING_REQUIRED_PARAM",
+          "message": "缺少必填参数: action",
+          "validationErrors": [
+            {
+              "category": "MISSING_REQUIRED_PARAM",
+              "param": "action",
+              "message": "缺少必填参数: action",
+              "expected": "string"
+            }
+          ],
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_inventory\",\"arguments\":\"{\\\"category\\\":\\\"厨房电器\\\",\\\"days\\\":120}\"}}]}"
+        },
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-inv-005",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-005",
+          "actualTool": "query_inventory",
+          "expectedTool": "query_inventory",
+          "category": "INVALID_ENUM",
+          "message": "参数 \"action\" 的值 \"INVALID_FORECAST\" 不在允许的枚举列表中",
+          "validationErrors": [
+            {
+              "category": "INVALID_ENUM",
+              "param": "action",
+              "message": "参数 \"action\" 的值 \"INVALID_FORECAST\" 不在允许的枚举列表中",
+              "expected": "overview | list | forecast | risk | detail | slow_moving | reorder",
+              "actual": "INVALID_FORECAST"
+            }
+          ],
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_inventory\",\"arguments\":\"{\\\"action\\\":\\\"INVALID_FORECAST\\\"}\"}}]}"
+        },
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-cost-001",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-cost-001",
+          "actualTool": "query_cost",
+          "expectedTool": "query_cost",
+          "category": "MISSING_REQUIRED_PARAM",
+          "message": "缺少必填参数: action",
+          "validationErrors": [
+            {
+              "category": "MISSING_REQUIRED_PARAM",
+              "param": "action",
+              "message": "缺少必填参数: action",
+              "expected": "string"
+            }
+          ],
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{\\\"sku\\\":\\\"KA-RC4001\\\"}\"}}]}"
+        },
+        "latencyMs": 1
+      },
+      {
+        "caseId": "crud-cost-002",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-cost-002",
+          "actualTool": "query_cost",
+          "expectedTool": "query_cost",
+          "category": "INVALID_ENUM",
+          "message": "参数 \"action\" 的值 \"INVALID_OPTIMIZATION\" 不在允许的枚举列表中",
+          "validationErrors": [
+            {
+              "category": "INVALID_ENUM",
+              "param": "action",
+              "message": "参数 \"action\" 的值 \"INVALID_OPTIMIZATION\" 不在允许的枚举列表中",
+              "expected": "overview | list | detail | benchmark | optimization | trend",
+              "actual": "INVALID_OPTIMIZATION"
+            }
+          ],
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{\\\"action\\\":\\\"INVALID_OPTIMIZATION\\\",\\\"category\\\":\\\"清洁电器\\\"}\"}}]}"
+        },
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-cost-003",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-cost-003",
+          "actualTool": "query_cost",
+          "expectedTool": "query_cost",
+          "category": "HALLUCINATED_PARAM",
+          "message": "参数 \"hallucinated_field\" 不在工具 schema 中（LLM 编造了不存在的参数）",
+          "validationErrors": [
+            {
+              "category": "HALLUCINATED_PARAM",
+              "param": "hallucinated_field",
+              "message": "参数 \"hallucinated_field\" 不在工具 schema 中（LLM 编造了不存在的参数）",
+              "actual": "fake_value"
+            }
+          ],
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_cost\",\"arguments\":\"{\\\"action\\\":\\\"trend\\\",\\\"months\\\":6,\\\"hallucinated_field\\\":\\\"fake_value\\\"}\"}}]}"
+        },
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-cost-004",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-cost-004",
+          "actualTool": "",
+          "expectedTool": "query_cost",
+          "category": "NO_TOOL_CALL",
+          "message": "LLM 未调用任何工具",
+          "rawOutput": ""
+        },
+        "latencyMs": 0
+      },
+      {
+        "caseId": "crud-sales-001",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-sales-001",
+          "actualTool": "query_sales",
+          "expectedTool": "query_sales",
+          "category": "MISSING_REQUIRED_PARAM",
+          "message": "缺少必填参数: action",
+          "validationErrors": [
+            {
+              "category": "MISSING_REQUIRED_PARAM",
+              "param": "action",
+              "message": "缺少必填参数: action",
+              "expected": "string"
+            }
+          ],
+          "rawOutput": "{\"tool_calls\":[{\"function\":{\"name\":\"query_sales\",\"arguments\":\"{\\\"days\\\":30,\\\"platform\\\":\\\"Amazon\\\"}\"}}]}"
+        },
+        "latencyMs": 0
+      }
+    ],
+    "durationMs": 8
+  },
+  "suggestions": [
+    "NO_TOOL_CALL (1次): 在 system prompt 中强化\"必须调用工具\"的指令，使用 tool_choice: \"required\" 强制工具调用。",
+    "WRONG_TOOL (1次): 改进工具描述，增加区分性关键词。考虑在 system prompt 中添加工具选择示例（few-shot）。",
+    "MISSING_REQUIRED_PARAM (3次): 在工具描述中明确标注必填参数，使用 \"必须提供X\" 的措辞。考虑在 prompt 中重申参数要求。",
+    "HALLUCINATED_PARAM (1次): LLM 编造了 schema 外的参数。检查是否有旧版工具参数被 LLM 记忆，或在描述中明确\"仅接受以下参数\"。",
+    "INVALID_ENUM (2次): 枚举值不匹配。在工具描述中用自然语言列出所有合法值，而非仅依赖 schema enum。"
+  ],
+  "failureReport": "## 失败模式分析报告\n\n**总失败数**: 8\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n| 缺少必填参数 (MISSING_REQUIRED_PARAM) | 3 | 37.5% |\n| 枚举值非法 (INVALID_ENUM) | 2 | 25% |\n| 工具选择错误 (WRONG_TOOL) | 1 | 12.5% |\n| 编造参数 (HALLUCINATED_PARAM) | 1 | 12.5% |\n| 未调用工具 (NO_TOOL_CALL) | 1 | 12.5% |\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n| crud | 8 |\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|\n| medium | 4 |\n| easy | 4 |\n\n**主要失败模式**: 缺少必填参数 (MISSING_REQUIRED_PARAM)"
+}

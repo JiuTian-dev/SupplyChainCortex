@@ -3,7 +3,7 @@
  */
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import type { Role } from '@/lib/rbac';
+import type { Role } from '@/lib/auth/permissions';
 
 const SALT_ROUNDS = 10;
 
@@ -111,14 +111,14 @@ export async function seedDefaultAdmin() {
       email: 'admin@supply-chain.com',
       name: '系统管理员',
       password: 'admin123',
-      role: 'admin',
+      role: 'org_admin',
     });
     // Also create a manager and viewer for demo
     await createUser({
       email: 'manager@supply-chain.com',
       name: '运营经理',
       password: 'manager123',
-      role: 'manager',
+      role: 'team_admin',
     });
     await createUser({
       email: 'viewer@supply-chain.com',

@@ -1,0 +1,792 @@
+{
+  "generatedAt": "2026-06-18T16:07:37.165Z",
+  "config": {
+    "provider": "deepseek",
+    "limit": 0,
+    "outputDir": "./tests/reliability/reports",
+    "concurrency": 3,
+    "maxRetries": 1,
+    "realApi": true,
+    "timeoutMs": 60000
+  },
+  "stats": {
+    "provider": "deepseek",
+    "totalCases": 121,
+    "passed": 115,
+    "failed": 6,
+    "successRate": 95,
+    "avgLatencyMs": 3009,
+    "minLatencyMs": 1969,
+    "maxLatencyMs": 4483,
+    "p50LatencyMs": 2923,
+    "p95LatencyMs": 4092,
+    "failureDistribution": {
+      "totalFailures": 6,
+      "byCategory": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 5,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 1,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byCategoryPct": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 83.3,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 16.7,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byFamily": {
+        "operations": 2,
+        "intelligence": 4
+      },
+      "byDifficulty": {
+        "easy": 1,
+        "hard": 2,
+        "medium": 3
+      },
+      "dominantCategory": "WRONG_TOOL"
+    },
+    "failureRecords": [
+      {
+        "caseId": "op-transfer-001",
+        "actualTool": "query_inventory",
+        "expectedTool": "create_transfer",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_inventory，期望 create_transfer",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_inventory\",\"params\":{\"action\":\"detail\",\"sku\":\"KA-RC4001\"},\"displayName\":\"库存查询\"}],\"content\":\"好的，我来执行这个调拨操作。先确认一下深圳仓的库存情况。\"}"
+      },
+      {
+        "caseId": "op-note-002",
+        "actualTool": "create_note",
+        "expectedTool": "create_note",
+        "category": "PARAM_MISMATCH",
+        "message": "参数不匹配: content(期望:\"本周五盘点深圳仓\", 实际:\"本周五进行深圳仓盘点\", 原因:wrong_value)",
+        "paramMismatches": [
+          {
+            "param": "content",
+            "expected": "本周五盘点深圳仓",
+            "actual": "本周五进行深圳仓盘点",
+            "reason": "wrong_value"
+          }
+        ],
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"create_note\",\"params\":{\"content\":\"本周五进行深圳仓盘点\",\"category\":\"inventory\",\"priority\":\"important\",\"author\":\"用户\"},\"displayName\":\"创建备注\"}],\"content\":\"好的，我来为您创建一条盘点备注。\"}"
+      },
+      {
+        "caseId": "intel-analytics-004",
+        "actualTool": "query_sales",
+        "expectedTool": "query_analytics",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_sales，期望 query_analytics",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_sales\",\"params\":{\"action\":\"overview\"},\"displayName\":\"销售查询\"},{\"name\":\"query_sales\",\"params\":{\"action\":\"forecast\",\"horizon\":14},\"displayName\":\"销售查询\"},{\"name\":\"query_analytics\",\"params\":{\"action\":\"sales_forecast\",\"forecastDays\":14},\"displayName\":\"数据分析\"}],\"content\":\"好的，我来为您进行销售预测分析。让我同时获取销售数据、销售预测以及相关的综合分析。\"}"
+      },
+      {
+        "caseId": "intel-cascade-001",
+        "actualTool": "query_port_congestion",
+        "expectedTool": "query_cascade_risk",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_port_congestion，期望 query_cascade_risk",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_port_congestion\",\"params\":{},\"displayName\":\"港口拥堵\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"port_congestion\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来为您运行港口拥堵的级联风险综合评估。首先让我获取当前港口拥堵数据，然后运行级联风险引擎。\"}"
+      },
+      {
+        "caseId": "intel-cascade-003",
+        "actualTool": "query_weather",
+        "expectedTool": "query_cascade_risk",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_weather，期望 query_cascade_risk",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_weather\",\"params\":{\"action\":\"summary\"},\"displayName\":\"港口天气\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"weather_disruption\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来为您执行台风天气对供应链的级联风险综合评估。首先，让我同时获取当前天气数据和启动级联风险引擎。\"}"
+      },
+      {
+        "caseId": "intel-decision-001",
+        "actualTool": "query_inventory",
+        "expectedTool": "query_decision_graph",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_inventory，期望 query_decision_graph",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_inventory\",\"params\":{\"action\":\"overview\"},\"displayName\":\"库存查询\"},{\"name\":\"query_inventory\",\"params\":{\"action\":\"reorder\"},\"displayName\":\"库存查询\"},{\"name\":\"query_decision_graph\",\"params\":{\"domains\":\"inventory\",\"query\":\"库存决策建议，应该补货还是等一等\"},\"displayName\":\"决策图查询\"}],\"content\":\"我来帮你分析库存决策。首先获取当前库存状态、补货建议和决策推理，综合判断应该补货还是等待。\"}"
+      }
+    ],
+    "caseResults": [
+      {
+        "caseId": "crud-inv-001",
+        "passed": true,
+        "latencyMs": 3822
+      },
+      {
+        "caseId": "crud-inv-002",
+        "passed": true,
+        "latencyMs": 4349
+      },
+      {
+        "caseId": "crud-inv-003",
+        "passed": true,
+        "latencyMs": 4160
+      },
+      {
+        "caseId": "crud-inv-004",
+        "passed": true,
+        "latencyMs": 2734
+      },
+      {
+        "caseId": "crud-inv-005",
+        "passed": true,
+        "latencyMs": 2626
+      },
+      {
+        "caseId": "crud-cost-001",
+        "passed": true,
+        "latencyMs": 2830
+      },
+      {
+        "caseId": "crud-cost-002",
+        "passed": true,
+        "latencyMs": 2499
+      },
+      {
+        "caseId": "crud-cost-003",
+        "passed": true,
+        "latencyMs": 2759
+      },
+      {
+        "caseId": "crud-cost-004",
+        "passed": true,
+        "latencyMs": 2658
+      },
+      {
+        "caseId": "crud-sales-001",
+        "passed": true,
+        "latencyMs": 2807
+      },
+      {
+        "caseId": "crud-sales-002",
+        "passed": true,
+        "latencyMs": 2865
+      },
+      {
+        "caseId": "crud-sales-003",
+        "passed": true,
+        "latencyMs": 2689
+      },
+      {
+        "caseId": "crud-log-001",
+        "passed": true,
+        "latencyMs": 3149
+      },
+      {
+        "caseId": "crud-log-002",
+        "passed": true,
+        "latencyMs": 3374
+      },
+      {
+        "caseId": "crud-log-003",
+        "passed": true,
+        "latencyMs": 2550
+      },
+      {
+        "caseId": "crud-sup-001",
+        "passed": true,
+        "latencyMs": 3344
+      },
+      {
+        "caseId": "crud-sup-002",
+        "passed": true,
+        "latencyMs": 2792
+      },
+      {
+        "caseId": "crud-dash-001",
+        "passed": true,
+        "latencyMs": 3892
+      },
+      {
+        "caseId": "crud-dash-002",
+        "passed": true,
+        "latencyMs": 3415
+      },
+      {
+        "caseId": "crud-dash-003",
+        "passed": true,
+        "latencyMs": 2581
+      },
+      {
+        "caseId": "crud-trend-001",
+        "passed": true,
+        "latencyMs": 2541
+      },
+      {
+        "caseId": "crud-proc-001",
+        "passed": true,
+        "latencyMs": 2512
+      },
+      {
+        "caseId": "crud-proc-002",
+        "passed": true,
+        "latencyMs": 2618
+      },
+      {
+        "caseId": "crud-risk-001",
+        "passed": true,
+        "latencyMs": 2376
+      },
+      {
+        "caseId": "crud-risk-002",
+        "passed": true,
+        "latencyMs": 2828
+      },
+      {
+        "caseId": "crud-loc-001",
+        "passed": true,
+        "latencyMs": 2656
+      },
+      {
+        "caseId": "crud-wh-001",
+        "passed": true,
+        "latencyMs": 2501
+      },
+      {
+        "caseId": "op-reorder-001",
+        "passed": true,
+        "latencyMs": 3105
+      },
+      {
+        "caseId": "op-reorder-002",
+        "passed": true,
+        "latencyMs": 3431
+      },
+      {
+        "caseId": "op-batch-001",
+        "passed": true,
+        "latencyMs": 2896
+      },
+      {
+        "caseId": "op-ship-001",
+        "passed": true,
+        "latencyMs": 2861
+      },
+      {
+        "caseId": "op-ship-002",
+        "passed": true,
+        "latencyMs": 3352
+      },
+      {
+        "caseId": "op-adjust-001",
+        "passed": true,
+        "latencyMs": 3038
+      },
+      {
+        "caseId": "op-adjust-002",
+        "passed": true,
+        "latencyMs": 3171
+      },
+      {
+        "caseId": "op-transfer-001",
+        "passed": false,
+        "failure": {
+          "caseId": "op-transfer-001",
+          "actualTool": "query_inventory",
+          "expectedTool": "create_transfer",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_inventory，期望 create_transfer",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_inventory\",\"params\":{\"action\":\"detail\",\"sku\":\"KA-RC4001\"},\"displayName\":\"库存查询\"}],\"content\":\"好的，我来执行这个调拨操作。先确认一下深圳仓的库存情况。\"}"
+        },
+        "latencyMs": 2839
+      },
+      {
+        "caseId": "op-cost-001",
+        "passed": true,
+        "latencyMs": 2793
+      },
+      {
+        "caseId": "op-cost-002",
+        "passed": true,
+        "latencyMs": 3220
+      },
+      {
+        "caseId": "op-note-001",
+        "passed": true,
+        "latencyMs": 3131
+      },
+      {
+        "caseId": "op-note-002",
+        "passed": false,
+        "failure": {
+          "caseId": "op-note-002",
+          "actualTool": "create_note",
+          "expectedTool": "create_note",
+          "category": "PARAM_MISMATCH",
+          "message": "参数不匹配: content(期望:\"本周五盘点深圳仓\", 实际:\"本周五进行深圳仓盘点\", 原因:wrong_value)",
+          "paramMismatches": [
+            {
+              "param": "content",
+              "expected": "本周五盘点深圳仓",
+              "actual": "本周五进行深圳仓盘点",
+              "reason": "wrong_value"
+            }
+          ],
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"create_note\",\"params\":{\"content\":\"本周五进行深圳仓盘点\",\"category\":\"inventory\",\"priority\":\"important\",\"author\":\"用户\"},\"displayName\":\"创建备注\"}],\"content\":\"好的，我来为您创建一条盘点备注。\"}"
+        },
+        "latencyMs": 2927
+      },
+      {
+        "caseId": "op-alert-001",
+        "passed": true,
+        "latencyMs": 4418
+      },
+      {
+        "caseId": "op-alert-002",
+        "passed": true,
+        "latencyMs": 2906
+      },
+      {
+        "caseId": "op-sup-status-001",
+        "passed": true,
+        "latencyMs": 2981
+      },
+      {
+        "caseId": "op-sup-status-002",
+        "passed": true,
+        "latencyMs": 2712
+      },
+      {
+        "caseId": "op-sup-create-001",
+        "passed": true,
+        "latencyMs": 3118
+      },
+      {
+        "caseId": "op-sup-update-001",
+        "passed": true,
+        "latencyMs": 2846
+      },
+      {
+        "caseId": "op-sup-update-002",
+        "passed": true,
+        "latencyMs": 2670
+      },
+      {
+        "caseId": "intel-analytics-001",
+        "passed": true,
+        "latencyMs": 3423
+      },
+      {
+        "caseId": "intel-analytics-002",
+        "passed": true,
+        "latencyMs": 2698
+      },
+      {
+        "caseId": "intel-analytics-003",
+        "passed": true,
+        "latencyMs": 2685
+      },
+      {
+        "caseId": "intel-analytics-004",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-analytics-004",
+          "actualTool": "query_sales",
+          "expectedTool": "query_analytics",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_sales，期望 query_analytics",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_sales\",\"params\":{\"action\":\"overview\"},\"displayName\":\"销售查询\"},{\"name\":\"query_sales\",\"params\":{\"action\":\"forecast\",\"horizon\":14},\"displayName\":\"销售查询\"},{\"name\":\"query_analytics\",\"params\":{\"action\":\"sales_forecast\",\"forecastDays\":14},\"displayName\":\"数据分析\"}],\"content\":\"好的，我来为您进行销售预测分析。让我同时获取销售数据、销售预测以及相关的综合分析。\"}"
+        },
+        "latencyMs": 3632
+      },
+      {
+        "caseId": "intel-fx-001",
+        "passed": true,
+        "latencyMs": 2604
+      },
+      {
+        "caseId": "intel-fx-002",
+        "passed": true,
+        "latencyMs": 3428
+      },
+      {
+        "caseId": "intel-weather-001",
+        "passed": true,
+        "latencyMs": 2490
+      },
+      {
+        "caseId": "intel-weather-002",
+        "passed": true,
+        "latencyMs": 2398
+      },
+      {
+        "caseId": "intel-comm-001",
+        "passed": true,
+        "latencyMs": 2961
+      },
+      {
+        "caseId": "intel-scfis-001",
+        "passed": true,
+        "latencyMs": 4401
+      },
+      {
+        "caseId": "intel-carbon-001",
+        "passed": true,
+        "latencyMs": 3058
+      },
+      {
+        "caseId": "intel-fin-001",
+        "passed": true,
+        "latencyMs": 2923
+      },
+      {
+        "caseId": "intel-amz-001",
+        "passed": true,
+        "latencyMs": 3400
+      },
+      {
+        "caseId": "intel-amz-002",
+        "passed": true,
+        "latencyMs": 3725
+      },
+      {
+        "caseId": "intel-sentiment-001",
+        "passed": true,
+        "latencyMs": 3104
+      },
+      {
+        "caseId": "intel-sentiment-002",
+        "passed": true,
+        "latencyMs": 2829
+      },
+      {
+        "caseId": "intel-cascade-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-cascade-001",
+          "actualTool": "query_port_congestion",
+          "expectedTool": "query_cascade_risk",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_port_congestion，期望 query_cascade_risk",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_port_congestion\",\"params\":{},\"displayName\":\"港口拥堵\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"port_congestion\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来为您运行港口拥堵的级联风险综合评估。首先让我获取当前港口拥堵数据，然后运行级联风险引擎。\"}"
+        },
+        "latencyMs": 3014
+      },
+      {
+        "caseId": "intel-cascade-002",
+        "passed": true,
+        "latencyMs": 3078
+      },
+      {
+        "caseId": "intel-cascade-003",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-cascade-003",
+          "actualTool": "query_weather",
+          "expectedTool": "query_cascade_risk",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_weather，期望 query_cascade_risk",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_weather\",\"params\":{\"action\":\"summary\"},\"displayName\":\"港口天气\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"weather_disruption\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来为您执行台风天气对供应链的级联风险综合评估。首先，让我同时获取当前天气数据和启动级联风险引擎。\"}"
+        },
+        "latencyMs": 3082
+      },
+      {
+        "caseId": "intel-cpsc-001",
+        "passed": true,
+        "latencyMs": 2409
+      },
+      {
+        "caseId": "intel-port-001",
+        "passed": true,
+        "latencyMs": 2427
+      },
+      {
+        "caseId": "intel-coherence-001",
+        "passed": true,
+        "latencyMs": 2571
+      },
+      {
+        "caseId": "intel-recall-001",
+        "passed": true,
+        "latencyMs": 2425
+      },
+      {
+        "caseId": "intel-decision-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-decision-001",
+          "actualTool": "query_inventory",
+          "expectedTool": "query_decision_graph",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_inventory，期望 query_decision_graph",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_inventory\",\"params\":{\"action\":\"overview\"},\"displayName\":\"库存查询\"},{\"name\":\"query_inventory\",\"params\":{\"action\":\"reorder\"},\"displayName\":\"库存查询\"},{\"name\":\"query_decision_graph\",\"params\":{\"domains\":\"inventory\",\"query\":\"库存决策建议，应该补货还是等一等\"},\"displayName\":\"决策图查询\"}],\"content\":\"我来帮你分析库存决策。首先获取当前库存状态、补货建议和决策推理，综合判断应该补货还是等待。\"}"
+        },
+        "latencyMs": 4092
+      },
+      {
+        "caseId": "intel-decision-002",
+        "passed": true,
+        "latencyMs": 2885
+      },
+      {
+        "caseId": "intel-wf-001",
+        "passed": true,
+        "latencyMs": 3266
+      },
+      {
+        "caseId": "intel-wf-002",
+        "passed": true,
+        "latencyMs": 3312
+      },
+      {
+        "caseId": "intel-tariff-001",
+        "passed": true,
+        "latencyMs": 2631
+      },
+      {
+        "caseId": "intel-tariff-002",
+        "passed": true,
+        "latencyMs": 3091
+      },
+      {
+        "caseId": "intel-tariff-003",
+        "passed": true,
+        "latencyMs": 3922
+      },
+      {
+        "caseId": "intel-sandbox-001",
+        "passed": true,
+        "latencyMs": 3051
+      },
+      {
+        "caseId": "intel-compliance-001",
+        "passed": true,
+        "latencyMs": 3589
+      },
+      {
+        "caseId": "intel-compliance-002",
+        "passed": true,
+        "latencyMs": 3786
+      },
+      {
+        "caseId": "intel-finsim-001",
+        "passed": true,
+        "latencyMs": 3827
+      },
+      {
+        "caseId": "intel-feed-001",
+        "passed": true,
+        "latencyMs": 2452
+      },
+      {
+        "caseId": "intel-arb-001",
+        "passed": true,
+        "latencyMs": 3707
+      },
+      {
+        "caseId": "intel-disc-001",
+        "passed": true,
+        "latencyMs": 3652
+      },
+      {
+        "caseId": "intel-web-001",
+        "passed": true,
+        "latencyMs": 2293
+      },
+      {
+        "caseId": "intel-chart-001",
+        "passed": true,
+        "latencyMs": 2754
+      },
+      {
+        "caseId": "intel-analyze-chart-001",
+        "passed": true,
+        "latencyMs": 2996
+      },
+      {
+        "caseId": "intel-report-001",
+        "passed": true,
+        "latencyMs": 2009
+      },
+      {
+        "caseId": "sc-eoq-001",
+        "passed": true,
+        "latencyMs": 2626
+      },
+      {
+        "caseId": "sc-ss-001",
+        "passed": true,
+        "latencyMs": 3053
+      },
+      {
+        "caseId": "sc-rop-001",
+        "passed": true,
+        "latencyMs": 3895
+      },
+      {
+        "caseId": "sc-abc-001",
+        "passed": true,
+        "latencyMs": 2444
+      },
+      {
+        "caseId": "sc-forecast-001",
+        "passed": true,
+        "latencyMs": 3039
+      },
+      {
+        "caseId": "sc-seasonal-001",
+        "passed": true,
+        "latencyMs": 2559
+      },
+      {
+        "caseId": "sc-mc-001",
+        "passed": true,
+        "latencyMs": 3526
+      },
+      {
+        "caseId": "sc-ww-001",
+        "passed": true,
+        "latencyMs": 2928
+      },
+      {
+        "caseId": "sc-nv-001",
+        "passed": true,
+        "latencyMs": 3248
+      },
+      {
+        "caseId": "sc-drp-001",
+        "passed": true,
+        "latencyMs": 2865
+      },
+      {
+        "caseId": "sc-wh-001",
+        "passed": true,
+        "latencyMs": 2494
+      },
+      {
+        "caseId": "sc-route-001",
+        "passed": true,
+        "latencyMs": 3496
+      },
+      {
+        "caseId": "sc-multi-001",
+        "passed": true,
+        "latencyMs": 3406
+      },
+      {
+        "caseId": "sc-kpi-001",
+        "passed": true,
+        "latencyMs": 3302
+      },
+      {
+        "caseId": "sc-fill-001",
+        "passed": true,
+        "latencyMs": 2990
+      },
+      {
+        "caseId": "sc-lt-001",
+        "passed": true,
+        "latencyMs": 2623
+      },
+      {
+        "caseId": "sc-pv-001",
+        "passed": true,
+        "latencyMs": 2297
+      },
+      {
+        "caseId": "sc-tc-001",
+        "passed": true,
+        "latencyMs": 3132
+      },
+      {
+        "caseId": "sc-score-001",
+        "passed": true,
+        "latencyMs": 2604
+      },
+      {
+        "caseId": "sc-lc-001",
+        "passed": true,
+        "latencyMs": 2691
+      },
+      {
+        "caseId": "sc-be-001",
+        "passed": true,
+        "latencyMs": 2459
+      },
+      {
+        "caseId": "sc-price-001",
+        "passed": true,
+        "latencyMs": 3792
+      },
+      {
+        "caseId": "sc-jrp-001",
+        "passed": true,
+        "latencyMs": 3750
+      },
+      {
+        "caseId": "sc-fa-001",
+        "passed": true,
+        "latencyMs": 4259
+      },
+      {
+        "caseId": "sg-graph-001",
+        "passed": true,
+        "latencyMs": 2204
+      },
+      {
+        "caseId": "sg-graph-002",
+        "passed": true,
+        "latencyMs": 3234
+      },
+      {
+        "caseId": "sg-dep-001",
+        "passed": true,
+        "latencyMs": 2131
+      },
+      {
+        "caseId": "sg-impact-001",
+        "passed": true,
+        "latencyMs": 2489
+      },
+      {
+        "caseId": "sg-choke-001",
+        "passed": true,
+        "latencyMs": 2989
+      },
+      {
+        "caseId": "sg-geo-001",
+        "passed": true,
+        "latencyMs": 2287
+      },
+      {
+        "caseId": "sg-tiers-001",
+        "passed": true,
+        "latencyMs": 4483
+      },
+      {
+        "caseId": "sg-health-001",
+        "passed": true,
+        "latencyMs": 2174
+      },
+      {
+        "caseId": "sg-evo-001",
+        "passed": true,
+        "latencyMs": 2197
+      },
+      {
+        "caseId": "sg-tree-001",
+        "passed": true,
+        "latencyMs": 1969
+      }
+    ],
+    "durationMs": 122200
+  },
+  "suggestions": [
+    "WRONG_TOOL (5次): 改进工具描述，增加区分性关键词。考虑在 system prompt 中添加工具选择示例（few-shot）。",
+    "PARAM_MISMATCH (1次): 工具正确但参数值与期望不符。检查 LLM 是否正确理解了用户输入中的数值/名称，可能需要在 prompt 中强化信息提取。"
+  ],
+  "failureReport": "## 失败模式分析报告\n\n**总失败数**: 6\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n| 工具选择错误 (WRONG_TOOL) | 5 | 83.3% |\n| 参数值不匹配 (PARAM_MISMATCH) | 1 | 16.7% |\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n| intelligence | 4 |\n| operations | 2 |\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|\n| medium | 3 |\n| hard | 2 |\n| easy | 1 |\n\n**主要失败模式**: 工具选择错误 (WRONG_TOOL)"
+}

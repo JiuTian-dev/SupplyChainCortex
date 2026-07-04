@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
 
   // ── Rendering & Caching (Next.js 16) ──────────────────────────────────
   // cacheComponents: true,  // enable after removing force-dynamic from route segments
-  viewTransition: true,
+  // viewTransition: not a valid Next.js 16 top-level key — removed
 
   // ── Images ────────────────────────────────────────────────────────────
   images: {
@@ -23,9 +23,6 @@ const nextConfig: NextConfig = {
   ],
 
   experimental: {
-    // Segment-level client cache (SPA-like navigations)
-    clientSegmentCache: true,
-
     // Lightning CSS (Rust-based, replaces PostCSS for production builds)
     useLightningcss: true,
 
@@ -60,12 +57,6 @@ const nextConfig: NextConfig = {
 
     // Stable filesystem cache for dev builds
     turbopackFileSystemCacheForDev: true,
-  },
-
-  turbopack: {
-    ignoreIssue: [
-      { path: "**/node_modules/**" },
-    ],
   },
 };
 

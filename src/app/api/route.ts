@@ -1,5 +1,73 @@
 import { NextResponse } from "next/server";
+import { withErrorHandler } from "@/lib/api-utils";
+import { optionalRequireAuth } from "@/lib/auth-helpers";
 
-export async function GET() {
-  return NextResponse.json({ message: "Hello, world!" });
-}
+// GET /api - API 根端点，返回服务元数据与可用端点列表
+export const GET = withErrorHandler(async () => {
+  await optionalRequireAuth();
+
+  return NextResponse.json({
+    name: "SupplyChain Cortex API",
+    version: "1.0.0",
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      auth: "/api/auth",
+      authInfo: "/api/auth-info",
+      dashboard: "/api/dashboard",
+      inventory: "/api/inventory",
+      suppliers: "/api/suppliers",
+      supplierPerformance: "/api/supplier-performance",
+      supplierGraph: "/api/supplier-graph",
+      products: "/api/products",
+      warehouse: "/api/warehouse",
+      sales: "/api/sales",
+      cost: "/api/cost",
+      logistics: "/api/logistics",
+      procurement: "/api/procurement",
+      reorder: "/api/reorder",
+      notifications: "/api/notifications",
+      events: "/api/events",
+      analytics: "/api/analytics",
+      stats: "/api/stats",
+      audit: "/api/audit",
+      search: "/api/search",
+      chat: "/api/chat",
+      chatHistory: "/api/chat-history",
+      notes: "/api/notes",
+      alertRules: "/api/alert-rules",
+      graph: "/api/graph",
+      workflow: "/api/workflow",
+      memory: "/api/memory",
+      agentMemory: "/api/agent-memory",
+      cache: "/api/cache",
+      cacheStats: "/api/cache-stats",
+      connectorHealth: "/api/connector-health",
+      engineFeedback: "/api/engine-feedback",
+      engineHealth: "/api/engine-health",
+      engineCalibrate: "/api/engine-calibrate",
+      sandbox: "/api/sandbox",
+      sandboxLlm: "/api/sandbox-llm",
+      cascadeRisk: "/api/cascade-risk",
+      rag: "/api/rag",
+      decisionGraph: "/api/decision-graph",
+      autonomyPolicy: "/api/autonomy-policy",
+      mcp: "/api/mcp",
+      metrics: "/api/metrics",
+      export: "/api/export",
+      sse: "/api/sse",
+      users: "/api/users",
+      weather: "/api/weather",
+      exchangeRates: "/api/exchange-rates",
+      commodity: "/api/commodity",
+      freight: "/api/freight",
+      tariff: "/api/tariff",
+      reports: "/api/reports",
+      supplyChainScore: "/api/supply-chain-score",
+      supplyChain: "/api/supply-chain",
+      gscpi: "/api/gscpi",
+      brief: "/api/brief",
+      billing: "/api/billing",
+    },
+  });
+});

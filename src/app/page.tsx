@@ -38,16 +38,7 @@ const AuditTab = dynamic(() => import('@/components/audit/AuditTab').then(m => (
 const LegacyPanels = dynamic(() => import('@/components/dashboard/TabbedSection').then(m => ({ default: m.TabbedSection })), { ssr: false });
 import { PANEL_REGISTRY } from '@/lib/dashboard/panel-registry';
 
-let engineInitPromise: Promise<void> | null = null;
-function initEngine() {
-  if (!engineInitPromise) {
-    engineInitPromise = import('@/lib/engine/persistence').then(m => m.initEnginePersistence());
-  }
-  return engineInitPromise;
-}
-
 function HomePageContent() {
-  useEffect(() => { initEngine(); }, []);
   const { checkAuth } = useAuthStore();
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
@@ -86,15 +77,13 @@ function HomePageContent() {
       <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
         <OfflineBanner />
         <Header
-          onRefresh={refreshAll}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenTools={() => setToolsOpen(true)}
-          onOpenNotes={() => { setNotesSku(undefined); setNotesOpen(true); }}
-          onOpenCSVImport={() => setCSVImportOpen(true)}
           userMenu={
             <UserMenu
               onOpenPasswordChange={() => setPasswordChangeOpen(true)}
               onOpenUserManagement={() => setUserManagementOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
           }
         />
@@ -136,7 +125,11 @@ function HomePageContent() {
         {/* Main content */}
         <main className="flex-1 flex flex-col overflow-hidden">
           {viewMode === 'chat' && (
-            <ChatPanel settingsOpen={settingsOpen} onSettingsOpenChange={setSettingsOpen} />
+            <ChatPanel
+              settingsOpen={settingsOpen}
+              onSettingsOpenChange={setSettingsOpen}
+              onJumpToPanel={(panelId) => { setViewMode('legacy'); setLegacyTab(panelId); }}
+            />
           )}
           {viewMode === 'audit' && (
             <div className="flex-1 overflow-auto">

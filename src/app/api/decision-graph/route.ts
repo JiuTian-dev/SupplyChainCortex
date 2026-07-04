@@ -10,12 +10,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { executeDecisionGraph, getDecisionDomains, DECISION_GRAPH } from '@/lib/services/decision-graph.service';
 import { getCascadeRisk } from '@/lib/services/cascade-risk.service';
 import { matchDecisions } from '@/lib/engine/decision-matcher';
 import type { DecisionDomain } from '@/lib/services/decision-graph.service';
 
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'analyze';
   const mode = searchParams.get('mode') || 'static';

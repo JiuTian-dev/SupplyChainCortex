@@ -16,6 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, apiError } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { recordFeedback, getFeedbackStats, feedbackStore } from '@/lib/engine';
 import {
   recordEvidenceFeedback,
@@ -29,7 +31,8 @@ import { db } from '@/lib/db';
 const VALID_ACTIONS = ['accepted', 'rejected', 'modified', 'ignored', 'deferred'];
 const VALID_VERDICTS: ClaimVerdict[] = ['accurate', 'inaccurate', 'outdated', 'irrelevant', 'unverified'];
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
@@ -52,9 +55,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     message: 'Use ?action=stats, ?action=recent, or ?action=evidence-stats. POST to record feedback.',
     validActions: VALID_ACTIONS,
   });
-});
+}));
 
-export const POST = withErrorHandler(async (request: NextRequest) => {
+export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { auditId, engine, action, modifications, userNotes, userId, suggestedAt, tags, claims } = body;
 
@@ -125,4 +129,4 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }).catch(() => { /* non-blocking */ });
 
   return NextResponse.json({ success: true, feedback }, { status: 201 });
-});
+}));

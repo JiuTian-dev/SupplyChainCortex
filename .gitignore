@@ -69,3 +69,44 @@ mcp-card-*.png.idea/
 .chat-history/
 .worktrees/
 ui-ux-pro-max-skill/
+
+# Test artifacts (don't commit)
+/test-e2e.py
+/test-supplychain.py
+/test-chat-extra.py
+/test-*.png
+/test-*.txt
+/test-*.json
+/test-*.html
+/test_chat_extra.py
+/test_supplychain.py
+/chat-final-text.txt
+/test-report.json
+/_count.ps1
+/.playwright/
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
+# Stray / accidental
+/nul
+/nul.txt
+
+# OS / editor cruft
+Thumbs.db
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts (extended)
+/*.tsbuildinfo
+/next-env.d.ts
+
+# Personal / local-only
+*.local
+.cache/
+.turbo/
+.tmp/
+.temp/

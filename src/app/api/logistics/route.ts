@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAuditLog } from "@/lib/services/audit.service";
 import { withErrorHandler, apiError, AppError } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getShipmentList,
   getShipmentByTracking,
@@ -16,6 +17,7 @@ import type { ShipmentStatusUpdate } from "@/lib/services/logistics.service";
 
 // GET /api/logistics - 物流追踪数据
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action") || "list";
   const trackingNumber = searchParams.get("trackingNumber");
@@ -90,6 +92,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 // POST /api/logistics - 货运状态更新
 // Body: { action: "update_status", trackingNumber: string, status: string, eta?: string, progress?: number, notes?: string }
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { action, trackingNumber, status, eta, progress, notes } = body;
 

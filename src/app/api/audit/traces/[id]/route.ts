@@ -1,31 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withErrorHandler, NotFoundError } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
 import { getTraceById, deleteTrace } from '@/lib/audit/trace-reader';
+import { optionalRequireAuth, requireAdmin } from '@/lib/auth-helpers';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
+export const GET = withApiRateLimit(withErrorHandler(async (
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  try {
-    const trace = await getTraceById(id);
-    if (!trace) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
-    return NextResponse.json({ success: true, data: trace });
-  } catch (err) {
-    return NextResponse.json({ success: false, error: (err as Error).message }, { status: 500 });
-  }
-}
+  context?: unknown,
+) => {
+  await optionalRequireAuth();
+  const { id } = await (context as { params: Promise<{ id: string }> }).params;
+  const trace = await getTraceById(id);
+  if (!trace) throw NotFoundError('Not found');
+  return NextResponse.json({ success: true, data: trace });
+}));
 
-export async function DELETE(
+export const DELETE = withApiRateLimit(withErrorHandler(async (
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  try {
-    await deleteTrace(id);
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    return NextResponse.json({ success: false, error: (err as Error).message }, { status: 500 });
-  }
-}
+  context?: unknown,
+) => {
+  await requireAdmin();
+  const { id } = await (context as { params: Promise<{ id: string }> }).params;
+  await deleteTrace(id);
+  return NextResponse.json({ success: true });
+}));

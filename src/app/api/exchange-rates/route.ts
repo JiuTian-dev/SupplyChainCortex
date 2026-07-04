@@ -8,10 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getLatestRates, getRateHistory } from '@/lib/queries/exchange-rate.queries';
 import { getExchangeRates, getExchangeRate } from '@/lib/exchange-rate';
 
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'latest';
   const base = searchParams.get('base') || 'CNY';

@@ -13,9 +13,11 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { withErrorHandler, apiSuccess, AppError, ValidationError } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { computeTariff } from '@/lib/services/tariff.service';
 
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { skus, countryCode } = body as { skus?: string[]; countryCode?: string };
 

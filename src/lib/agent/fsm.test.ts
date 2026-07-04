@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { createFSMContext, getNextState } from './fsm';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createFSMContext, getNextState, isRagEnabled } from './fsm';
 import type { FSMContext, FSMState } from './fsm-types';
 import { DEFAULT_FSM_CONFIG } from './fsm-types';
 
@@ -8,7 +8,9 @@ import { DEFAULT_FSM_CONFIG } from './fsm-types';
 vi.mock('@/lib/mcp/tools', () => ({ getToolSchemas: vi.fn(), executeTool: vi.fn() }));
 vi.mock('@/lib/engine/autonomy-policy', () => ({ executeWithPolicy: vi.fn() }));
 vi.mock('@/lib/engine/passport', () => ({ createPassport: vi.fn(), provenanceEntry: vi.fn() }));
-vi.mock('@/lib/engine/rag', () => ({ retrieveKnowledge: vi.fn(), augmentPrompt: vi.fn() }));
+vi.mock('@/lib/knowledge/rag-pipeline', () => ({
+  buildRagContext: vi.fn().mockResolvedValue({ context: '', results: [], totalTokens: 0, truncated: false }),
+}));
 vi.mock('@/lib/engine/graph-rag', () => ({ buildGraphContext: vi.fn(() => ({ summary: '', relevantSubgraph: '' })), formatGraphContext: vi.fn(() => '') }));
 vi.mock('@/lib/services/web-search.service', () => ({ webSearchWithQuality: vi.fn(), formatSearchContext: vi.fn() }));
 vi.mock('@/app/api/chat/chat.prompt', () => ({ SYSTEM_PROMPT: '' }));
@@ -28,6 +30,10 @@ function mockCtx(overrides?: Partial<FSMContext>): FSMContext {
 }
 
 describe('FSM transition table', () => {
+  it('retrieve → classify (always, RAG state)', () => {
+    expect(getNextState('retrieve', mockCtx())).toBe('classify');
+  });
+
   it('classify → plan (always)', () => {
     expect(getNextState('classify', mockCtx())).toBe('plan');
   });
@@ -117,5 +123,37 @@ describe('createFSMContext', () => {
     });
     expect(ctx.config.maxRounds).toBe(5);
     expect(ctx.config.maxToolsPerRound).toBe(DEFAULT_FSM_CONFIG.maxToolsPerRound);
+  });
+});
+
+describe('isRagEnabled', () => {
+  const original = process.env.ENABLE_RAG;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.ENABLE_RAG;
+    } else {
+      process.env.ENABLE_RAG = original;
+    }
+  });
+
+  it('returns false when ENABLE_RAG is unset (backward compat)', () => {
+    delete process.env.ENABLE_RAG;
+    expect(isRagEnabled()).toBe(false);
+  });
+
+  it('returns true when ENABLE_RAG=true', () => {
+    process.env.ENABLE_RAG = 'true';
+    expect(isRagEnabled()).toBe(true);
+  });
+
+  it('returns true when ENABLE_RAG=1', () => {
+    process.env.ENABLE_RAG = '1';
+    expect(isRagEnabled()).toBe(true);
+  });
+
+  it('returns false when ENABLE_RAG=false', () => {
+    process.env.ENABLE_RAG = 'false';
+    expect(isRagEnabled()).toBe(false);
   });
 });

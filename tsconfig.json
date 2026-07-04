@@ -34,12 +34,22 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next/dev/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "examples",
     "scripts",
-    "skills"
+    "skills",
+    "ui-ux-pro-max-skill",
+    "tests/reliability",
+    "e2e",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "vitest.setup.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts"
   ]
 }

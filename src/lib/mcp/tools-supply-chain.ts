@@ -3,16 +3,23 @@
  *
  * These tools call the Python mcp-server/bridge.py for computational
  * supply chain algorithms: EOQ, safety stock, forecasting, optimization, etc.
+ *
+ * 调用模式通过环境变量 PYTHON_BRIDGE_MODE 切换:
+ * - "exec" (默认): 通过 execFile('python3', ...) 启动子进程，向后兼容
+ * - "http": 优先通过 FastAPI 常驻服务 (mcp-server/server.py) HTTP 调用，
+ *           服务不可用时自动降级到 execFile
  */
 
 import type { MCPTool } from './tools';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { callBridgeHttp, BridgeHttpUnavailableError } from '../python-bridge/http-client';
 
 const execFileAsync = promisify(execFile);
 
-function callBridge(tool: string, params: Record<string, unknown>): Promise<unknown> {
+/** 通过 execFile 启动 Python 子进程调用 bridge.py（原始模式） */
+function callBridgeExec(tool: string, params: Record<string, unknown>): Promise<unknown> {
   const bridgePath = path.join(process.cwd(), 'mcp-server', 'bridge.py');
   const argsJson = JSON.stringify(params);
   const timeout = tool === 'monte_carlo_inventory' ? 60000 : 15000;
@@ -25,6 +32,27 @@ function callBridge(tool: string, params: Record<string, unknown>): Promise<unkn
     if (result.error) throw new Error(result.error);
     return result;
   });
+}
+
+/**
+ * 统一桥接入口：根据 PYTHON_BRIDGE_MODE 环境变量选择调用路径。
+ * - "http": 优先 HTTP 调用 FastAPI 服务，连接失败时自动降级到 execFile
+ * - "exec" (默认): 直接使用 execFile 子进程模式
+ */
+function callBridge(tool: string, params: Record<string, unknown>): Promise<unknown> {
+  const mode = process.env.PYTHON_BRIDGE_MODE || 'exec';
+
+  if (mode === 'http') {
+    return callBridgeHttp(tool, params).catch((err) => {
+      if (err instanceof BridgeHttpUnavailableError) {
+        // FastAPI 服务不可用，降级到 execFile 保持功能可用
+        return callBridgeExec(tool, params);
+      }
+      throw err;
+    });
+  }
+
+  return callBridgeExec(tool, params);
 }
 
 // ─── Tool Definitions ──────────────────────────────────────────────────────────
@@ -40,7 +68,7 @@ export const supplyChainTools: MCPTool[] = [
         annual_demand: { type: 'number', description: '年需求量 D' },
         order_cost: { type: 'number', description: '每次订货固定成本 S' },
         holding_cost_per_unit: { type: 'number', description: '单位年持有成本 H' },
-        discount_schedule: { type: 'string', description: '折扣计划的JSON字符串，格式: [{"break_qty": 0, "unit_cost": 10}, ...]' },
+        discount_schedule: { type: ['string', 'array'], description: '折扣计划的JSON字符串或数组，格式: [{"break_qty": 0, "unit_cost": 10}, ...]' },
         discount_type: { type: 'string', description: '折扣类型: all_units | incremental', enum: ['all_units', 'incremental'] },
       },
       required: ['annual_demand', 'order_cost', 'holding_cost_per_unit'],
@@ -92,15 +120,16 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        records: { type: 'string', description: '记录列表的JSON字符串，每条含sku, revenue, demand_std, avg_demand' },
-        abc_thresholds: { type: 'string', description: 'ABC阈值JSON，如[0.80, 0.95]' },
+        records: { type: ['string', 'array'], description: '记录列表的JSON字符串或数组，每条含sku, revenue, demand_std, avg_demand' },
+        abc_thresholds: { type: ['string', 'array'], description: 'ABC阈值JSON，如[0.80, 0.95]' },
       },
       required: ['records'],
     },
     handler: async (p) => {
       const params: Record<string, unknown> = {};
       if (typeof p.records === 'string') params.records = JSON.parse(p.records as string);
-      if (p.abc_thresholds) params.abc_thresholds = JSON.parse(p.abc_thresholds as string);
+      else params.records = p.records;
+      if (p.abc_thresholds) params.abc_thresholds = typeof p.abc_thresholds === 'string' ? JSON.parse(p.abc_thresholds as string) : p.abc_thresholds;
       return callBridge('classify_abc_xyz', params);
     },
   },
@@ -112,7 +141,7 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        demand_history: { type: 'string', description: '历史需求数据JSON数组，如[120,135,142,...]' },
+        demand_history: { type: ['string', 'array'], description: '历史需求数据JSON数组，如[120,135,142,...]。可传字符串或直接传数组。' },
         periods: { type: 'number', description: '预测期数' },
         alpha: { type: 'number', description: 'ES平滑参数(0-1)，默认0.3' },
         beta: { type: 'number', description: '趋势平滑参数(0-1)，默认0.1' },
@@ -136,7 +165,7 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        demand_history: { type: 'string', description: '历史需求数据JSON数组' },
+        demand_history: { type: ['string', 'array'], description: '历史需求数据JSON数组。可传字符串或直接传数组。' },
         period_length: { type: 'number', description: '季节周期长度（如12=月度，4=季度）' },
       },
       required: ['demand_history', 'period_length'],
@@ -177,7 +206,7 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        demands: { type: 'string', description: '每期需求量JSON数组，如[100,200,150,80]' },
+        demands: { type: ['string', 'array'], description: '每期需求量JSON数组，如[100,200,150,80]。可传字符串或直接传数组。' },
         order_cost: { type: 'number', description: '固定订货成本' },
         holding_cost_per_unit: { type: 'number', description: '单位持有成本/期' },
       },
@@ -214,8 +243,8 @@ export const supplyChainTools: MCPTool[] = [
       type: 'object',
       properties: {
         initial_inventory: { type: 'number', description: '期初库存' },
-        scheduled_receipts: { type: 'string', description: '已排程接收JSON数组' },
-        demand_schedule: { type: 'string', description: '需求计划JSON数组' },
+        scheduled_receipts: { type: ['string', 'array'], description: '已排程接收JSON数组。可传字符串或直接传数组。' },
+        demand_schedule: { type: ['string', 'array'], description: '需求计划JSON数组。可传字符串或直接传数组。' },
         lead_time_days: { type: 'number', description: '提前期（周期数）' },
         order_quantity: { type: 'number', description: '固定订货批量，0=按需订货' },
         safety_stock: { type: 'number', description: '安全库存量' },
@@ -236,13 +265,14 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        locations: { type: 'string', description: '位置列表JSON，每条含name, x, y, demand' },
+        locations: { type: ['string', 'array'], description: '位置列表JSON或数组，每条含name, x, y, demand' },
       },
       required: ['locations'],
     },
     handler: async (p) => {
       const params: Record<string, unknown> = {};
       if (typeof p.locations === 'string') params.locations = JSON.parse(p.locations as string);
+      else params.locations = p.locations;
       return callBridge('calculate_warehouse_location', params);
     },
   },
@@ -252,7 +282,7 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        points: { type: 'string', description: '点列表JSON，每条含name, x, y' },
+        points: { type: ['string', 'array'], description: '点列表JSON或数组，每条含name, x, y' },
         start_point: { type: 'string', description: '起始点名称' },
       },
       required: ['points'],
@@ -260,6 +290,7 @@ export const supplyChainTools: MCPTool[] = [
     handler: async (p) => {
       const params: Record<string, unknown> = {};
       if (typeof p.points === 'string') params.points = JSON.parse(p.points as string);
+      else params.points = p.points;
       if (p.start_point) params.start_point = p.start_point;
       return callBridge('calculate_transport_route', params);
     },
@@ -323,7 +354,7 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        lead_times: { type: 'string', description: '历史提前期数据JSON数组' },
+        lead_times: { type: ['string', 'array'], description: '历史提前期数据JSON数组。可传字符串或直接传数组。' },
         demand_rate: { type: 'number', description: '需求速率' },
         service_level: { type: 'number', description: '服务水平(0.50-0.9999)' },
       },
@@ -377,13 +408,14 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        suppliers: { type: 'string', description: '供应商列表JSON，每条含name, quality_score, delivery_score, cost_score, service_score, flexibility_score' },
+        suppliers: { type: ['string', 'array'], description: '供应商列表JSON或数组，每条含name, quality_score, delivery_score, cost_score, service_score, flexibility_score' },
       },
       required: ['suppliers'],
     },
     handler: async (p) => {
       const params: Record<string, unknown> = {};
       if (typeof p.suppliers === 'string') params.suppliers = JSON.parse(p.suppliers as string);
+      else params.suppliers = p.suppliers;
       return callBridge('calculate_supplier_scoring', params);
     },
   },
@@ -417,7 +449,7 @@ export const supplyChainTools: MCPTool[] = [
         target_profit: { type: 'number', description: '目标利润（税后，默认0=盈亏平衡）' },
         depreciation: { type: 'number', description: '固定成本中的折旧（用于现金BEP）' },
         tax_rate: { type: 'number', description: '税率(0-1)，默认0' },
-        scenarios: { type: 'string', description: '场景JSON数组，每条可选label,price,vc,fc' },
+        scenarios: { type: ['string', 'array'], description: '场景JSON数组或数组，每条可选label,price,vc,fc' },
       },
       required: ['fixed_costs', 'unit_price', 'unit_variable_cost'],
     },
@@ -455,7 +487,7 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        items: { type: 'string', description: '产品列表JSON，每条含annual_demand,unit_cost,minor_setup_cost,name' },
+        items: { type: ['string', 'array'], description: '产品列表JSON或数组，每条含annual_demand,unit_cost,minor_setup_cost,name' },
         major_setup_cost: { type: 'number', description: '主订货费（所有产品共用，如卡车调度费）' },
         interest_rate: { type: 'number', description: '年持有成本率(0.05-1.0)，默认0.25' },
         detailed: { type: 'boolean', description: '是否输出逐项明细，默认true' },
@@ -474,9 +506,9 @@ export const supplyChainTools: MCPTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        forecasts: { type: 'string', description: '预测列表JSON，每条含sku,category(可选),period_values(每期预测值数组)' },
-        actuals: { type: 'string', description: '实际值JSON数组（每期）' },
-        period_labels: { type: 'string', description: '周期标签JSON数组，如["1月","2月",...]' },
+        forecasts: { type: ['string', 'array'], description: '预测列表JSON或数组，每条含sku,category(可选),period_values(每期预测值数组)' },
+        actuals: { type: ['string', 'array'], description: '实际值JSON数组（每期）' },
+        period_labels: { type: ['string', 'array'], description: '周期标签JSON数组，如["1月","2月",...]' },
       },
       required: ['forecasts', 'actuals'],
     },
@@ -484,6 +516,7 @@ export const supplyChainTools: MCPTool[] = [
       const params: Record<string, unknown> = {};
       for (const k of ['forecasts', 'actuals', 'period_labels']) {
         if (typeof p[k] === 'string') params[k] = JSON.parse(p[k] as string);
+        else if (p[k] !== undefined) params[k] = p[k];
       }
       return callBridge('calculate_forecast_accuracy', params);
     },

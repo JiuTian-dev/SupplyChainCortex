@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiRateLimit, strictRateLimit, authRateLimit, chatRateLimit, exportRateLimit, mcpRateLimit } from '@/lib/rate-limit';
 import { optionalRequirePermission } from '@/lib/auth-helpers';
-import type { Permission } from '@/lib/rbac';
+import type { Permission } from '@/lib/auth/permissions';
 
 /** Return type for optionalRequirePermission / optionalRequireAuth */
 export type OptionalAuthResult = Awaited<ReturnType<typeof optionalRequirePermission>>;

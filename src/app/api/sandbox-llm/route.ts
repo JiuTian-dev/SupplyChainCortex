@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { runLLMAgent, runAllAgents } from '@/lib/engine/llm-agent';
 import { db } from '@/lib/db';
 
@@ -41,7 +43,12 @@ async function gatherRealState() {
         const { getLatestRates } = await import('@/lib/queries/exchange-rate.queries');
         const fx = await getLatestRates();
         return { usdCny: fx.rates?.USD ? 1 / fx.rates.USD : 7.25, midpoint: fx.midpoints?.USD?.midpoint, spread: fx.midpoints?.USD?.spread };
-      } catch { return { usdCny: 7.25 }; }
+      } catch {
+        // Fallback: 7.25 is a conservative USD/CNY estimate used when the live
+        // exchange-rate service is unavailable. Replace with a fresher value
+        // periodically or wire up an external FX API.
+        return { usdCny: 7.25 };
+      }
     })(),
 
     // Live carbon
@@ -136,7 +143,28 @@ async function gatherRealState() {
 
   // Computed derived fields for LLM agent compatibility
   const weatherSeverity = cascadeRisk.sources?.some((s: any) => s.cause?.includes('天气')) ? 40 : 15;
-  const tariffRate = 7.5; // default Section 301 List 3 rate
+
+  // Tariff rate: try to fetch the live Section 301 List 3 rate from the DB
+  // first; fall back to 7.5% (the default US Section 301 List 3 rate on
+  // Chinese electro-mechanical imports, per USTR 4-year review extended to 2026).
+  let tariffRate = 7.5; // default Section 301 List 3 rate
+  try {
+    const section301Rule = await db.tariffRule.findFirst({
+      where: {
+        countryCode: 'US',
+        originCountry: 'CN',
+        tradeAgreement: 'Section301-list3',
+        isActive: true,
+      },
+      orderBy: { priority: 'desc' },
+    });
+    if (section301Rule) tariffRate = section301Rule.rate;
+  } catch { /* keep default fallback */ }
+
+  // Market demand heuristic: when inventory data is present we assume a
+  // healthy/normal market (100); when the inventory feed is empty we assume
+  // a degraded signal and lower the demand estimate (80). This is a proxy
+  // until a real demand/sales-trend feed is wired in.
   const marketDemand = inventoryState.length > 0 ? 100 : 80;
   const stockoutEvents = inventoryState.filter(i => i.stockStatus === 'critical').length;
   const totalDelays = shipmentState.filter(s => s.status === 'delayed' || s.status === 'exception').length;
@@ -153,6 +181,8 @@ async function gatherRealState() {
     // Extended real-time external data
     fxMidpoint: fx.midpoint || 0,
     fxSpread: fx.spread || 0,
+    // Fallback: 77 €/t is a conservative EUA price used when the live carbon
+    // price feed (fetchCarbonPrice) is unavailable or returns null.
     carbonPrice: carbon?.euaPrice || 77,
     // Commodity trends
     commodityTrend: commodity.length > 0
@@ -174,7 +204,8 @@ async function gatherRealState() {
   };
 }
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const rounds = parseInt(searchParams.get('rounds') || '5');
   const role = searchParams.get('role');
@@ -251,4 +282,4 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     decisions,
     summary,
   });
-});
+}));

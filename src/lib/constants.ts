@@ -63,10 +63,10 @@ export const AGING_COLORS = { '0-30天': '#22c55e', '31-60天': '#3b82f6', '61-9
 
 // ==================== 预警规则默认值 ====================
 export const DEFAULT_ALERT_RULES: Omit<AlertRule, 'createdAt' | 'updatedAt' | 'ruleId'>[] = [
-  { id: 'low-stock', name: '低库存预警', field: 'quantity', operator: '<', threshold: 0.5, unit: '安全库存倍数', enabled: true, severity: 'critical' },
-  { id: 'overstock', name: '库存积压预警', field: 'turnoverDays', operator: '>', threshold: 120, unit: '天', enabled: true, severity: 'warning' },
-  { id: 'slow-moving', name: '滞销产品预警', field: 'turnoverDays', operator: '>', threshold: 90, unit: '天', enabled: true, severity: 'warning' },
-  { id: 'low-margin', name: '低毛利预警', field: 'grossMargin', operator: '<', threshold: 48, unit: '%', enabled: true, severity: 'critical' },
+  { id: 'low-stock', name: '低库存预警', field: 'quantity', operator: '<', threshold: 0.5, unit: '安全库存倍数', enabled: true, severity: 'critical', tenantId: 'default' },
+  { id: 'overstock', name: '库存积压预警', field: 'turnoverDays', operator: '>', threshold: 120, unit: '天', enabled: true, severity: 'warning', tenantId: 'default' },
+  { id: 'slow-moving', name: '滞销产品预警', field: 'turnoverDays', operator: '>', threshold: 90, unit: '天', enabled: true, severity: 'warning', tenantId: 'default' },
+  { id: 'low-margin', name: '低毛利预警', field: 'grossMargin', operator: '<', threshold: 48, unit: '%', enabled: true, severity: 'critical', tenantId: 'default' },
 ];
 
 // ==================== 供应商品类/地区选项 ====================

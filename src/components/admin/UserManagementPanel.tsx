@@ -47,8 +47,8 @@ import {
   Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Role } from '@/lib/rbac';
-import { ROLE_LABELS, ROLE_COLORS } from '@/lib/rbac';
+import type { Role } from '@/lib/auth/permissions';
+import { ROLE_LABELS, ROLE_COLORS } from '@/lib/auth/permissions';
 
 interface UserRecord {
   id: string;
@@ -429,17 +429,17 @@ export function UserManagementPanel({ open, onOpenChange }: UserManagementPanelP
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">
+                  <SelectItem value="org_admin">
                     <span className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${ROLE_COLORS.admin}`}>
+                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${ROLE_COLORS.org_admin}`}>
                         管理员
                       </Badge>
                       - 完全访问权限
                     </span>
                   </SelectItem>
-                  <SelectItem value="manager">
+                  <SelectItem value="team_admin">
                     <span className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${ROLE_COLORS.manager}`}>
+                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${ROLE_COLORS.team_admin}`}>
                         经理
                       </Badge>
                       - 读写权限（无用户管理）
@@ -504,8 +504,8 @@ export function UserManagementPanel({ open, onOpenChange }: UserManagementPanelP
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">管理员</SelectItem>
-                    <SelectItem value="manager">经理</SelectItem>
+                    <SelectItem value="org_admin">管理员</SelectItem>
+                    <SelectItem value="team_admin">经理</SelectItem>
                     <SelectItem value="viewer">观察者</SelectItem>
                   </SelectContent>
                 </Select>

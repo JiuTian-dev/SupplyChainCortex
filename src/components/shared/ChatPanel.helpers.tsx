@@ -528,7 +528,7 @@ export function CopyButton({ text }: { text: string }) {
 
 export function TypingIndicator({ thinking }: { thinking?: boolean }) {
   return (
-    <div className="flex gap-2 items-start">
+    <div className="flex gap-2 items-start" data-testid="typing-indicator">
       <div className="h-6 w-6 rounded-full bg-gradient-to-br from-orange-100 to-rose-100 dark:from-orange-950/30 dark:to-rose-950/30 flex items-center justify-center shrink-0">
         <Bot className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
       </div>

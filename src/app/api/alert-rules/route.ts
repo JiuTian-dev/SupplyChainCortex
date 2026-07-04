@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getAlertRules, bulkUpdateAlertRules } from "@/lib/queries/alert-rules.queries";
 import { createAuditLog } from "@/lib/services/audit.service";
 
 // GET /api/alert-rules - List all alert rules
 export const GET = withApiRateLimit(withErrorHandler(async () => {
+  await optionalRequireAuth();
   const result = await getAlertRules();
   return NextResponse.json({ rules: result.rules });
 }));
 
 // PUT /api/alert-rules - Bulk update alert rules
 export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { rules } = body;
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler, AppError } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getProductsList,
   searchProducts,
@@ -14,6 +15,7 @@ import type { CreateProductData, UpdateProductData } from "@/lib/services/produc
 
 // GET /api/products - List all products with optional filters and pagination
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   // Fix: decode category to handle URL-encoded values (e.g. %E5%8E%A8...)
   const category = safeDecode(searchParams.get("category"));
@@ -72,6 +74,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
 // POST /api/products - Create a new product
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { sku, name, category, subCategory, unitCost, sellingPrice, weight, origin, abcClass, fsnClass } = body;
 
@@ -111,6 +114,7 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
 
 // PUT /api/products - Update a product
 export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { id, ...fields } = body;
 
@@ -138,6 +142,7 @@ export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
 // DELETE /api/products - Delete a product
 export const DELETE = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 

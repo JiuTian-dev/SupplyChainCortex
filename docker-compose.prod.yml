@@ -1,0 +1,395 @@
+# ===========================================
+# SupplyChain Cortex — Production Docker Compose
+# ===========================================
+# 多租户 SaaS 生产编排（自托管模式）
+#
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml up -d --scale app=3
+#   docker compose -f docker-compose.prod.yml down
+#
+# 详见：vibe路径/SupplyChain-Cortex-SaaS-部署架构.md
+# ===========================================
+
+services:
+  # ─── Nginx 反向代理 / SSL 终止 / 负载均衡 ──────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cortex-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      app:
+        condition: service_healthy
+      python-bridge:
+        condition: service_healthy
+    networks:
+      - cortex-prod
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── Next.js 应用（可水平扩展）────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cortex-app
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-supplychain}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB:-supply_chain}?connection_limit=10&pgbouncer=true&connection_timeout=30
+      - DATABASE_READ_URL=postgresql://${POSTGRES_USER:-supplychain}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-supply_chain}?connection_limit=5
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_SESSION_URL=redis://redis:6379/1
+      - REDIS_RATELIMIT_URL=redis://redis:6379/2
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-https://cortex.app}
+      - PYTHON_BRIDGE_URL=http://python-bridge:8765
+      - CACHE_BACKEND=redis
+      - TENANT_MODE=${TENANT_MODE:-subdomain}
+      - BASE_DOMAIN=${BASE_DOMAIN:-cortex.app}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - METRICS_BASIC_AUTH=${METRICS_BASIC_AUTH:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - TZ=Asia/Shanghai
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-bridge:
+        condition: service_healthy
+    networks:
+      - cortex-prod
+    deploy:
+      replicas: ${APP_REPLICAS:-2}
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+        failure_action: rollback
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+
+  # ─── Python FastAPI 桥接服务（供应链数学引擎）──────────────────────
+  python-bridge:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.python
+    container_name: cortex-python-bridge
+    restart: unless-stopped
+    expose:
+      - "8765"
+    environment:
+      - PYTHON_BRIDGE_PORT=8765
+      - PYTHONUNBUFFERED=1
+    networks:
+      - cortex-prod
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  # ─── PostgreSQL 16 主库 ────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cortex-postgres
+    restart: unless-stopped
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-supplychain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-supply_chain}
+      # 启用 RLS 审计日志
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - cortex-prod
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplychain} -d ${POSTGRES_DB:-supply_chain}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # ─── PgBouncer 连接池（Serverless / 多实例必需）────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:1.23.1
+    container_name: cortex-pgbouncer
+    restart: unless-stopped
+    expose:
+      - "6432"
+    environment:
+      DB_USER: ${POSTGRES_USER:-supplychain}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-supply_chain}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+      RESERVE_POOL_SIZE: 5
+      SERVER_IDLE_TIMEOUT: 600
+      QUERY_WAIT_TIMEOUT: 120
+      AUTH_TYPE: scram-sha-256
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cortex-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432 -U ${POSTGRES_USER:-supplychain}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis 7（缓存 + 会话 + 限流）──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cortex-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+    networks:
+      - cortex-prod
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── SearXNG 自托管搜索 ────────────────────────────────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: cortex-searxng
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET is required}
+    networks:
+      - cortex-prod
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── 日志聚合：Loki ────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: cortex-loki
+    restart: unless-stopped
+    expose:
+      - "3100"
+    volumes:
+      - loki-data:/loki
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - cortex-prod
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ─── 日志收集：Promtail ────────────────────────────────────────────
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: cortex-promtail
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log:ro
+      - ./promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - nginx-logs:/var/log/nginx:ro
+      - app-logs:/var/log/app:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - cortex-prod
+
+  # ─── 监控仪表盘：Grafana ───────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: cortex-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD is required}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=postgres-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - loki
+      - prometheus
+    networks:
+      - cortex-prod
+
+  # ─── 指标采集：Prometheus ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: cortex-prometheus
+    restart: unless-stopped
+    expose:
+      - "9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/grafana/alerting/rules.yml:/etc/prometheus/rules/rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - app
+    networks:
+      - cortex-prod
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── 数据库备份 Cron（每日 03:00）──────────────────────────────────
+  backup:
+    image: postgres:16-alpine
+    container_name: cortex-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-supplychain}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-supply_chain}
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./scripts/backup-db-saas.sh:/backup.sh:ro
+      - backup-data:/backups
+    entrypoint: |
+      sh -c "
+        echo '0 3 * * * /backup.sh >> /var/log/backup.log 2>&1' > /etc/crontabs/root
+        crond -f -l 2
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cortex-prod
+
+# ─── Volumes ──────────────────────────────────────────────────────────
+volumes:
+  postgres-data:
+    name: cortex-postgres-data
+  redis-data:
+    name: cortex-redis-data
+  loki-data:
+    name: cortex-loki-data
+  grafana-data:
+    name: cortex-grafana-data
+  prometheus-data:
+    name: cortex-prometheus-data
+  nginx-logs:
+    name: cortex-nginx-logs
+  app-logs:
+    name: cortex-app-logs
+  backup-data:
+    name: cortex-backup-data
+
+# ─── Network ──────────────────────────────────────────────────────────
+networks:
+  cortex-prod:
+    driver: bridge
+    name: cortex-prod

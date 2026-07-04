@@ -5,11 +5,20 @@
  * Used by the ChatPanel /brief command and decision center.
  */
 
+/**
+ * @internal 待评估 — 此路由在前端组件中无直接调用，疑似无运行时引用。
+ * 决策：保留以备运维/外部系统/未来用途，但标注待评估。
+ * 评估建议：如确认无任何调用方（含外部脚本、Prometheus、运维工具），可考虑删除。
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 
 async function handler(_request: NextRequest) {
+  await optionalRequireAuth();
   // ── Gather all data in parallel ─────────────────────────────────────────
 
   const [
@@ -225,4 +234,4 @@ async function handler(_request: NextRequest) {
   });
 }
 
-export const GET = withErrorHandler(handler);
+export const GET = withApiRateLimit(withErrorHandler(handler));

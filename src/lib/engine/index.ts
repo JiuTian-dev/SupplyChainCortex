@@ -28,9 +28,6 @@ export type {
 // Cache
 export {
   engineCache,
-  engineCached,
-  engineCacheKey,
-  versionedCachedFetch,
   computeConfigVersion,
   getConfigVersion,
   setConfigVersion,

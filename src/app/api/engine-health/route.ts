@@ -11,12 +11,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { runHealthProbe, getEngineMetrics, getFeedbackStats } from '@/lib/engine';
 import { detectAnomalies } from '@/lib/engine/anomaly';
 import { db } from '@/lib/db';
 import type { DecisionLog, FeedbackLog } from '@prisma/client';
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
   const format = searchParams.get('format');
@@ -85,4 +88,4 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   return NextResponse.json(health, {
     status: health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503,
   });
-});
+}));

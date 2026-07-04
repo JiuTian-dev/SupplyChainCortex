@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, AppError } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getAllPortsWeather,
   getPortWeatherSummary,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/services/weather.service';
 
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'all';
 

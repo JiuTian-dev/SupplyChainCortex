@@ -5,10 +5,20 @@ vi.mock('@/lib/api-protection', () => ({
   withApiRateLimit: (handler: unknown) => handler,
 }));
 
+vi.mock('@/lib/auth-helpers', () => ({
+  optionalRequireAuth: vi.fn().mockResolvedValue(null),
+  requireAdmin: vi.fn().mockResolvedValue(null),
+  requireAuth: vi.fn().mockResolvedValue(null),
+  getAuth: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     auditLog: {
       create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
+    },
+    user: {
+      count: vi.fn().mockResolvedValue(0),
     },
   },
 }));

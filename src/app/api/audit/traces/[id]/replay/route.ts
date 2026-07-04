@@ -1,31 +1,25 @@
 // src/app/api/audit/traces/[id]/replay/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { withErrorHandler, ValidationError } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
 import { replayTrace } from '@/lib/audit/replay-engine';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(
+export const POST = withApiRateLimit(withErrorHandler(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  try {
-    const body = await request.json();
-    const { modifications } = body;
+  context?: unknown,
+) => {
+  await optionalRequireAuth();
+  const { id } = await (context as { params: Promise<{ id: string }> }).params;
+  const body = await request.json();
+  const { modifications } = body;
 
-    if (!modifications || !Array.isArray(modifications) || modifications.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'modifications array is required' },
-        { status: 400 },
-      );
-    }
-
-    const result = await replayTrace(id, modifications);
-    return NextResponse.json({ success: true, data: result });
-  } catch (err) {
-    return NextResponse.json(
-      { success: false, error: (err as Error).message },
-      { status: 500 },
-    );
+  if (!modifications || !Array.isArray(modifications) || modifications.length === 0) {
+    throw ValidationError('modifications array is required');
   }
-}
+
+  const result = await replayTrace(id, modifications);
+  return NextResponse.json({ success: true, data: result });
+}));

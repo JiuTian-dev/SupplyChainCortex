@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import { withErrorHandler, apiSuccess, parsePagination } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getAuditLogs, getAuditStats } from '@/lib/services/audit.service';
 
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'list';
 

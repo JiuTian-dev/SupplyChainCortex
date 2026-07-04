@@ -5,9 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getCommodityPrices } from '@/lib/services/commodity.service';
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const report = await getCommodityPrices();
   return NextResponse.json(report);
-});
+}));

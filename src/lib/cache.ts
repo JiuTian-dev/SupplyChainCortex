@@ -26,6 +26,7 @@ export interface ICacheBackend {
   invalidateExact(key: string): boolean;
   clear(): void;
   stats(): CacheStats;
+  statsAsync(): Promise<CacheStats>;
   readonly backendType: 'memory' | 'postgres' | 'redis';
 }
 
@@ -108,6 +109,11 @@ class MemoryCacheBackend implements ICacheBackend {
       hitCounts[key] = entry.hitCount;
     }
     return { size: this.cache.size, keys: [...this.cache.keys()], hitCounts };
+  }
+
+  statsAsync(): Promise<CacheStats> {
+    // Memory backend is synchronous — no need for async fetch.
+    return Promise.resolve(this.stats());
   }
 
   private evictExpired(): void {

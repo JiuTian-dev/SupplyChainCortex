@@ -1,0 +1,140 @@
+# SupplyChain Cortex — Service Level Objective Definitions
+#
+# Authoritative SLO source-of-truth. Alert thresholds (see
+# observability/grafana/alerting/rules.yml) and dashboards (see
+# observability/grafana/dashboards/sla.json) are derived from these numbers.
+#
+# Reference: Google SRE Workbook — "Alerting on SLOs" + "Error Budget Policy".
+
+service: supply-chain-cortex
+team: supply-chain-platform
+review_cycle: monthly  # SLO targets reviewed at the start of each month
+
+# ─── SLO Window ──────────────────────────────────────────────────────────────
+# 30-day rolling window. Error budget = (1 - SLO target) * window.
+window:
+  duration: 30d
+  description: |
+    Rolling 30-day window. At the end of each cycle the burn rate is reviewed
+    and remaining error budget is reported to product leadership.
+
+# ─── SLO Targets ─────────────────────────────────────────────────────────────
+slos:
+  - id: availability
+    name: "Service Availability"
+    description: |
+      Fraction of minutes in which the Next.js app responded to /api/health
+      with HTTP 2xx and the LLM provider request pipeline was operational.
+    target: 0.995                    # 99.5% uptime
+    window: 30d
+    error_budget: 0.005              # 1 - 0.995
+    indicator:
+      metric: provider_requests_total
+      good_events: 'status="success"'
+      total_events: '*'
+      query: |
+        1 - (
+          sum(rate(provider_requests_total{status!="success"}[30d]))
+          / clamp_min(sum(rate(provider_requests_total[30d])), 1e-9)
+        )
+    alerts:
+      - burn_rate_2x:
+          window: 1h
+          threshold: 2
+          severity: critical
+      - burn_rate_1x:
+          window: 6h
+          threshold: 1
+          severity: warning
+
+  - id: tool-call-success-rate
+    name: "Tool Call Success Rate"
+    description: |
+      Fraction of MCP / supply-chain tool calls that complete without error.
+      Covers both local tools and remote MCP server invocations.
+    target: 0.95                     # 95% success
+    window: 30d
+    error_budget: 0.05               # 1 - 0.95
+    indicator:
+      metric: tool_calls_total
+      good_events: 'status="success"'
+      total_events: '*'
+      query: |
+        sum(rate(tool_calls_total{status="success"}[30d]))
+        / clamp_min(sum(rate(tool_calls_total[30d])), 1e-9)
+    alerts:
+      - failure_rate_10pct:
+          window: 5m
+          threshold: 0.10
+          severity: critical
+      - burn_rate_2x:
+          window: 1h
+          threshold: 2
+          severity: critical
+
+  - id: tool-call-p95-latency
+    name: "Tool Call P95 Latency"
+    description: |
+      95th-percentile end-to-end duration of tool calls. Includes any LLM
+      reasoning, MCP transport, and tool execution time.
+    target: 8                        # < 8 seconds
+    unit: seconds
+    window: 30d
+    direction: upper                 # lower is better
+    indicator:
+      metric: tool_call_duration_seconds
+      query: |
+        histogram_quantile(0.95, sum by (le) (rate(tool_call_duration_seconds_bucket[30d])))
+    alerts:
+      - p95_over_10s:
+          window: 5m
+          threshold: 10
+          severity: warning
+
+# ─── Error Budget Policy ────────────────────────────────────────────────────
+error_budget_policy:
+  description: |
+    The error budget is shared across all SLOs listed above. When the budget
+    is exhausted for any SLO, the following actions are taken:
+      1. Freeze non-essential feature rollouts that touch the affected path.
+      2. Page on-call (critical) or open a tracked ticket (warning).
+      3. Prioritize reliability work over new features until budget recovers.
+  burn_rate_alerts:
+    - name: fast_burn
+      window: 1h
+      multiplier: 2
+      action: page
+      severity: critical
+      description: |
+        Burns 2% of the monthly budget in 1 hour → would exhaust the budget
+        in ~14 days if sustained. Page on-call immediately.
+    - name: slow_burn
+      window: 6h
+      multiplier: 1
+      action: ticket
+      severity: warning
+      description: |
+        Burns 1% of the monthly budget in 6 hours → would exhaust the budget
+        in ~30 days if sustained. Open a ticket for investigation.
+
+# ─── Calculation Rules ──────────────────────────────────────────────────────
+calculation_rules:
+  availability: |
+    availability = 1 - (failed_provider_requests / total_provider_requests)
+    Measured over the rolling 30-day window using Prometheus rate().
+    A minute counts as "down" if >50% of provider requests in that minute fail.
+  tool_success_rate: |
+    success_rate = successful_tool_calls / total_tool_calls
+    A tool call is "successful" if it returns a result without throwing
+    (status="success"). Timeouts and exceptions count as failures.
+  p95_latency: |
+    p95 = histogram_quantile(0.95, tool_call_duration_seconds_bucket)
+    Computed from the cumulative histogram buckets over the rolling window.
+  error_budget_remaining: |
+    remaining_pct = 100 * (1 - (observed_error_rate / error_budget))
+    Where observed_error_rate is the actual error rate over the window and
+    error_budget = 1 - SLO_target. Clamped to [0, 100].
+  burn_rate: |
+    burn_rate = observed_error_rate_over_window / error_budget
+    A burn rate of 1x means the budget will be exactly exhausted at the end
+    of the window. 2x means it will be exhausted in half the window.

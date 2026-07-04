@@ -12,7 +12,6 @@
  * - Cache stampede prevention via request deduplication (maps in-flight keys).
  */
 
-import { serverCache } from '@/lib/cache';
 import crypto from 'crypto';
 
 // ─── Types ───────────────────────────────────────────────────────────────────────
@@ -145,49 +144,5 @@ class VersionedMemoryCache {
 /** Singleton versioned cache */
 export const engineCache = new VersionedMemoryCache();
 
-// ─── Convenience Wrapper ─────────────────────────────────────────────────────────
-
-/**
- * Fetch with versioned caching. On cache miss, executes `fetcher`,
- * stores result with the current config version hash, and sets TTL.
- *
- * Usage:
- *   const data = await engineCached('cascade:propagation', 60000, () => propagate(...));
- */
-export async function engineCached<T>(
-  key: string,
-  ttlMs: number,
-  fetcher: () => Promise<T>,
-): Promise<T> {
-  const cached = engineCache.get<T>(key);
-  if (cached !== null) return cached;
-
-  const data = await fetcher();
-  engineCache.set(key, data, ttlMs);
-  return data;
-}
-
-// ─── Integration with existing serverCache ───────────────────────────────────────
-
-/** Build a composite cache key with engine version prefix */
-export function engineCacheKey(domain: string, ...parts: (string | number)[]): string {
-  return `engine:${getConfigVersion()}:${domain}:${parts.join(':')}`;
-}
-
-/**
- * Drop-in replacement for cachedFetch that adds engine version awareness.
- * Falls back to the standard serverCache when engine version is unavailable.
- */
-export async function versionedCachedFetch<T>(
-  key: string,
-  fetcher: () => Promise<T>,
-  ttlMs: number,
-): Promise<T> {
-  const versionedKey = `v:${getConfigVersion()}:${key}`;
-  const cached = await serverCache.get<T>(versionedKey);
-  if (cached !== null) return cached;
-
-  const data = await fetcher();
-  serverCache.set(versionedKey, data, ttlMs / 1000);
-  return data;
-}
+// NOTE: engineCached / engineCacheKey / versionedCachedFetch were removed (dead exports).
+// Only `engineCache` singleton is retained (used by observability.ts for stats).

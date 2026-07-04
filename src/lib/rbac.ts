@@ -1,8 +1,24 @@
 /**
+ * @deprecated 此文件已废弃，请使用 @/lib/auth/permissions。
+ * 此文件保留作为源代码备份，不再被任何代码引用（所有消费者已迁移到 @/lib/auth/permissions）。
+ * 迁移日期：2026-06-25
+ * 兼容性：auth/permissions.ts 已添加 hasPermission/hasAllPermissions/hasAnyPermission
+ *         兼容函数和 ACTION_PERMISSION_MAP，API 完全等价。
+ *
+ * 旧版角色 → 新版角色映射（语义等价）：
+ *   admin    → org_admin
+ *   manager  → team_admin
+ *   viewer   → viewer
+ *
+ * 注意：旧版 Role 类型值（'admin'/'manager'/'viewer'）与新版（'org_admin'/'team_admin'/'member'/'viewer'）不同。
+ *       迁移后的代码使用新版 Role 类型。如需保留旧版角色名，请参考 auth/permissions.ts 的 Legacy Compatibility API。
+ */
+
+/**
  * Role-Based Access Control (RBAC) Permission System
- * 
+ *
  * Roles: admin, manager, viewer
- * 
+ *
  * Permissions Matrix:
  * - admin: Full access to all resources
  * - manager: Read + Write access (no user management, no system config)

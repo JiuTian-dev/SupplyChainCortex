@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { withErrorHandler } from "@/lib/api-utils";
+import { withApiRateLimit } from "@/lib/api-protection";
+import { optionalRequireAuth } from "@/lib/auth-helpers";
 import { CACHE_TAGS, CACHE_TTL } from "@/lib/cache";
 import { computeSupplyChainScore } from "@/lib/queries/score.queries";
 import { db } from "@/lib/db";
@@ -34,7 +36,13 @@ function deterministicOffset(seed: string): number {
   return ((Math.abs(hash) % 800) / 100) - 4;
 }
 
-// Generate 5-day forecast based on trend data (deterministic, no Math.random)
+// Generate 5-day forecast using a deterministic heuristic (no Math.random).
+//
+// DATA SOURCE: This is NOT a real ML / statistical forecast. It derives a
+// trend sign from the current sales sub-score and applies a small seeded
+// deterministic offset. Each returned item is tagged with
+// `source: 'heuristic'` so consumers can distinguish it from real model
+// output. Keep the heuristic, but keep it transparent.
 function generateForecast(score: number, subScores: Record<string, { score: number }>) {
   const days = ["明天", "后天", "周三", "周四", "周五"];
   const trend = subScores.sales.score > 60 ? 1 : -1;
@@ -45,7 +53,7 @@ function generateForecast(score: number, subScores: Record<string, { score: numb
     const weather = getWeatherCondition(Math.round(projectedScore));
     const tempHigh = Math.round((projectedScore / 100) * 45);
     const tempLow = Math.round(tempHigh * 0.6);
-    return { day, condition: weather.condition, icon: weather.icon, high: tempHigh, low: tempLow };
+    return { day, condition: weather.condition, icon: weather.icon, high: tempHigh, low: tempLow, source: 'heuristic' as const };
   });
 }
 
@@ -66,10 +74,21 @@ function getGrade(score: number): string {
   return score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
 }
 
-// Generate 30-day historical score snapshots.
-// TODAY uses the actual current score. Past days show a plausible gentle trend
-// where scores were slightly lower, reflecting gradual improvement.
-function generateHistory(result: {
+// Generate historical score snapshots from REAL data only — never fabricated.
+//
+// DATA SOURCES (in priority order):
+//   1. AuditLog entries with entity='supply-chain-score' (last 30 days).
+//      These are optional persisted snapshots; their `details` Json is expected
+//      to carry { overallScore, subScores: { inventory, cost, logistics,
+//      sales, risk } }. Malformed entries are skipped.
+//   2. TODAY's live-computed score from computeSupplyChainScore() — always
+//      appended so the chart has at least one real data point.
+//
+// NOTE: The SupplyChainEvent model stores alerts/events (type, title,
+// description, severity) and does NOT carry score fields, so it is not used
+// here. If no AuditLog score snapshots exist, only today's real score is
+// returned — we do NOT synthesize a degradation trend for past days.
+async function generateHistory(result: {
   overallScore: number;
   subScores: {
     inventory: { score: number };
@@ -80,76 +99,109 @@ function generateHistory(result: {
   };
 }) {
   const today = new Date();
-  const history: Array<{ date: string; overallScore: number; grade: string; inventoryScore: number; costScore: number; logisticsScore: number; salesScore: number; riskScore: number }> = [];
-  const subKeys = ['inventory', 'cost', 'logistics', 'sales', 'risk'] as const;
-  const weights = { inventory: 0.25, cost: 0.20, logistics: 0.20, sales: 0.20, risk: 0.15 };
+  const todayStr = today.toISOString().slice(0, 10);
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
 
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().slice(0, 10);
+  type HistoryEntry = {
+    date: string;
+    overallScore: number;
+    grade: string;
+    inventoryScore: number;
+    costScore: number;
+    logisticsScore: number;
+    salesScore: number;
+    riskScore: number;
+    source: 'audit' | 'actual';
+  };
 
-    if (i === 0) {
-      // TODAY: use actual current score
-      history.push({
-        date: dateStr,
-        overallScore: result.overallScore,
-        grade: getGrade(result.overallScore),
-        inventoryScore: result.subScores.inventory.score,
-        costScore: result.subScores.cost.score,
-        logisticsScore: result.subScores.logistics.score,
-        salesScore: result.subScores.sales.score,
-        riskScore: result.subScores.risk.score,
-      });
-    } else {
-      // Past days: current score minus a small degradation that grows with distance
-      // Max degradation at 30 days ago: ~6-8 points depending on dimension
-      const daysAgo = i;
-      const degradationPct = daysAgo / 30; // 0 at today, 1 at 30 days ago
+  const history: HistoryEntry[] = [];
 
-      const dimScores: Record<string, number> = {};
-      for (const key of subKeys) {
-        const current = result.subScores[key].score;
-        // Each dimension drifts independently, capped at current ± 8
-        const maxDrift = Math.min(8, current * 0.15);
-        const drift = Math.round(maxDrift * degradationPct);
-        dimScores[key] = Math.max(0, Math.min(100, current - drift));
+  // 1) Query AuditLog for any persisted supply-chain-score snapshots.
+  try {
+    const auditEntries = await db.auditLog.findMany({
+      where: {
+        entity: 'supply-chain-score',
+        createdAt: { gte: thirtyDaysAgo, lte: today },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true, details: true },
+    });
+
+    for (const entry of auditEntries) {
+      const dateStr = entry.createdAt.toISOString().slice(0, 10);
+      if (dateStr === todayStr) continue; // today is filled from the live score below
+      const d = (entry.details ?? {}) as Record<string, unknown>;
+      const overall = typeof d.overallScore === 'number' ? d.overallScore : null;
+      const sub = (d.subScores ?? {}) as Record<string, { score?: number }>;
+      const inv = sub.inventory?.score;
+      const cost = sub.cost?.score;
+      const log = sub.logistics?.score;
+      const sales = sub.sales?.score;
+      const risk = sub.risk?.score;
+      // Skip entries that don't carry a complete score snapshot.
+      if (overall === null || inv === undefined || cost === undefined ||
+          log === undefined || sales === undefined || risk === undefined) {
+        continue;
       }
-      const overallScore = Math.round(
-        dimScores.inventory * weights.inventory +
-        dimScores.cost * weights.cost +
-        dimScores.logistics * weights.logistics +
-        dimScores.sales * weights.sales +
-        dimScores.risk * weights.risk
-      );
-
       history.push({
         date: dateStr,
-        overallScore,
-        grade: getGrade(overallScore),
-        inventoryScore: dimScores.inventory,
-        costScore: dimScores.cost,
-        logisticsScore: dimScores.logistics,
-        salesScore: dimScores.sales,
-        riskScore: dimScores.risk,
+        overallScore: Math.round(overall),
+        grade: getGrade(Math.round(overall)),
+        inventoryScore: Math.round(inv),
+        costScore: Math.round(cost),
+        logisticsScore: Math.round(log),
+        salesScore: Math.round(sales),
+        riskScore: Math.round(risk),
+        source: 'audit',
       });
     }
+  } catch {
+    // If the AuditLog query fails, fall through to today-only — never fabricate.
   }
+
+  // 2) Always append TODAY's real, live-computed score.
+  history.push({
+    date: todayStr,
+    overallScore: result.overallScore,
+    grade: getGrade(result.overallScore),
+    inventoryScore: result.subScores.inventory.score,
+    costScore: result.subScores.cost.score,
+    logisticsScore: result.subScores.logistics.score,
+    salesScore: result.subScores.sales.score,
+    riskScore: result.subScores.risk.score,
+    source: 'actual',
+  });
+
+  // Sort ascending by date for chart consumption.
+  history.sort((a, b) => a.date.localeCompare(b.date));
+
   return history;
 }
 
 // GET /api/supply-chain-score - Comprehensive supply chain health scoring
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action");
 
   // Use cached score computation
   const result = await cachedScore(searchParams.get("detailed") === "true");
 
-  // History action - 30-day trend data
+  // History action - historical trend data (real data only, no fabrication)
   if (action === "history") {
-    const history = generateHistory(result);
-    return NextResponse.json({ history, generatedAt: new Date().toISOString() });
+    const history = await generateHistory(result);
+    return NextResponse.json({
+      history,
+      generatedAt: new Date().toISOString(),
+      // Transparency metadata: how many points came from each data source.
+      // `fabricated` is always 0 — past days are never synthesized.
+      sources: {
+        audit: history.filter(h => h.source === 'audit').length,
+        actual: history.filter(h => h.source === 'actual').length,
+        fabricated: 0,
+      },
+    });
   }
 
   // Weather action
@@ -184,4 +236,4 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   }
 
   return NextResponse.json(result);
-});
+}));

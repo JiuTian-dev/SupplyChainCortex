@@ -20,6 +20,7 @@ import type {
 } from './cascade-risk.types';
 import { propagate, setPropagationRules } from './cascade-risk.propagation';
 import { db } from '@/lib/db';
+import { estimateCausalEffect, type CausalSample } from './causal-estimator';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Counterfactuals
@@ -63,12 +64,11 @@ function classifyIntervention(scenario: string): InterventionType {
 /**
  * Estimate Average Treatment Effect (ATE) from historical audit logs.
  *
- * Uses propensity score matching:
- * 1. Query historical cascade-risk analyses
- * 2. Classify each as "treated" (had intervention) or "control"
- * 3. Match on similarity (risk level, affected products)
- * 4. Compute ATE = mean(outcome_treated) - mean(outcome_control)
- * 5. Permutation test for statistical significance
+ * Now uses the unified CausalEstimator which automatically selects:
+ * - DML (Double Machine Learning) when n≥20
+ * - PSM (Propensity Score Matching) when n<20
+ *
+ * Falls back to domain priors when data is insufficient.
  */
 async function estimateATE(
   intervention: InterventionType,
@@ -92,17 +92,8 @@ async function estimateATE(
     }).catch(() => []);
   } catch { /* DB may not be available */ }
 
-  // Parse logs into structured historical samples
-  interface HistSample {
-    scenario: string;
-    intervention: InterventionType;
-    originalRisk: number;
-    improvementPct: number;
-    affectedProducts: number;
-    treated: boolean; // had counterfactual intervention
-  }
-
-  const samples: HistSample[] = [];
+  // Parse logs into CausalSample format
+  const samples: CausalSample[] = [];
   for (const log of logs) {
     const d = log.details as Record<string, unknown> | null;
     if (!d) continue;
@@ -116,145 +107,24 @@ async function estimateATE(
       for (const cf of counterfactuals) {
         const cfIntervention = classifyIntervention((cf.scenario as string) ?? '');
         samples.push({
-          scenario: (cf.scenario as string) ?? 'unknown',
-          intervention: cfIntervention,
-          originalRisk,
-          improvementPct: (cf.improvement as number) ?? 0,
-          affectedProducts: affected,
+          features: [originalRisk, affected],
           treated: true,
+          outcome: ((cf.improvement as number) ?? 0) / 100,
+          intervention: cfIntervention,
         });
       }
     } else {
-      // No intervention = control group
       samples.push({
-        scenario: 'no_intervention',
-        intervention: 'reroute', // irrelevant
-        originalRisk,
-        improvementPct: 0,
-        affectedProducts: affected,
+        features: [originalRisk, affected],
         treated: false,
+        outcome: 0,
+        intervention: 'reroute',
       });
     }
   }
 
-  // Filter treated samples for this intervention type
-  const treatedSamples = samples.filter(s => s.treated && s.intervention === intervention);
-  const controlSamples = samples.filter(s => !s.treated);
-
-  const sampleSize = treatedSamples.length + controlSamples.length;
-
-  // If insufficient data, return conservative prior estimate
-  if (sampleSize < 5) {
-    // Prior: based on domain knowledge
-    const priors: Record<InterventionType, number> = {
-      reroute: 0.25,       // rerouting typically reduces 20-30% risk
-      safety_stock: 0.35,  // safety stock reduces 30-40%
-      supplier_switch: 0.30, // supplier switch reduces 25-35%
-      combined: 0.55,      // combined interventions reduce 50-60%
-    };
-    const priorATE = priors[intervention];
-    return {
-      intervention,
-      ate: priorATE,
-      confidenceInterval: [priorATE * 0.6, priorATE * 1.3],
-      sampleSize: 0,
-      propensityScore: 0,
-      pValue: 1.0, // not statistically significant
-      explanation: `样本不足 (${sampleSize}条)，使用领域先验估计`,
-    };
-  }
-
-  // Domain priors for fallback when no treated samples match this intervention
-  const priors: Record<InterventionType, number> = {
-    reroute: 0.25, safety_stock: 0.35, supplier_switch: 0.30, combined: 0.55,
-  };
-
-  // If no treated samples for this specific intervention, return prior
-  if (treatedSamples.length === 0) {
-    const priorATE = priors[intervention];
-    return {
-      intervention,
-      ate: priorATE,
-      confidenceInterval: [priorATE * 0.6, priorATE * 1.3],
-      sampleSize,
-      propensityScore: 0,
-      pValue: 1.0,
-      explanation: `该干预类型无历史匹配 (${sampleSize}条通用样本)，使用领域先验`,
-    };
-  }
-
-  // Propensity score: probability of receiving this intervention
-  const totalTreated = samples.filter(s => s.treated).length;
-  const propensityScore = totalTreated / Math.max(samples.length, 1);
-
-  // Propensity-weighted matching: compare treated vs control at similar risk levels
-  const riskBand = currentRiskLevel * 0.3; // ±30% risk band for matching
-  const matchedTreated = treatedSamples.filter(
-    s => Math.abs(s.originalRisk - currentRiskLevel) <= riskBand || treatedSamples.length < 3,
-  );
-  const matchedControl = controlSamples.filter(
-    s => Math.abs(s.originalRisk - currentRiskLevel) <= riskBand || controlSamples.length < 3,
-  );
-
-  // Compute ATE: mean improvement in treated - mean improvement in control
-  const meanTreated = matchedTreated.length > 0
-    ? matchedTreated.reduce((s, x) => s + x.improvementPct, 0) / matchedTreated.length / 100
-    : treatedSamples.length > 0
-      ? treatedSamples.reduce((s, x) => s + x.improvementPct, 0) / treatedSamples.length / 100
-      : 0;
-
-  const meanControl = matchedControl.length > 0
-    ? matchedControl.reduce((s, x) => s + x.improvementPct, 0) / matchedControl.length / 100
-    : 0; // control group has no improvement by definition
-
-  // NaN guard: if computation yields NaN, fall back to prior
-  const rawATE = meanTreated - meanControl;
-  const ate = Number.isFinite(rawATE)
-    ? Math.min(Math.max(rawATE, 0.05), 0.85)
-    : priors[intervention];
-
-  // Confidence interval: bootstrap from treated samples
-  const improvements = (matchedTreated.length > 0 ? matchedTreated : treatedSamples)
-    .map(s => s.improvementPct / 100);
-  const sorted = [...improvements].sort((a, b) => a - b);
-  const ci_lower = sorted[Math.floor(sorted.length * 0.1)] ?? ate * 0.5;
-  const ci_upper = sorted[Math.floor(sorted.length * 0.9)] ?? ate * 1.5;
-
-  // Permutation test: shuffle treatment labels, measure how often
-  // shuffled ATE >= observed ATE
-  let permCount = 0;
-  const PERM_ITERATIONS = 100;
-  const allImprovements = samples.map(s => s.improvementPct / 100);
-  for (let i = 0; i < PERM_ITERATIONS; i++) {
-    // Fisher-Yates shuffle
-    const shuffled = [...allImprovements];
-    for (let j = shuffled.length - 1; j > 0; j--) {
-      const k = Math.floor(Math.random() * (j + 1));
-      [shuffled[j], shuffled[k]] = [shuffled[k], shuffled[j]];
-    }
-    const permTreated = shuffled.slice(0, treatedSamples.length);
-    const permControl = shuffled.slice(treatedSamples.length);
-    const permMeanTreated = permTreated.reduce((s, v) => s + v, 0) / Math.max(permTreated.length, 1);
-    const permMeanControl = permControl.reduce((s, v) => s + v, 0) / Math.max(permControl.length, 1);
-    if (permMeanTreated - permMeanControl >= ate) permCount++;
-  }
-  const pValue = permCount / PERM_ITERATIONS;
-
-  const reliable = sampleSize >= 10 && pValue < 0.1;
-  return {
-    intervention,
-    ate,
-    confidenceInterval: [
-      Math.round(ci_lower * 100) / 100,
-      Math.round(ci_upper * 100) / 100,
-    ],
-    sampleSize,
-    propensityScore: Math.round(propensityScore * 100) / 100,
-    pValue: Math.round(pValue * 1000) / 1000,
-    explanation: reliable
-      ? `基于 ${sampleSize} 条历史样本的因果估计 (p=${pValue.toFixed(3)})`
-      : `样本有限 (${sampleSize}条)，估计值仅供参考`,
-  };
+  // Use unified estimator (auto-selects DML vs PSM)
+  return estimateCausalEffect(samples, intervention, currentRiskLevel);
 }
 
 /**

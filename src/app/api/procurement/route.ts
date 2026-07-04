@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getProcurementPlan,
   getBudgetAnalysis,
@@ -12,6 +13,7 @@ import {
 // GET /api/procurement - Procurement planning API
 // Actions: plan, budget, timeline, comparison, history
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action") || "plan";
 

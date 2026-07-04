@@ -50,6 +50,7 @@ export const CONNECTOR_DEFINITIONS: { name: string; type: string }[] = [
   { name: '成本 MCP',       type: 'cost' },
   { name: '物流 MCP',       type: 'logistics' },
   { name: '销售 MCP',       type: 'sales' },
+  { name: 'Supplier API 图谱', type: 'supplier-api' },
 ];
 
 // ==================== Helpers ====================
@@ -144,3 +145,4 @@ function buildOffline(
     recordsSynced: 0,
   };
 }
+

@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import type { Permission, Role } from '@/lib/rbac';
+import type { Permission, Role } from '@/lib/auth/permissions';
 
 /**
  * Check if the current user has a specific permission.

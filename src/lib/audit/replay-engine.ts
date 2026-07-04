@@ -4,7 +4,7 @@ import { executeTool } from '@/lib/mcp/tools';
 import { getAdapter } from '@/lib/agent/adapter-factory';
 import type { ProviderId } from '@/lib/agent/adapter-factory';
 import type { ChatMessage } from '@/lib/services/ai-providers.service';
-import { SYSTEM_PROMPT } from '@/app/api/chat/chat.prompt';
+import { SYSTEM_PROMPT } from '@/lib/agent/prompts/system-prompt';
 import { extractClaims } from './trace-writer';
 
 export interface ReplayModification {

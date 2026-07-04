@@ -1,0 +1,78 @@
+﻿═══════════════════════════════════════════════════════════
+  真实 API 工具调用可靠性基准测试
+  Provider: OpenCode Go (DeepSeek V4 Pro)
+═══════════════════════════════════════════════════════════
+
+📊 测试套件概览:
+   总测试用例数: 121
+   覆盖工具数: 82 / 82
+   家族分布: {"crud":27,"operations":19,"intelligence":41,"supply-chain":24,"supplier-graph":10}
+
+⚙️  配置:
+   上游 API: https://opencode.ai/zen/go/v1
+   模型: deepseek-v4-pro
+   模式: 🔴 真实 API
+   用例限制: 全部
+   家族筛选: 全部
+   并发数: 3
+   超时: 60000ms
+
+🚀 开始运行真实 API 基准测试...
+   (每个用例约 3-10 秒，总计约 6-20 分钟)
+
+
+═══════════════════════════════════════════════════════════
+  测试结果
+═══════════════════════════════════════════════════════════
+
+📊 核心指标:
+   成功率: 80.2% (97/121)
+   平均延迟: 2697ms
+   P50 延迟: 2542ms
+   P95 延迟: 3757ms
+   最小/最大延迟: 1899ms / 5723ms
+   总耗时: 1分49秒
+
+❌ 失败模式分布:
+   UNKNOWN: 15 (62.5%)
+   WRONG_TOOL: 7 (29.2%)
+   PARAM_MISMATCH: 2 (8.3%)
+
+📝 失败用例详情:
+   • op-reorder-002: PARAM_MISMATCH — 参数不匹配: ; 不应出现的参数: priority
+   • op-batch-001: UNKNOWN — 未知失败原因
+   • op-transfer-001: WRONG_TOOL — LLM 选择了 query_inventory，期望 create_transfer
+   • intel-analytics-004: WRONG_TOOL — LLM 选择了 query_sales，期望 query_analytics
+   • intel-fin-001: UNKNOWN — 未知失败原因
+   • intel-sentiment-001: PARAM_MISMATCH — 参数不匹配: action(期望:"full", 实际:"quick", 原因:wrong_value)
+   • intel-cascade-001: WRONG_TOOL — LLM 选择了 query_port_congestion，期望 query_cascade_risk
+   • intel-cascade-003: WRONG_TOOL — LLM 选择了 query_weather，期望 query_cascade_risk
+   • intel-decision-001: WRONG_TOOL — LLM 选择了 query_dashboard，期望 query_decision_graph
+   • intel-wf-002: WRONG_TOOL — LLM 选择了 query_exchange_rates，期望 execute_workflow
+   • intel-tariff-003: WRONG_TOOL — LLM 选择了 run_sandbox，期望 query_tariff
+   • intel-arb-001: UNKNOWN — 未知失败原因
+   • intel-disc-001: UNKNOWN — 未知失败原因
+   • sc-abc-001: UNKNOWN — 未知失败原因
+   • sc-forecast-001: UNKNOWN — 未知失败原因
+   • sc-seasonal-001: UNKNOWN — 未知失败原因
+   • sc-ww-001: UNKNOWN — 未知失败原因
+   • sc-drp-001: UNKNOWN — 未知失败原因
+   • sc-wh-001: UNKNOWN — 未知失败原因
+   • sc-route-001: UNKNOWN — 未知失败原因
+   • sc-lt-001: UNKNOWN — 未知失败原因
+   • sc-score-001: UNKNOWN — 未知失败原因
+   • sc-jrp-001: UNKNOWN — 未知失败原因
+   • sc-fa-001: UNKNOWN — 未知失败原因
+
+💡 改进建议:
+   • WRONG_TOOL (7次): 改进工具描述，增加区分性关键词。考虑在 system prompt 中添加工具选择示例（few-shot）。
+   • PARAM_MISMATCH (2次): 工具正确但参数值与期望不符。检查 LLM 是否正确理解了用户输入中的数值/名称，可能需要在 prompt 中强化信息提取。
+
+📁 报告已生成:
+   JSON: D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3\tests\reliability\reports\real-benchmark-deepseek-v4-pro-2026-06-18T15-55-51-522Z.json
+   Markdown: D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3\tests\reliability\reports\real-benchmark-deepseek-v4-pro-2026-06-18T15-55-51-522Z.md
+
+🎯 SLO 评估:
+   工具调用成功率 ≥ 95%: ❌ 未达标 (80.2%)
+   P95 延迟 ≤ 8s: ✅ 达标 (3757ms)
+

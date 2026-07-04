@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler, apiSuccess, apiError } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getEvents, createEvent, markEventRead, markAllEventsRead } from "@/lib/queries/events.queries";
 import { createAuditLog } from "@/lib/services/audit.service";
 
 // GET /api/events - List supply chain events
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type") || undefined;
   const unreadOnly = searchParams.get("unreadOnly") === "true";
@@ -23,6 +25,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
 // POST /api/events - Create a new supply chain event
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { type, title, description, icon, color, severity, sku } = body;
 
@@ -49,6 +52,7 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
 
 // PUT /api/events - Mark events as read
 export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { eventIds, markAllRead } = body;
 

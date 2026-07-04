@@ -1,0 +1,59 @@
+﻿═══════════════════════════════════════════════════════════
+  真实 API 工具调用可靠性基准测试
+  Provider: OpenCode Go (DeepSeek V4 Pro)
+═══════════════════════════════════════════════════════════
+
+📊 测试套件概览:
+   总测试用例数: 121
+   覆盖工具数: 82 / 82
+   家族分布: {"crud":27,"operations":19,"intelligence":41,"supply-chain":24,"supplier-graph":10}
+
+⚙️  配置:
+   上游 API: https://opencode.ai/zen/go/v1
+   模型: deepseek-v4-pro
+   模式: 🔴 真实 API
+   用例限制: 全部
+   家族筛选: 全部
+   并发数: 3
+   超时: 60000ms
+
+🚀 开始运行真实 API 基准测试...
+   (每个用例约 3-10 秒，总计约 6-20 分钟)
+
+
+═══════════════════════════════════════════════════════════
+  测试结果
+═══════════════════════════════════════════════════════════
+
+📊 核心指标:
+   成功率: 95% (115/121)
+   平均延迟: 3009ms
+   P50 延迟: 2923ms
+   P95 延迟: 4092ms
+   最小/最大延迟: 1969ms / 4483ms
+   总耗时: 2分2秒
+
+❌ 失败模式分布:
+   WRONG_TOOL: 5 (83.3%)
+   PARAM_MISMATCH: 1 (16.7%)
+
+📝 失败用例详情:
+   • op-transfer-001: WRONG_TOOL — LLM 选择了 query_inventory，期望 create_transfer
+   • op-note-002: PARAM_MISMATCH — 参数不匹配: content(期望:"本周五盘点深圳仓", 实际:"本周五进行深圳仓盘点", 原因:wrong_value)
+   • intel-analytics-004: WRONG_TOOL — LLM 选择了 query_sales，期望 query_analytics
+   • intel-cascade-001: WRONG_TOOL — LLM 选择了 query_port_congestion，期望 query_cascade_risk
+   • intel-cascade-003: WRONG_TOOL — LLM 选择了 query_weather，期望 query_cascade_risk
+   • intel-decision-001: WRONG_TOOL — LLM 选择了 query_inventory，期望 query_decision_graph
+
+💡 改进建议:
+   • WRONG_TOOL (5次): 改进工具描述，增加区分性关键词。考虑在 system prompt 中添加工具选择示例（few-shot）。
+   • PARAM_MISMATCH (1次): 工具正确但参数值与期望不符。检查 LLM 是否正确理解了用户输入中的数值/名称，可能需要在 prompt 中强化信息提取。
+
+📁 报告已生成:
+   JSON: D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3\tests\reliability\reports\real-benchmark-deepseek-v4-pro-2026-06-18T16-07-37-171Z.json
+   Markdown: D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3\tests\reliability\reports\real-benchmark-deepseek-v4-pro-2026-06-18T16-07-37-171Z.md
+
+🎯 SLO 评估:
+   工具调用成功率 ≥ 95%: ✅ 达标 (95%)
+   P95 延迟 ≤ 8s: ✅ 达标 (4092ms)
+

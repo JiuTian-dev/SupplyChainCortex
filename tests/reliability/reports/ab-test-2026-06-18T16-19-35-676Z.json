@@ -1,0 +1,280 @@
+{
+  "generatedAt": "2026-06-18T16:19:35.677Z",
+  "model": "deepseek-v4-pro",
+  "strategyA": {
+    "generatedAt": "2026-06-18T16:19:28.478Z",
+    "config": {
+      "provider": "deepseek",
+      "limit": 6,
+      "outputDir": "./tests/reliability/reports",
+      "concurrency": 2,
+      "maxRetries": 1,
+      "realApi": true,
+      "timeoutMs": 60000
+    },
+    "stats": {
+      "provider": "deepseek",
+      "totalCases": 6,
+      "passed": 6,
+      "failed": 0,
+      "successRate": 100,
+      "avgLatencyMs": 2799,
+      "minLatencyMs": 2257,
+      "maxLatencyMs": 3492,
+      "p50LatencyMs": 2868,
+      "p95LatencyMs": 3492,
+      "failureDistribution": {
+        "totalFailures": 0,
+        "byCategory": {
+          "TOOL_NOT_FOUND": 0,
+          "WRONG_TOOL": 0,
+          "MISSING_REQUIRED_PARAM": 0,
+          "INVALID_TYPE": 0,
+          "INVALID_ENUM": 0,
+          "HALLUCINATED_PARAM": 0,
+          "JSON_PARSE_ERROR": 0,
+          "NO_TOOL_CALL": 0,
+          "PARAM_MISMATCH": 0,
+          "EMPTY_REQUIRED_PARAM": 0,
+          "NETWORK_ERROR": 0,
+          "UNKNOWN": 0
+        },
+        "byCategoryPct": {
+          "TOOL_NOT_FOUND": 0,
+          "WRONG_TOOL": 0,
+          "MISSING_REQUIRED_PARAM": 0,
+          "INVALID_TYPE": 0,
+          "INVALID_ENUM": 0,
+          "HALLUCINATED_PARAM": 0,
+          "JSON_PARSE_ERROR": 0,
+          "NO_TOOL_CALL": 0,
+          "PARAM_MISMATCH": 0,
+          "EMPTY_REQUIRED_PARAM": 0,
+          "NETWORK_ERROR": 0,
+          "UNKNOWN": 0
+        },
+        "byFamily": {},
+        "byDifficulty": {},
+        "dominantCategory": null
+      },
+      "failureRecords": [],
+      "caseResults": [
+        {
+          "caseId": "crud-inv-001",
+          "passed": true,
+          "latencyMs": 3492
+        },
+        {
+          "caseId": "crud-inv-002",
+          "passed": true,
+          "latencyMs": 3443
+        },
+        {
+          "caseId": "crud-inv-003",
+          "passed": true,
+          "latencyMs": 2868
+        },
+        {
+          "caseId": "crud-inv-004",
+          "passed": true,
+          "latencyMs": 2429
+        },
+        {
+          "caseId": "crud-inv-005",
+          "passed": true,
+          "latencyMs": 2305
+        },
+        {
+          "caseId": "crud-cost-001",
+          "passed": true,
+          "latencyMs": 2257
+        }
+      ],
+      "durationMs": 8574
+    },
+    "suggestions": [],
+    "failureReport": "## 失败模式分析报告\n\n**总失败数**: 0\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|"
+  },
+  "strategyB": {
+    "generatedAt": "2026-06-18T16:19:35.675Z",
+    "config": {
+      "provider": "deepseek",
+      "limit": 6,
+      "outputDir": "./tests/reliability/reports",
+      "concurrency": 2,
+      "maxRetries": 1,
+      "realApi": true,
+      "timeoutMs": 60000
+    },
+    "stats": {
+      "provider": "deepseek",
+      "totalCases": 6,
+      "passed": 6,
+      "failed": 0,
+      "successRate": 100,
+      "avgLatencyMs": 2241,
+      "minLatencyMs": 1842,
+      "maxLatencyMs": 2719,
+      "p50LatencyMs": 2516,
+      "p95LatencyMs": 2719,
+      "failureDistribution": {
+        "totalFailures": 0,
+        "byCategory": {
+          "TOOL_NOT_FOUND": 0,
+          "WRONG_TOOL": 0,
+          "MISSING_REQUIRED_PARAM": 0,
+          "INVALID_TYPE": 0,
+          "INVALID_ENUM": 0,
+          "HALLUCINATED_PARAM": 0,
+          "JSON_PARSE_ERROR": 0,
+          "NO_TOOL_CALL": 0,
+          "PARAM_MISMATCH": 0,
+          "EMPTY_REQUIRED_PARAM": 0,
+          "NETWORK_ERROR": 0,
+          "UNKNOWN": 0
+        },
+        "byCategoryPct": {
+          "TOOL_NOT_FOUND": 0,
+          "WRONG_TOOL": 0,
+          "MISSING_REQUIRED_PARAM": 0,
+          "INVALID_TYPE": 0,
+          "INVALID_ENUM": 0,
+          "HALLUCINATED_PARAM": 0,
+          "JSON_PARSE_ERROR": 0,
+          "NO_TOOL_CALL": 0,
+          "PARAM_MISMATCH": 0,
+          "EMPTY_REQUIRED_PARAM": 0,
+          "NETWORK_ERROR": 0,
+          "UNKNOWN": 0
+        },
+        "byFamily": {},
+        "byDifficulty": {},
+        "dominantCategory": null
+      },
+      "failureRecords": [],
+      "caseResults": [
+        {
+          "caseId": "crud-inv-001",
+          "passed": true,
+          "latencyMs": 1842
+        },
+        {
+          "caseId": "crud-inv-002",
+          "passed": true,
+          "latencyMs": 2567
+        },
+        {
+          "caseId": "crud-inv-003",
+          "passed": true,
+          "latencyMs": 2516
+        },
+        {
+          "caseId": "crud-inv-004",
+          "passed": true,
+          "latencyMs": 2719
+        },
+        {
+          "caseId": "crud-inv-005",
+          "passed": true,
+          "latencyMs": 1893
+        },
+        {
+          "caseId": "crud-cost-001",
+          "passed": true,
+          "latencyMs": 1908
+        }
+      ],
+      "durationMs": 7195
+    },
+    "suggestions": [],
+    "failureReport": "## 失败模式分析报告\n\n**总失败数**: 0\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|"
+  },
+  "routingLog": [
+    {
+      "userInput": "帮我查一下 KA-RC4001 的库存情况",
+      "classifiedFamily": "crud",
+      "toolCount": 11
+    },
+    {
+      "userInput": "深圳仓现在的库存概览是什么样的",
+      "classifiedFamily": "crud",
+      "toolCount": 11
+    },
+    {
+      "userInput": "哪些产品有缺货风险？给我看下风险分析",
+      "classifiedFamily": "crud",
+      "toolCount": 11
+    },
+    {
+      "userInput": "厨房电器品类有哪些滞销品？超过120天的",
+      "classifiedFamily": "crud",
+      "toolCount": 11
+    },
+    {
+      "userInput": "未来14天库存预测",
+      "classifiedFamily": "crud",
+      "toolCount": 11
+    },
+    {
+      "userInput": "KA-RC4001 的成本分解详情",
+      "classifiedFamily": "crud",
+      "toolCount": 11
+    }
+  ],
+  "deltaSuccessRate": 0,
+  "deltaP95Latency": -773,
+  "perFamilyComparison": [
+    {
+      "family": "crud",
+      "aPassed": 6,
+      "aTotal": 6,
+      "aSuccessRate": 100,
+      "bPassed": 6,
+      "bTotal": 6,
+      "bSuccessRate": 100,
+      "delta": 0
+    },
+    {
+      "family": "operations",
+      "aPassed": 0,
+      "aTotal": 0,
+      "aSuccessRate": 0,
+      "bPassed": 0,
+      "bTotal": 0,
+      "bSuccessRate": 0,
+      "delta": 0
+    },
+    {
+      "family": "intelligence",
+      "aPassed": 0,
+      "aTotal": 0,
+      "aSuccessRate": 0,
+      "bPassed": 0,
+      "bTotal": 0,
+      "bSuccessRate": 0,
+      "delta": 0
+    },
+    {
+      "family": "supply-chain",
+      "aPassed": 0,
+      "aTotal": 0,
+      "aSuccessRate": 0,
+      "bPassed": 0,
+      "bTotal": 0,
+      "bSuccessRate": 0,
+      "delta": 0
+    },
+    {
+      "family": "supplier-graph",
+      "aPassed": 0,
+      "aTotal": 0,
+      "aSuccessRate": 0,
+      "bPassed": 0,
+      "bTotal": 0,
+      "bSuccessRate": 0,
+      "delta": 0
+    }
+  ],
+  "flippedCases": [],
+  "summary": "两策略成功率持平：改善 0 例，回退 0 例（净变化 0）"
+}

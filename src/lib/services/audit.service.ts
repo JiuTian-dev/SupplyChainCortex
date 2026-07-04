@@ -1,8 +1,16 @@
 /**
  * Audit Service - Centralized audit logging for all operations
+ *
+ * Phase 1: Cryptographic audit trail — hash chain + HMAC signature.
+ * EU AI Act Article 12 compliant: automatic recording with tamper evidence.
  */
 import { db } from '@/lib/db';
 import { NextRequest } from 'next/server';
+import {
+  computeAuditContentHash,
+  signContentHash,
+  getLastAuditHash,
+} from '@/lib/audit/crypto-trail';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'EXPORT' | 'ADJUST' | 'TRANSFER' | 'RATE' | 'SIMULATE' | 'RESOLVE';
 export type AuditEntity = 'product' | 'inventory' | 'shipment' | 'note' | 'supplier' | 'reorder' | 'alert_rule' | 'cost' | 'forecast' | 'event' | 'notification' | 'warehouse';
@@ -19,8 +27,29 @@ export interface CreateAuditLogParams {
   request?: NextRequest; // Optional: extract IP and user agent
 }
 
-/** Create an audit log entry */
+/** Create an audit log entry with cryptographic hash chain */
 export async function createAuditLog(params: CreateAuditLogParams) {
+  const previousHash = await getLastAuditHash();
+  const createdAt = new Date();
+
+  const contentHash = computeAuditContentHash({
+    id: 'pending', // id not known yet, will be replaced by DB
+    action: params.action,
+    entity: params.entity,
+    entityId: params.entityId,
+    sku: params.sku,
+    userId: params.userId || 'system',
+    userName: params.userName || '系统用户',
+    details: params.details,
+    ipAddress: params.request?.headers?.get('x-forwarded-for') || null,
+    userAgent: params.request?.headers?.get('user-agent')?.substring(0, 255) || null,
+    severity: params.severity || 'info',
+    createdAt,
+    previousHash,
+  });
+
+  const signature = signContentHash(contentHash);
+
   return db.auditLog.create({
     data: {
       action: params.action,
@@ -33,6 +62,9 @@ export async function createAuditLog(params: CreateAuditLogParams) {
       ipAddress: params.request?.headers?.get('x-forwarded-for') || null,
       userAgent: params.request?.headers?.get('user-agent')?.substring(0, 255) || null,
       severity: params.severity || 'info',
+      previousHash,
+      contentHash,
+      signature,
     },
   });
 }

@@ -20,6 +20,12 @@ export class PostgresCacheBackend implements ICacheBackend {
   private maxSize: number;
   readonly backendType = 'postgres' as const;
 
+  // Cached stats — stats() is sync but PG queries are async, so we return the
+  // last statsAsync() result and refresh it in the background periodically.
+  private cachedStats: CacheStats = { size: 0, keys: [], hitCounts: {} };
+  private cachedStatsAt = 0;
+  private static readonly STATS_TTL_MS = 5000; // refresh at most every 5s
+
   constructor(maxSize = 500) {
     this.maxSize = maxSize;
   }
@@ -128,8 +134,20 @@ export class PostgresCacheBackend implements ICacheBackend {
   }
 
   stats(): CacheStats {
-    // Sync stub — use statsAsync() for real data
-    return { size: 0, keys: [], hitCounts: {} };
+    // Return the last cached statsAsync() result; refresh in the background if stale.
+    // This preserves the sync interface while providing real data (max staleness = STATS_TTL_MS).
+    if (Date.now() - this.cachedStatsAt > PostgresCacheBackend.STATS_TTL_MS) {
+      this.refreshStats();
+    }
+    return this.cachedStats;
+  }
+
+  private refreshStats(): void {
+    // Throttle: reset timestamp immediately to prevent re-entrant refreshes.
+    this.cachedStatsAt = Date.now();
+    this.statsAsync()
+      .then(s => { this.cachedStats = s; })
+      .catch(e => console.warn(TAG, 'refreshStats failed:', String(e)));
   }
 
   async statsAsync(): Promise<CacheStats> {

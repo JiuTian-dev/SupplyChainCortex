@@ -5,18 +5,18 @@ import { getUsers, createUser, updateUser, changePassword, getUserById } from '@
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import type { Role } from '@/lib/rbac';
+import type { Role } from '@/lib/auth/permissions';
 
 const createUserSchema = z.object({
   email: z.string().email('邮箱格式无效'),
   name: z.string().min(1, '姓名不能为空').max(50),
   password: z.string().min(6, '密码至少6位'),
-  role: z.enum(['admin', 'manager', 'viewer']).default('viewer'),
+  role: z.enum(['org_admin', 'team_admin', 'member', 'viewer']).default('viewer'),
 });
 
 const updateUserSchema = z.object({
   name: z.string().min(1).max(50).optional(),
-  role: z.enum(['admin', 'manager', 'viewer']).optional(),
+  role: z.enum(['org_admin', 'team_admin', 'member', 'viewer']).optional(),
   isActive: z.boolean().optional(),
   avatar: z.string().optional(),
 });

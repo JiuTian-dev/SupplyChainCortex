@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getWarehouseOverview,
   getWarehouseCapacity,
@@ -15,6 +16,7 @@ import { createAuditLog } from "@/lib/services/audit.service";
 
 // GET /api/warehouse - Warehouse analytics and stats
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action") || "overview";
   const warehouse = searchParams.get("warehouse") || undefined;
@@ -63,6 +65,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
 // POST /api/warehouse - Transfer stock between zones/warehouses
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action") || "transfer";
 

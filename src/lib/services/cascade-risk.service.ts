@@ -20,7 +20,8 @@ export {
 export {
   backtest,
   getCascadeRisk,
+  runModelValidation,
   buildCounterfactualAuditSnapshot,
   buildPassportAlternatives,
-} from './cascade-risk.main';
+} from './cascade-risk/index';
 export { runCounterfactual, runCausalCounterfactual, sensitivityAnalysis, boundaryTest } from './cascade-risk.validation';

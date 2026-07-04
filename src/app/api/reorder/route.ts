@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { getReorderOrders, createReorderOrder, updateReorderOrder } from "@/lib/queries/reorder.queries";
 import { createAuditLog } from "@/lib/services/audit.service";
 
 // GET /api/reorder - List all reorder orders
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || undefined;
 
@@ -16,6 +18,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 
 // POST /api/reorder - Create a new reorder order
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { sku, productName, quantity, warehouse, priority, notes } = body;
 
@@ -49,6 +52,7 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
 
 // PUT /api/reorder - Update reorder order status
 export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { id, status } = body;
 

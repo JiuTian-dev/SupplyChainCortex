@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAuditLog } from '@/lib/services/audit.service';
 import { withErrorHandler, apiSuccess, apiError, AppError } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getNotes,
   createNote,
@@ -18,6 +19,7 @@ import {
 import type { NoteListFilters, CreateNoteData, UpdateNoteData } from '@/lib/services/notes.service';
 
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const sku = searchParams.get('sku');
   const category = searchParams.get('category');
@@ -48,6 +50,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
 }));
 
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { sku, author, content, category, priority } = body;
 
@@ -88,6 +91,7 @@ export const POST = withApiRateLimit(withErrorHandler(async (request: NextReques
 }));
 
 export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json();
   const { id, content, priority, isResolved } = body;
 
@@ -131,6 +135,7 @@ export const PUT = withApiRateLimit(withErrorHandler(async (request: NextRequest
 }));
 
 export const DELETE = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 

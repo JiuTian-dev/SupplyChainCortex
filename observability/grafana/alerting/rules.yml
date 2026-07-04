@@ -1,0 +1,150 @@
+# SupplyChain Cortex — Prometheus Alerting Rules
+#
+# Loaded by Prometheus via `rule_files` and forwarded to Alertmanager.
+# Severity conventions:
+#   - critical: page on-call (SLO breach / outage)
+#   - warning:  investigate during business hours (approaching SLO breach)
+#
+# SLO reference (see observability/slo/definitions.yml):
+#   - Availability:            99.5%  (30d)
+#   - Tool call success rate:  95%
+#   - Tool call P95 latency:   < 8s
+
+groups:
+  - name: supply-chain-cortex.tools
+    interval: 30s
+    rules:
+      - alert: ToolCallFailureRate
+        expr: |
+          (
+            sum(rate(tool_calls_total{status!="success"}[5m]))
+            / clamp_min(sum(rate(tool_calls_total[5m])), 1e-9)
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+          service: supply-chain-cortex
+          slo: tool-success-rate
+        annotations:
+          summary: "Tool call failure rate exceeds 10% (5m window)"
+          description: |
+            Tool call failure rate is {{ $value | humanizePercentage }} over the
+            last 5 minutes, exceeding the 10% threshold. SLO target is 95% success.
+          runbook_url: "https://wiki.internal/scc/runbooks/tool-call-failures"
+
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, tool) (rate(tool_call_duration_seconds_bucket[5m]))
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: supply-chain-cortex
+          slo: tool-p95-latency
+        annotations:
+          summary: "Tool call P95 latency exceeds 10s ({{ $labels.tool }})"
+          description: |
+            P95 latency for tool {{ $labels.tool }} is {{ $value | humanizeDuration }}
+            over the last 5 minutes. SLO target is < 8s; alert threshold is 10s.
+          runbook_url: "https://wiki.internal/scc/runbooks/tool-latency"
+
+  - name: supply-chain-cortex.providers
+    interval: 30s
+    rules:
+      - alert: ProviderDown
+        expr: |
+          (
+            sum by (provider) (rate(provider_requests_total{status="success"}[2m]))
+            / clamp_min(sum by (provider) (rate(provider_requests_total[2m])), 1e-9)
+          ) < 0.80
+        for: 2m
+        labels:
+          severity: critical
+          service: supply-chain-cortex
+          component: llm-provider
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} success rate < 80%"
+          description: |
+            Provider {{ $labels.provider }} success rate is
+            {{ $value | humanizePercentage }} over the last 2 minutes.
+            Investigate provider status / API key / rate limits.
+          runbook_url: "https://wiki.internal/scc/runbooks/provider-down"
+
+  - name: supply-chain-cortex.tenants
+    interval: 30s
+    rules:
+      - alert: TenantQuotaExceeded
+        expr: tenant_quota_usage > 95
+        for: 5m
+        labels:
+          severity: warning
+          service: supply-chain-cortex
+          component: billing
+        annotations:
+          summary: "Tenant {{ $labels.tenant }} quota usage > 95% ({{ $labels.resource }})"
+          description: |
+            Tenant {{ $labels.tenant }} is using {{ $value }}% of its
+            {{ $labels.resource }} quota. Notify customer and consider upgrade.
+          runbook_url: "https://wiki.internal/scc/runbooks/quota-exceeded"
+
+  - name: supply-chain-cortex.billing
+    interval: 30s
+    rules:
+      - alert: StripeWebhookFailures
+        expr: sum by (event_type) (increase(stripe_webhook_events_total{status!="success"}[10m])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          service: supply-chain-cortex
+          component: billing
+        annotations:
+          summary: "Stripe webhook failures for {{ $labels.event_type }} > 3 in 10m"
+          description: |
+            {{ $value }} failed Stripe webhook events of type {{ $labels.event_type }}
+            in the last 10 minutes. Check Stripe dashboard + webhook handler logs.
+          runbook_url: "https://wiki.internal/scc/runbooks/stripe-webhooks"
+
+  - name: supply-chain-cortex.cascade-risk
+    interval: 30s
+    rules:
+      - alert: CascadeRiskComputationSlow
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(cascade_risk_computation_duration_seconds_bucket[5m]))
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: supply-chain-cortex
+          component: risk-engine
+        annotations:
+          summary: "Cascade risk computation P95 > 30s"
+          description: |
+            P95 cascade risk computation duration is {{ $value | humanizeDuration }}.
+            Consider optimizing the propagation graph or scaling the Python bridge.
+          runbook_url: "https://wiki.internal/scc/runbooks/cascade-risk-slow"
+
+  - name: supply-chain-cortex.slo
+    interval: 30s
+    rules:
+      - alert: HighErrorBudgetBurn
+        expr: |
+          (
+            sum(rate(tool_calls_total{status!="success"}[1h]))
+            / clamp_min(sum(rate(tool_calls_total[1h])), 1e-9)
+          ) / 0.05 > 2
+        for: 10m
+        labels:
+          severity: critical
+          service: supply-chain-cortex
+          slo: error-budget
+        annotations:
+          summary: "Error budget burn rate > 2x (1h window)"
+          description: |
+            Error budget is burning at {{ $value }}x the sustainable rate over
+            the last hour. At this pace the 30-day SLO will be exhausted soon.
+            See SLA dashboard for remaining budget.
+          runbook_url: "https://wiki.internal/scc/runbooks/error-budget-burn"

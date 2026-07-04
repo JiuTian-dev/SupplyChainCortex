@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-06-18T14:39:52.595Z",
+  "config": {
+    "provider": "deepseek",
+    "limit": 5,
+    "outputDir": "./tests/reliability/reports",
+    "concurrency": 2,
+    "maxRetries": 1,
+    "realApi": true,
+    "timeoutMs": 60000
+  },
+  "stats": {
+    "provider": "deepseek",
+    "totalCases": 5,
+    "passed": 5,
+    "failed": 0,
+    "successRate": 100,
+    "avgLatencyMs": 3206,
+    "minLatencyMs": 2190,
+    "maxLatencyMs": 4349,
+    "p50LatencyMs": 2735,
+    "p95LatencyMs": 4349,
+    "failureDistribution": {
+      "totalFailures": 0,
+      "byCategory": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 0,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 0,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byCategoryPct": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 0,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 0,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byFamily": {},
+      "byDifficulty": {},
+      "dominantCategory": null
+    },
+    "failureRecords": [],
+    "caseResults": [
+      {
+        "caseId": "crud-inv-001",
+        "passed": true,
+        "latencyMs": 4349
+      },
+      {
+        "caseId": "crud-inv-002",
+        "passed": true,
+        "latencyMs": 4161
+      },
+      {
+        "caseId": "crud-inv-003",
+        "passed": true,
+        "latencyMs": 2735
+      },
+      {
+        "caseId": "crud-inv-004",
+        "passed": true,
+        "latencyMs": 2597
+      },
+      {
+        "caseId": "crud-inv-005",
+        "passed": true,
+        "latencyMs": 2190
+      }
+    ],
+    "durationMs": 9091
+  },
+  "suggestions": [],
+  "failureReport": "## 失败模式分析报告\n\n**总失败数**: 0\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|"
+}

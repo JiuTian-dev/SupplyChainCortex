@@ -2,6 +2,11 @@
 import { db } from '@/lib/db';
 import type { FSMContext, ToolResult } from '@/lib/agent/fsm-types';
 import type { DecisionPassport } from '@/lib/engine/passport';
+import {
+  computeTraceContentHash,
+  signContentHash,
+  getLastTraceHash,
+} from './crypto-trail';
 
 export function extractClaims(
   text: string,
@@ -54,6 +59,39 @@ export async function writeTrace(
       ? ctx.history.slice(-4).map(m => `${m.role}: ${m.content?.slice(0, 80)}`).join(' | ')
       : null;
 
+    const previousHash = await getLastTraceHash();
+    const createdAt = new Date();
+
+    const contentHash = computeTraceContentHash({
+      id: 'pending',
+      auditId: passport.auditId,
+      userQuery: ctx.query,
+      intent: ctx.routing?.intent || 'unknown',
+      confidence: passport.confidence,
+      mode: 'fsm-v2',
+      tier: ctx.routing ? (ctx.routing.shouldUseTools ? 1 : ctx.routing.shouldSearch ? 3 : 0) : 0,
+      durationMs: elapsed,
+      toolsUsed: [...new Set(ctx.toolsUsed)],
+      claimsCount: claims.length,
+      passport: {
+        auditId: passport.auditId,
+        generatedAt: passport.generatedAt,
+        engine: passport.engine,
+        confidence: passport.confidence,
+        ruleVersion: passport.ruleVersion,
+        dataProvenance: passport.dataProvenance,
+        alternatives: passport.alternatives,
+        trace: passport.trace,
+        warnings: passport.warnings,
+      },
+      userId: undefined,
+      summary: historySummary || undefined,
+      createdAt,
+      previousHash,
+    });
+
+    const signature = signContentHash(contentHash);
+
     const trace = await db.decisionTrace.create({
       data: {
         auditId: passport.auditId,
@@ -77,6 +115,9 @@ export async function writeTrace(
           trace: passport.trace,
           warnings: passport.warnings,
         })),
+        previousHash,
+        contentHash,
+        signature,
         steps: {
           create: buildStepData(ctx, claims, passport, elapsed),
         },

@@ -4,7 +4,7 @@
 
 ## 项目概要
 
-小家电跨境供应链决策智能平台。Next.js 16 App Router 单页应用，9 个业务标签页，61 个 MCP 工具，6 层决策智能架构。
+小家电跨境供应链决策智能平台。Next.js 16 App Router 单页应用，9 个业务标签页，82 个 MCP 工具，6 层决策智能架构。
 
 ## 技术栈
 
@@ -18,7 +18,7 @@
 | 数学引擎 | Python 3 + NumPy（24 个 OR 模型，通过 `mcp-server/bridge.py` 调用） |
 | 搜索 | SearXNG 自托管 + 多源并行竞速 |
 | 实时 | SSE（替代 WebSocket） |
-| 测试 | Vitest 4（647 测试）+ Playwright |
+| 测试 | Vitest 4（748 测试）+ Playwright |
 
 ## 关键目录
 
@@ -50,7 +50,7 @@ docker compose up -d postgres          # 数据库
 bun run dev                           # 开发服务器
 
 # 代码质量
-bun run test                          # 647 tests
+bun run test                          # 748 tests
 npx tsc --noEmit                      # 类型检查（当前有 node_modules 类型兼容问题）
 bun run lint                          # ESLint
 

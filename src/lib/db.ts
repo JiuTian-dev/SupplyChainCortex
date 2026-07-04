@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { applyTenantExtension } from '@/lib/tenant/prisma-extension'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -12,7 +13,7 @@ function buildDatabaseUrl(): string {
   return `${base}${sep}connection_limit=${limit}`;
 }
 
-export const db =
+const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.DEBUG_PRISMA === '1' ? ['query', 'error', 'warn'] : ['error'],
@@ -23,4 +24,6 @@ export const db =
     },
   })
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+export const db = applyTenantExtension(prisma)
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

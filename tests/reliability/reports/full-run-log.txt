@@ -1,0 +1,76 @@
+﻿═══════════════════════════════════════════════════════════
+  真实 API 工具调用可靠性基准测试
+  Provider: OpenCode Go (DeepSeek V4 Pro)
+═══════════════════════════════════════════════════════════
+
+📊 测试套件概览:
+   总测试用例数: 121
+   覆盖工具数: 82 / 82
+   家族分布: {"crud":27,"operations":19,"intelligence":41,"supply-chain":24,"supplier-graph":10}
+
+⚙️  配置:
+   上游 API: https://opencode.ai/zen/go/v1
+   模型: deepseek-v4-pro
+   模式: 🔴 真实 API
+   用例限制: 全部
+   家族筛选: 全部
+   并发数: 3
+   超时: 60000ms
+
+🚀 开始运行真实 API 基准测试...
+   (每个用例约 3-10 秒，总计约 6-20 分钟)
+
+
+═══════════════════════════════════════════════════════════
+  测试结果
+═══════════════════════════════════════════════════════════
+
+📊 核心指标:
+   成功率: 82.6% (100/121)
+   平均延迟: 2748ms
+   P50 延迟: 2619ms
+   P95 延迟: 3733ms
+   最小/最大延迟: 1884ms / 4928ms
+   总耗时: 1分51秒
+
+❌ 失败模式分布:
+   WRONG_TOOL: 10 (47.6%)
+   PARAM_MISMATCH: 10 (47.6%)
+   INVALID_TYPE: 1 (4.8%)
+
+📝 失败用例详情:
+   • crud-cost-002: PARAM_MISMATCH — 参数不匹配: action(期望:"optimization", 实际:"overview", 原因:wrong_value)
+   • crud-sup-001: WRONG_TOOL — LLM 选择了 query_supplier_location，期望 query_suppliers
+   • crud-sup-002: PARAM_MISMATCH — 参数不匹配: action(期望:"performance", 实际:"list", 原因:wrong_value)
+   • op-batch-001: PARAM_MISMATCH — 参数不匹配: items(期望:[{"sku":"KA-RC4001","productName":"智能电饭煲","quantity":100,"warehouse":"深圳仓"},{"sku":"KB-VS2002","productN
+   • op-note-002: PARAM_MISMATCH — 参数不匹配: content(期望:"本周五盘点深圳仓", 实际:"本周五进行深圳仓全面盘点，请提前做好库存整理和人员安排。", 原因:wrong_value); 不应出现的参数: category, priority
+   • intel-analytics-001: WRONG_TOOL — LLM 选择了 query_suppliers，期望 query_analytics
+   • intel-analytics-002: WRONG_TOOL — LLM 选择了 query_cost，期望 query_analytics
+   • intel-analytics-004: WRONG_TOOL — LLM 选择了 query_sales，期望 query_analytics
+   • intel-fin-001: PARAM_MISMATCH — 参数不匹配: symbols(期望:["QQQ","SMH"], 实际:["QQQ","SMH","^IXIC"], 原因:wrong_value)
+   • intel-cascade-002: WRONG_TOOL — LLM 选择了 query_exchange_rates，期望 query_cascade_risk
+   • intel-cascade-003: WRONG_TOOL — LLM 选择了 query_weather，期望 query_cascade_risk
+   • intel-decision-001: WRONG_TOOL — LLM 选择了 query_dashboard，期望 query_decision_graph
+   • intel-decision-002: WRONG_TOOL — LLM 选择了 query_dashboard，期望 query_decision_graph
+   • intel-wf-001: WRONG_TOOL — LLM 选择了 query_dashboard，期望 execute_workflow
+   • intel-wf-002: WRONG_TOOL — LLM 选择了 query_exchange_rates，期望 execute_workflow
+   • intel-arb-001: PARAM_MISMATCH — 参数不匹配: product_description(期望:"便携榨汁杯300ml USB充电", 实际:"便携榨汁杯 300ml USB充电", 原因:wrong_value)
+   • intel-disc-001: PARAM_MISMATCH — 参数不匹配: product_description(期望:"蓝牙音箱便携防水", 实际:"蓝牙音箱 便携防水", 原因:wrong_value)
+   • sc-forecast-001: INVALID_TYPE — 参数 "demand_history" 类型错误: 期望 string, 实际 array
+   • sc-ww-001: PARAM_MISMATCH — 参数不匹配: demands(期望:"[100,200,150,80,120]", 实际:"[100, 200, 150, 80, 120]", 原因:wrong_value)
+   • sc-drp-001: PARAM_MISMATCH — 参数不匹配: scheduled_receipts(期望:"[200,0,0]", 实际:"[200, 0, 0]", 原因:wrong_value); demand_schedule(期望:"[150,180,200]", 实际:"[15
+   • sc-lt-001: PARAM_MISMATCH — 参数不匹配: lead_times(期望:"[12,14,11,13,15,12,14]", 实际:"[12, 14, 11, 13, 15, 12, 14]", 原因:wrong_value)
+
+💡 改进建议:
+   • WRONG_TOOL (10次): 改进工具描述，增加区分性关键词。考虑在 system prompt 中添加工具选择示例（few-shot）。
+   • INVALID_TYPE (1次): 参数类型错误。在描述中添加类型示例，如 "quantity: 数字，如 100"。
+   • PARAM_MISMATCH (10次): 工具正确但参数值与期望不符。检查 LLM 是否正确理解了用户输入中的数值/名称，可能需要在 prompt 中强化信息提取。
+
+📁 报告已生成:
+   JSON: D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3\tests\reliability\reports\real-benchmark-deepseek-v4-pro-2026-06-18T14-42-08-323Z.json
+   Markdown: D:\vibe-coding\jiadian_supply\02_LocalDev\2\2.9.3\tests\reliability\reports\real-benchmark-deepseek-v4-pro-2026-06-18T14-42-08-323Z.md
+
+🎯 SLO 评估:
+   工具调用成功率 ≥ 95%: ❌ 未达标 (82.6%)
+   P95 延迟 ≤ 8s: ✅ 达标 (3733ms)
+

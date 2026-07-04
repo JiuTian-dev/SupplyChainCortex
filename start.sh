@@ -5,7 +5,7 @@
 set -e
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  SupplyChain Cortex v2.0"
+echo "  SupplyChain Cortex v2.1"
 echo "  AI Agent for Supply Chain Intelligence"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""

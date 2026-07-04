@@ -97,7 +97,7 @@ export function SupplierGeoMap() {
       .then(r => r.json())
       .then(d => {
         const names = (d.zones || d.data?.zones || []).map((z: any) => z.warehouse as string).filter(Boolean);
-        setWarehouseNames(names.length > 0 ? [...new Set(names)] : ['深圳仓','义乌仓']);
+        setWarehouseNames(names.length > 0 ? [...new Set(names)] as string[] : ['深圳仓','义乌仓']);
       })
       .catch(() => setWarehouseNames(['深圳仓','义乌仓','宁波仓','越南仓']));
   }, []);

@@ -1,0 +1,177 @@
+{
+  "generatedAt": "2026-06-18T14:39:12.431Z",
+  "config": {
+    "provider": "deepseek",
+    "limit": 5,
+    "outputDir": "./tests/reliability/reports",
+    "concurrency": 2,
+    "maxRetries": 1,
+    "realApi": true,
+    "timeoutMs": 60000
+  },
+  "stats": {
+    "provider": "deepseek",
+    "totalCases": 5,
+    "passed": 0,
+    "failed": 5,
+    "successRate": 0,
+    "avgLatencyMs": 2020,
+    "minLatencyMs": 838,
+    "maxLatencyMs": 4071,
+    "p50LatencyMs": 1835,
+    "p95LatencyMs": 4071,
+    "failureDistribution": {
+      "totalFailures": 5,
+      "byCategory": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 0,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 5,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 0,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byCategoryPct": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 0,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 100,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 0,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 0
+      },
+      "byFamily": {
+        "crud": 5
+      },
+      "byDifficulty": {
+        "easy": 3,
+        "medium": 2
+      },
+      "dominantCategory": "JSON_PARSE_ERROR"
+    },
+    "failureRecords": [
+      {
+        "caseId": "crud-inv-001",
+        "actualTool": "",
+        "expectedTool": "query_inventory",
+        "category": "JSON_PARSE_ERROR",
+        "message": "LLM 返回的工具调用无法解析为有效 JSON",
+        "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      },
+      {
+        "caseId": "crud-inv-002",
+        "actualTool": "",
+        "expectedTool": "query_inventory",
+        "category": "JSON_PARSE_ERROR",
+        "message": "LLM 返回的工具调用无法解析为有效 JSON",
+        "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      },
+      {
+        "caseId": "crud-inv-003",
+        "actualTool": "",
+        "expectedTool": "query_inventory",
+        "category": "JSON_PARSE_ERROR",
+        "message": "LLM 返回的工具调用无法解析为有效 JSON",
+        "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      },
+      {
+        "caseId": "crud-inv-004",
+        "actualTool": "",
+        "expectedTool": "query_inventory",
+        "category": "JSON_PARSE_ERROR",
+        "message": "LLM 返回的工具调用无法解析为有效 JSON",
+        "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      },
+      {
+        "caseId": "crud-inv-005",
+        "actualTool": "",
+        "expectedTool": "query_inventory",
+        "category": "JSON_PARSE_ERROR",
+        "message": "LLM 返回的工具调用无法解析为有效 JSON",
+        "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      }
+    ],
+    "caseResults": [
+      {
+        "caseId": "crud-inv-001",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-001",
+          "actualTool": "",
+          "expectedTool": "query_inventory",
+          "category": "JSON_PARSE_ERROR",
+          "message": "LLM 返回的工具调用无法解析为有效 JSON",
+          "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+        },
+        "latencyMs": 1889
+      },
+      {
+        "caseId": "crud-inv-002",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-002",
+          "actualTool": "",
+          "expectedTool": "query_inventory",
+          "category": "JSON_PARSE_ERROR",
+          "message": "LLM 返回的工具调用无法解析为有效 JSON",
+          "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+        },
+        "latencyMs": 4071
+      },
+      {
+        "caseId": "crud-inv-003",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-003",
+          "actualTool": "",
+          "expectedTool": "query_inventory",
+          "category": "JSON_PARSE_ERROR",
+          "message": "LLM 返回的工具调用无法解析为有效 JSON",
+          "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+        },
+        "latencyMs": 1835
+      },
+      {
+        "caseId": "crud-inv-004",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-004",
+          "actualTool": "",
+          "expectedTool": "query_inventory",
+          "category": "JSON_PARSE_ERROR",
+          "message": "LLM 返回的工具调用无法解析为有效 JSON",
+          "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+        },
+        "latencyMs": 838
+      },
+      {
+        "caseId": "crud-inv-005",
+        "passed": false,
+        "failure": {
+          "caseId": "crud-inv-005",
+          "actualTool": "",
+          "expectedTool": "query_inventory",
+          "category": "JSON_PARSE_ERROR",
+          "message": "LLM 返回的工具调用无法解析为有效 JSON",
+          "rawOutput": "Error: OpenCode Go API error 400: {\"error\":{\"message\":\"Error from provider (DeepSeek): Thinking mode does not support this tool_choice\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+        },
+        "latencyMs": 1465
+      }
+    ],
+    "durationMs": 5542
+  },
+  "suggestions": [
+    "JSON_PARSE_ERROR (5次): LLM 输出无法解析。增强 text-fallback 解析逻辑，或使用 response_format: json_object。"
+  ],
+  "failureReport": "## 失败模式分析报告\n\n**总失败数**: 5\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n| JSON解析错误 (JSON_PARSE_ERROR) | 5 | 100% |\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n| crud | 5 |\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|\n| easy | 3 |\n| medium | 2 |\n\n**主要失败模式**: JSON解析错误 (JSON_PARSE_ERROR)"
+}

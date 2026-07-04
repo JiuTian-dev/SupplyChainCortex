@@ -39,6 +39,9 @@ import { CHART_TOOLTIP_STYLE, StarRating, SupplierForm } from './SupplierTab.hel
 import { SupplierPerformancePanel } from './SupplierPerformancePanel';
 import { SupplierReorderOrders } from './SupplierReorderOrders';
 import { SupplierDetailDialog } from './SupplierDetailDialog';
+import { SupplierNetworkGraph } from './SupplierNetworkGraph';
+import { SupplierChokepointAlerts } from './SupplierChokepointAlerts';
+import { useSupplierNetwork, useChokepoints } from '@/hooks/use-supplier-graph';
 
 const SupplierGeoMap = dynamic(
   () => import('./SupplierGeoMap').then((m) => ({ default: m.SupplierGeoMap })),
@@ -71,6 +74,10 @@ export function SupplierTab() {
   const { data: performanceData } = useAnalytics('supplier-performance');
   const { data: reorderData } = useReorder();
   const { data: warehouseCapacityData } = useWarehouse('capacity');
+
+  // Graph analytics hooks (Supplier API-backed)
+  const { data: networkData, isLoading: networkLoading } = useSupplierNetwork('MIDE', 2);
+  const { data: chokepointData, isLoading: chokepointLoading } = useChokepoints(1, 10);
 
   // Local state
   const [supplierVirtualMode, setSupplierVirtualMode] = useState(true);
@@ -302,6 +309,22 @@ export function SupplierTab() {
       <SupplierAnalyticsPanel
         suppliers={suppliers}
       />
+
+      {/* ==================== 图谱智能面板 ==================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <SupplierNetworkGraph
+            data={networkData}
+            isLoading={networkLoading}
+          />
+        </div>
+        <div className="lg:col-span-1">
+          <SupplierChokepointAlerts
+            data={chokepointData}
+            isLoading={chokepointLoading}
+          />
+        </div>
+      </div>
 
       {/* ==================== 筛选 + 操作 ==================== */}
       <Card className="card-dashboard">

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, apiError } from '@/lib/api-utils';
+import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { runSandbox, SCENARIOS } from '@/lib/services/agent-sandbox.service';
 import {
   runStrategyComparison,
@@ -19,7 +21,8 @@ const VALID_SCENARIOS = Object.keys(SCENARIOS);
 // GET  — run standard sandbox (legacy)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const scenario = (searchParams.get('scenario') as string) || 'perfect_storm';
   const rounds = parseInt(searchParams.get('rounds') || '100');
@@ -38,13 +41,14 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     seed,
   });
   return NextResponse.json({ success: true, ...report });
-});
+}));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // POST — strategy operations
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const POST = withErrorHandler(async (request: NextRequest) => {
+export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body: Record<string, unknown> = await request.json();
   const { action } = body;
 
@@ -141,4 +145,4 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         400,
       );
   }
-});
+}));

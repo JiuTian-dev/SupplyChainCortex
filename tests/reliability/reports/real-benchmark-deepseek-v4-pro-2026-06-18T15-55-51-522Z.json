@@ -1,0 +1,1083 @@
+{
+  "generatedAt": "2026-06-18T15:55:51.520Z",
+  "config": {
+    "provider": "deepseek",
+    "limit": 0,
+    "outputDir": "./tests/reliability/reports",
+    "concurrency": 3,
+    "maxRetries": 1,
+    "realApi": true,
+    "timeoutMs": 60000
+  },
+  "stats": {
+    "provider": "deepseek",
+    "totalCases": 121,
+    "passed": 97,
+    "failed": 24,
+    "successRate": 80.2,
+    "avgLatencyMs": 2697,
+    "minLatencyMs": 1899,
+    "maxLatencyMs": 5723,
+    "p50LatencyMs": 2542,
+    "p95LatencyMs": 3757,
+    "failureDistribution": {
+      "totalFailures": 24,
+      "byCategory": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 7,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 2,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 15
+      },
+      "byCategoryPct": {
+        "TOOL_NOT_FOUND": 0,
+        "WRONG_TOOL": 29.2,
+        "MISSING_REQUIRED_PARAM": 0,
+        "INVALID_TYPE": 0,
+        "INVALID_ENUM": 0,
+        "HALLUCINATED_PARAM": 0,
+        "JSON_PARSE_ERROR": 0,
+        "NO_TOOL_CALL": 0,
+        "PARAM_MISMATCH": 8.3,
+        "EMPTY_REQUIRED_PARAM": 0,
+        "NETWORK_ERROR": 0,
+        "UNKNOWN": 62.5
+      },
+      "byFamily": {
+        "operations": 3,
+        "intelligence": 10,
+        "supply-chain": 11
+      },
+      "byDifficulty": {
+        "medium": 7,
+        "hard": 16,
+        "easy": 1
+      },
+      "dominantCategory": "UNKNOWN"
+    },
+    "failureRecords": [
+      {
+        "caseId": "op-reorder-002",
+        "actualTool": "create_reorder",
+        "expectedTool": "create_reorder",
+        "category": "PARAM_MISMATCH",
+        "message": "参数不匹配: ; 不应出现的参数: priority",
+        "paramMismatches": [],
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"create_reorder\",\"params\":{\"sku\":\"KB-VS2002\",\"productName\":\"无线吸尘器\",\"quantity\":50,\"warehouse\":\"义乌仓\",\"priority\":\"常规\"},\"displayName\":\"创建补货单\"}],\"content\":\"好的，我来为 KB-VS2002 无线吸尘器创建补货订单，补货50台到义乌仓。\"}"
+      },
+      {
+        "caseId": "op-batch-001",
+        "actualTool": "batch_create_reorder",
+        "expectedTool": "batch_create_reorder",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"batch_create_reorder\",\"params\":{\"items\":[{\"sku\":\"KA-RC4001\",\"productName\":\"智能电饭煲\",\"quantity\":100,\"warehouse\":\"深圳仓\",\"priority\":\"常规\"},{\"sku\":\"KB-VS2002\",\"productName\":\"无线吸尘器\",\"quantity\":50,\"warehouse\":\"义乌仓\",\"priority\":\"常规\"}]},\"displayName\":\"批量补货\"}],\"content\":\"好的，我来为您批量创建这两个补货订单。\"}"
+      },
+      {
+        "caseId": "op-transfer-001",
+        "actualTool": "query_inventory",
+        "expectedTool": "create_transfer",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_inventory，期望 create_transfer",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_inventory\",\"params\":{\"action\":\"detail\",\"sku\":\"KA-RC4001\"},\"displayName\":\"库存查询\"}],\"content\":\"好的，我先确认一下深圳仓的库存情况，然后执行调拨。\"}"
+      },
+      {
+        "caseId": "intel-analytics-004",
+        "actualTool": "query_sales",
+        "expectedTool": "query_analytics",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_sales，期望 query_analytics",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_sales\",\"params\":{\"action\":\"overview\"},\"displayName\":\"销售查询\"},{\"name\":\"query_sales\",\"params\":{\"action\":\"forecast\",\"horizon\":14},\"displayName\":\"销售查询\"},{\"name\":\"query_analytics\",\"params\":{\"action\":\"sales_forecast\",\"forecastDays\":14},\"displayName\":\"数据分析\"}],\"content\":\"好的，我来为您进行销售预测分析。让我同时获取销售概览、销售预测和相关的分析数据。\"}"
+      },
+      {
+        "caseId": "intel-fin-001",
+        "actualTool": "query_financial_index",
+        "expectedTool": "query_financial_index",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_financial_index\",\"params\":{\"symbols\":[\"QQQ\",\"SMH\",\"^IXIC\"]},\"displayName\":\"金融指数\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "intel-sentiment-001",
+        "actualTool": "query_brand_sentiment",
+        "expectedTool": "query_brand_sentiment",
+        "category": "PARAM_MISMATCH",
+        "message": "参数不匹配: action(期望:\"full\", 实际:\"quick\", 原因:wrong_value)",
+        "paramMismatches": [
+          {
+            "param": "action",
+            "expected": "full",
+            "actual": "quick",
+            "reason": "wrong_value"
+          }
+        ],
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_brand_sentiment\",\"params\":{\"brand\":\"Cosori air fryer\",\"action\":\"quick\"},\"displayName\":\"品牌舆情\"},{\"name\":\"query_brand_sentiment\",\"params\":{\"brand\":\"Cosori air fryer\",\"action\":\"full\"},\"displayName\":\"品牌舆情\"}],\"content\":\"我来帮您查询 Cosori air fryer 的社交媒体舆情。让我同时进行快速风险扫描和完整报告分析。\"}"
+      },
+      {
+        "caseId": "intel-cascade-001",
+        "actualTool": "query_port_congestion",
+        "expectedTool": "query_cascade_risk",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_port_congestion，期望 query_cascade_risk",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_port_congestion\",\"params\":{},\"displayName\":\"港口拥堵\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"port_congestion\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来为您模拟港口拥堵对供应链的级联影响。首先让我获取当前的港口拥堵数据和供应链风险信息，然后运行级联风险模拟。\"}"
+      },
+      {
+        "caseId": "intel-cascade-003",
+        "actualTool": "query_weather",
+        "expectedTool": "query_cascade_risk",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_weather，期望 query_cascade_risk",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_weather\",\"params\":{\"action\":\"summary\"},\"displayName\":\"港口天气\"},{\"name\":\"query_port_congestion\",\"params\":{},\"displayName\":\"港口拥堵\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"weather_disruption\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来帮您评估台风天气对供应链的影响。我将同时查询当前天气状况、港口拥堵情况，并进行级联风险模拟。\"}"
+      },
+      {
+        "caseId": "intel-decision-001",
+        "actualTool": "query_dashboard",
+        "expectedTool": "query_decision_graph",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_dashboard，期望 query_decision_graph",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_dashboard\",\"params\":{\"action\":\"alerts\"},\"displayName\":\"仪表盘概览\"},{\"name\":\"query_inventory\",\"params\":{\"action\":\"overview\"},\"displayName\":\"库存查询\"},{\"name\":\"query_sales\",\"params\":{\"action\":\"overview\"},\"displayName\":\"销售查询\"},{\"name\":\"query_procurement\",\"params\":{\"action\":\"summary\"},\"displayName\":\"采购计划\"}],\"content\":\"好的，我来帮您做库存决策分析。让我同时从多个维度获取数据，包括库存状态、销售趋势、采购计划和决策推理。\"}"
+      },
+      {
+        "caseId": "intel-wf-002",
+        "actualTool": "query_exchange_rates",
+        "expectedTool": "execute_workflow",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 query_exchange_rates，期望 execute_workflow",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_exchange_rates\",\"params\":{\"action\":\"latest\",\"base\":\"CNY\"},\"displayName\":\"汇率查询\"},{\"name\":\"execute_workflow\",\"params\":{\"workflowId\":\"wf-fx-impact\",\"autoDetect\":false},\"displayName\":\"工作流执行\"}],\"content\":\"我来为您执行汇率冲击分析。首先获取最新的汇率数据，同时运行汇率冲击分析工作流。\"}"
+      },
+      {
+        "caseId": "intel-tariff-003",
+        "actualTool": "run_sandbox",
+        "expectedTool": "query_tariff",
+        "category": "WRONG_TOOL",
+        "message": "LLM 选择了 run_sandbox，期望 query_tariff",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"run_sandbox\",\"params\":{\"scenario\":\"trade_war\",\"rounds\":100},\"displayName\":\"供应链仿真\"},{\"name\":\"query_tariff\",\"params\":{\"action\":\"simulate\",\"scenario\":\"US Section 301 escalation\"},\"displayName\":\"关税查询\"}],\"content\":\"我来为你运行美国Section 301关税升级的沙盒模拟。这个场景将展示关税战对供应链各环节的冲击。\"}"
+      },
+      {
+        "caseId": "intel-arb-001",
+        "actualTool": "query_arbitrage",
+        "expectedTool": "query_arbitrage",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_arbitrage\",\"params\":{\"product_description\":\"便携榨汁杯 300ml USB充电\",\"target_market\":\"US\",\"source_platform\":\"1688\"},\"displayName\":\"套利引擎\"},{\"name\":\"query_compliance_check\",\"params\":{\"product_name\":\"便携榨汁杯 300ml USB充电\",\"market\":\"US\"},\"displayName\":\"合规审查\"}],\"content\":\"好的，我来帮你分析\\\"便携榨汁杯 300ml USB充电\\\"出口美国的套利可行性。让我同时从多个维度获取数据：\"}"
+      },
+      {
+        "caseId": "intel-disc-001",
+        "actualTool": "query_supplier_discovery",
+        "expectedTool": "query_supplier_discovery",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"query_supplier_discovery\",\"params\":{\"product_description\":\"蓝牙音箱 便携防水\",\"target_market\":\"US\"},\"displayName\":\"供应商发现\"},{\"name\":\"query_amazon_competitors\",\"params\":{\"keyword\":\"bluetooth speaker portable waterproof\",\"action\":\"overview\"},\"displayName\":\"竞品分析\"}],\"content\":\"好的！我来帮您搜索蓝牙音箱（便携防水）的供应商，目标市场美国。让我同时进行供应商发现和竞品分析。\"}"
+      },
+      {
+        "caseId": "sc-abc-001",
+        "actualTool": "classify_abc_xyz",
+        "expectedTool": "classify_abc_xyz",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"classify_abc_xyz\",\"params\":{\"records\":[{\"sku\":\"A001\",\"revenue\":100000,\"demand_std\":15,\"avg_demand\":300}]},\"displayName\":\"ABC-XYZ分类\"}],\"content\":\"我来对这个SKU进行ABC-XYZ分类分析。\"}"
+      },
+      {
+        "caseId": "sc-forecast-001",
+        "actualTool": "forecast_demand",
+        "expectedTool": "forecast_demand",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"forecast_demand\",\"params\":{\"demand_history\":[120,135,142,128,150,160],\"periods\":3,\"method\":\"all\"},\"displayName\":\"需求预测\"}],\"content\":\"我来帮你进行需求预测。使用历史数据 [120, 135, 142, 128, 150, 160] 预测未来3期，我将运行多种预测方法（移动平均、指数平滑、线性回归等）进行综合分析。\"}"
+      },
+      {
+        "caseId": "sc-seasonal-001",
+        "actualTool": "calculate_seasonal_decompose",
+        "expectedTool": "calculate_seasonal_decompose",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_seasonal_decompose\",\"params\":{\"demand_history\":[100,120,140,130,110,130,150,140],\"period_length\":4},\"displayName\":\"季节分解\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "sc-ww-001",
+        "actualTool": "calculate_wagner_whitin",
+        "expectedTool": "calculate_wagner_whitin",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_wagner_whitin\",\"params\":{\"demands\":[100,200,150,80,120],\"order_cost\":100,\"holding_cost_per_unit\":2},\"displayName\":\"动态批量优化\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "sc-drp-001",
+        "actualTool": "calculate_drp",
+        "expectedTool": "calculate_drp",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_drp\",\"params\":{\"initial_inventory\":500,\"scheduled_receipts\":[200,0,0],\"demand_schedule\":[150,180,200],\"lead_time_days\":1,\"order_quantity\":300,\"safety_stock\":100},\"displayName\":\"分销需求计划\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "sc-wh-001",
+        "actualTool": "calculate_warehouse_location",
+        "expectedTool": "calculate_warehouse_location",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_warehouse_location\",\"params\":{\"locations\":[{\"name\":\"A\",\"x\":10,\"y\":20,\"demand\":500},{\"name\":\"B\",\"x\":30,\"y\":40,\"demand\":300}]},\"displayName\":\"仓库选址\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "sc-route-001",
+        "actualTool": "calculate_transport_route",
+        "expectedTool": "calculate_transport_route",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_transport_route\",\"params\":{\"points\":[{\"name\":\"仓库\",\"x\":0,\"y\":0},{\"name\":\"A点\",\"x\":10,\"y\":5},{\"name\":\"B点\",\"x\":20,\"y\":15}],\"start_point\":\"仓库\"},\"displayName\":\"运输路径优化\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "sc-lt-001",
+        "actualTool": "calculate_lead_time_analysis",
+        "expectedTool": "calculate_lead_time_analysis",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_lead_time_analysis\",\"params\":{\"lead_times\":[12,14,11,13,15,12,14],\"demand_rate\":50,\"service_level\":0.95},\"displayName\":\"提前期分析\"}],\"content\":\"\"}"
+      },
+      {
+        "caseId": "sc-score-001",
+        "actualTool": "calculate_supplier_scoring",
+        "expectedTool": "calculate_supplier_scoring",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_supplier_scoring\",\"params\":{\"suppliers\":[{\"name\":\"A\",\"quality_score\":90,\"delivery_score\":85,\"cost_score\":80,\"service_score\":88,\"flexibility_score\":75}]},\"displayName\":\"供应商综合评分\"}],\"content\":\"好的，我来对供应商 A 进行综合评分分析。\"}"
+      },
+      {
+        "caseId": "sc-jrp-001",
+        "actualTool": "calculate_joint_replenishment",
+        "expectedTool": "calculate_joint_replenishment",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_joint_replenishment\",\"params\":{\"items\":[{\"annual_demand\":10000,\"unit_cost\":50,\"minor_setup_cost\":50,\"name\":\"A\"}],\"major_setup_cost\":200,\"interest_rate\":0.25,\"detailed\":true},\"displayName\":\"联合补货\"}],\"content\":\"好的，我来为您进行联合补货优化分析。不过您只提供了一个产品A，联合补货(JRP)的优势在于多产品共享主订货费。我先用您提供的数据进行计算，同时也建议您补充更多产品以获得更有意义的联合vs独立对比。\"}"
+      },
+      {
+        "caseId": "sc-fa-001",
+        "actualTool": "calculate_forecast_accuracy",
+        "expectedTool": "calculate_forecast_accuracy",
+        "category": "UNKNOWN",
+        "message": "未知失败原因",
+        "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_forecast_accuracy\",\"params\":{\"forecasts\":[{\"sku\":\"A001\",\"period_values\":[100,110,105]}],\"actuals\":[98,112,108]},\"displayName\":\"预测准确度\"}],\"content\":\"\"}"
+      }
+    ],
+    "caseResults": [
+      {
+        "caseId": "crud-inv-001",
+        "passed": true,
+        "latencyMs": 3308
+      },
+      {
+        "caseId": "crud-inv-002",
+        "passed": true,
+        "latencyMs": 4451
+      },
+      {
+        "caseId": "crud-inv-003",
+        "passed": true,
+        "latencyMs": 5723
+      },
+      {
+        "caseId": "crud-inv-004",
+        "passed": true,
+        "latencyMs": 2991
+      },
+      {
+        "caseId": "crud-inv-005",
+        "passed": true,
+        "latencyMs": 2216
+      },
+      {
+        "caseId": "crud-cost-001",
+        "passed": true,
+        "latencyMs": 4767
+      },
+      {
+        "caseId": "crud-cost-002",
+        "passed": true,
+        "latencyMs": 2250
+      },
+      {
+        "caseId": "crud-cost-003",
+        "passed": true,
+        "latencyMs": 2264
+      },
+      {
+        "caseId": "crud-cost-004",
+        "passed": true,
+        "latencyMs": 2495
+      },
+      {
+        "caseId": "crud-sales-001",
+        "passed": true,
+        "latencyMs": 2143
+      },
+      {
+        "caseId": "crud-sales-002",
+        "passed": true,
+        "latencyMs": 2514
+      },
+      {
+        "caseId": "crud-sales-003",
+        "passed": true,
+        "latencyMs": 2816
+      },
+      {
+        "caseId": "crud-log-001",
+        "passed": true,
+        "latencyMs": 3254
+      },
+      {
+        "caseId": "crud-log-002",
+        "passed": true,
+        "latencyMs": 3182
+      },
+      {
+        "caseId": "crud-log-003",
+        "passed": true,
+        "latencyMs": 2104
+      },
+      {
+        "caseId": "crud-sup-001",
+        "passed": true,
+        "latencyMs": 2497
+      },
+      {
+        "caseId": "crud-sup-002",
+        "passed": true,
+        "latencyMs": 2105
+      },
+      {
+        "caseId": "crud-dash-001",
+        "passed": true,
+        "latencyMs": 2224
+      },
+      {
+        "caseId": "crud-dash-002",
+        "passed": true,
+        "latencyMs": 2490
+      },
+      {
+        "caseId": "crud-dash-003",
+        "passed": true,
+        "latencyMs": 2176
+      },
+      {
+        "caseId": "crud-trend-001",
+        "passed": true,
+        "latencyMs": 1904
+      },
+      {
+        "caseId": "crud-proc-001",
+        "passed": true,
+        "latencyMs": 2019
+      },
+      {
+        "caseId": "crud-proc-002",
+        "passed": true,
+        "latencyMs": 2509
+      },
+      {
+        "caseId": "crud-risk-001",
+        "passed": true,
+        "latencyMs": 2019
+      },
+      {
+        "caseId": "crud-risk-002",
+        "passed": true,
+        "latencyMs": 2182
+      },
+      {
+        "caseId": "crud-loc-001",
+        "passed": true,
+        "latencyMs": 2877
+      },
+      {
+        "caseId": "crud-wh-001",
+        "passed": true,
+        "latencyMs": 2225
+      },
+      {
+        "caseId": "op-reorder-001",
+        "passed": true,
+        "latencyMs": 2518
+      },
+      {
+        "caseId": "op-reorder-002",
+        "passed": false,
+        "failure": {
+          "caseId": "op-reorder-002",
+          "actualTool": "create_reorder",
+          "expectedTool": "create_reorder",
+          "category": "PARAM_MISMATCH",
+          "message": "参数不匹配: ; 不应出现的参数: priority",
+          "paramMismatches": [],
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"create_reorder\",\"params\":{\"sku\":\"KB-VS2002\",\"productName\":\"无线吸尘器\",\"quantity\":50,\"warehouse\":\"义乌仓\",\"priority\":\"常规\"},\"displayName\":\"创建补货单\"}],\"content\":\"好的，我来为 KB-VS2002 无线吸尘器创建补货订单，补货50台到义乌仓。\"}"
+        },
+        "latencyMs": 2587
+      },
+      {
+        "caseId": "op-batch-001",
+        "passed": false,
+        "failure": {
+          "caseId": "op-batch-001",
+          "actualTool": "batch_create_reorder",
+          "expectedTool": "batch_create_reorder",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"batch_create_reorder\",\"params\":{\"items\":[{\"sku\":\"KA-RC4001\",\"productName\":\"智能电饭煲\",\"quantity\":100,\"warehouse\":\"深圳仓\",\"priority\":\"常规\"},{\"sku\":\"KB-VS2002\",\"productName\":\"无线吸尘器\",\"quantity\":50,\"warehouse\":\"义乌仓\",\"priority\":\"常规\"}]},\"displayName\":\"批量补货\"}],\"content\":\"好的，我来为您批量创建这两个补货订单。\"}"
+        },
+        "latencyMs": 2568
+      },
+      {
+        "caseId": "op-ship-001",
+        "passed": true,
+        "latencyMs": 3142
+      },
+      {
+        "caseId": "op-ship-002",
+        "passed": true,
+        "latencyMs": 2529
+      },
+      {
+        "caseId": "op-adjust-001",
+        "passed": true,
+        "latencyMs": 2160
+      },
+      {
+        "caseId": "op-adjust-002",
+        "passed": true,
+        "latencyMs": 2990
+      },
+      {
+        "caseId": "op-transfer-001",
+        "passed": false,
+        "failure": {
+          "caseId": "op-transfer-001",
+          "actualTool": "query_inventory",
+          "expectedTool": "create_transfer",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_inventory，期望 create_transfer",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_inventory\",\"params\":{\"action\":\"detail\",\"sku\":\"KA-RC4001\"},\"displayName\":\"库存查询\"}],\"content\":\"好的，我先确认一下深圳仓的库存情况，然后执行调拨。\"}"
+        },
+        "latencyMs": 2492
+      },
+      {
+        "caseId": "op-cost-001",
+        "passed": true,
+        "latencyMs": 2572
+      },
+      {
+        "caseId": "op-cost-002",
+        "passed": true,
+        "latencyMs": 2442
+      },
+      {
+        "caseId": "op-note-001",
+        "passed": true,
+        "latencyMs": 2513
+      },
+      {
+        "caseId": "op-note-002",
+        "passed": true,
+        "latencyMs": 2415
+      },
+      {
+        "caseId": "op-alert-001",
+        "passed": true,
+        "latencyMs": 2600
+      },
+      {
+        "caseId": "op-alert-002",
+        "passed": true,
+        "latencyMs": 2422
+      },
+      {
+        "caseId": "op-sup-status-001",
+        "passed": true,
+        "latencyMs": 2590
+      },
+      {
+        "caseId": "op-sup-status-002",
+        "passed": true,
+        "latencyMs": 2239
+      },
+      {
+        "caseId": "op-sup-create-001",
+        "passed": true,
+        "latencyMs": 3163
+      },
+      {
+        "caseId": "op-sup-update-001",
+        "passed": true,
+        "latencyMs": 2482
+      },
+      {
+        "caseId": "op-sup-update-002",
+        "passed": true,
+        "latencyMs": 2784
+      },
+      {
+        "caseId": "intel-analytics-001",
+        "passed": true,
+        "latencyMs": 2775
+      },
+      {
+        "caseId": "intel-analytics-002",
+        "passed": true,
+        "latencyMs": 2467
+      },
+      {
+        "caseId": "intel-analytics-003",
+        "passed": true,
+        "latencyMs": 2900
+      },
+      {
+        "caseId": "intel-analytics-004",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-analytics-004",
+          "actualTool": "query_sales",
+          "expectedTool": "query_analytics",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_sales，期望 query_analytics",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_sales\",\"params\":{\"action\":\"overview\"},\"displayName\":\"销售查询\"},{\"name\":\"query_sales\",\"params\":{\"action\":\"forecast\",\"horizon\":14},\"displayName\":\"销售查询\"},{\"name\":\"query_analytics\",\"params\":{\"action\":\"sales_forecast\",\"forecastDays\":14},\"displayName\":\"数据分析\"}],\"content\":\"好的，我来为您进行销售预测分析。让我同时获取销售概览、销售预测和相关的分析数据。\"}"
+        },
+        "latencyMs": 2930
+      },
+      {
+        "caseId": "intel-fx-001",
+        "passed": true,
+        "latencyMs": 3064
+      },
+      {
+        "caseId": "intel-fx-002",
+        "passed": true,
+        "latencyMs": 2340
+      },
+      {
+        "caseId": "intel-weather-001",
+        "passed": true,
+        "latencyMs": 1959
+      },
+      {
+        "caseId": "intel-weather-002",
+        "passed": true,
+        "latencyMs": 1922
+      },
+      {
+        "caseId": "intel-comm-001",
+        "passed": true,
+        "latencyMs": 2455
+      },
+      {
+        "caseId": "intel-scfis-001",
+        "passed": true,
+        "latencyMs": 2006
+      },
+      {
+        "caseId": "intel-carbon-001",
+        "passed": true,
+        "latencyMs": 2537
+      },
+      {
+        "caseId": "intel-fin-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-fin-001",
+          "actualTool": "query_financial_index",
+          "expectedTool": "query_financial_index",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_financial_index\",\"params\":{\"symbols\":[\"QQQ\",\"SMH\",\"^IXIC\"]},\"displayName\":\"金融指数\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2407
+      },
+      {
+        "caseId": "intel-amz-001",
+        "passed": true,
+        "latencyMs": 3171
+      },
+      {
+        "caseId": "intel-amz-002",
+        "passed": true,
+        "latencyMs": 3079
+      },
+      {
+        "caseId": "intel-sentiment-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-sentiment-001",
+          "actualTool": "query_brand_sentiment",
+          "expectedTool": "query_brand_sentiment",
+          "category": "PARAM_MISMATCH",
+          "message": "参数不匹配: action(期望:\"full\", 实际:\"quick\", 原因:wrong_value)",
+          "paramMismatches": [
+            {
+              "param": "action",
+              "expected": "full",
+              "actual": "quick",
+              "reason": "wrong_value"
+            }
+          ],
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_brand_sentiment\",\"params\":{\"brand\":\"Cosori air fryer\",\"action\":\"quick\"},\"displayName\":\"品牌舆情\"},{\"name\":\"query_brand_sentiment\",\"params\":{\"brand\":\"Cosori air fryer\",\"action\":\"full\"},\"displayName\":\"品牌舆情\"}],\"content\":\"我来帮您查询 Cosori air fryer 的社交媒体舆情。让我同时进行快速风险扫描和完整报告分析。\"}"
+        },
+        "latencyMs": 3202
+      },
+      {
+        "caseId": "intel-sentiment-002",
+        "passed": true,
+        "latencyMs": 2624
+      },
+      {
+        "caseId": "intel-cascade-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-cascade-001",
+          "actualTool": "query_port_congestion",
+          "expectedTool": "query_cascade_risk",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_port_congestion，期望 query_cascade_risk",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_port_congestion\",\"params\":{},\"displayName\":\"港口拥堵\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"port_congestion\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来为您模拟港口拥堵对供应链的级联影响。首先让我获取当前的港口拥堵数据和供应链风险信息，然后运行级联风险模拟。\"}"
+        },
+        "latencyMs": 2585
+      },
+      {
+        "caseId": "intel-cascade-002",
+        "passed": true,
+        "latencyMs": 3772
+      },
+      {
+        "caseId": "intel-cascade-003",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-cascade-003",
+          "actualTool": "query_weather",
+          "expectedTool": "query_cascade_risk",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_weather，期望 query_cascade_risk",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_weather\",\"params\":{\"action\":\"summary\"},\"displayName\":\"港口天气\"},{\"name\":\"query_port_congestion\",\"params\":{},\"displayName\":\"港口拥堵\"},{\"name\":\"query_cascade_risk\",\"params\":{\"scenario\":\"weather_disruption\"},\"displayName\":\"级联风险分析\"}],\"content\":\"我来帮您评估台风天气对供应链的影响。我将同时查询当前天气状况、港口拥堵情况，并进行级联风险模拟。\"}"
+        },
+        "latencyMs": 2711
+      },
+      {
+        "caseId": "intel-cpsc-001",
+        "passed": true,
+        "latencyMs": 2099
+      },
+      {
+        "caseId": "intel-port-001",
+        "passed": true,
+        "latencyMs": 2719
+      },
+      {
+        "caseId": "intel-coherence-001",
+        "passed": true,
+        "latencyMs": 2763
+      },
+      {
+        "caseId": "intel-recall-001",
+        "passed": true,
+        "latencyMs": 2595
+      },
+      {
+        "caseId": "intel-decision-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-decision-001",
+          "actualTool": "query_dashboard",
+          "expectedTool": "query_decision_graph",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_dashboard，期望 query_decision_graph",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_dashboard\",\"params\":{\"action\":\"alerts\"},\"displayName\":\"仪表盘概览\"},{\"name\":\"query_inventory\",\"params\":{\"action\":\"overview\"},\"displayName\":\"库存查询\"},{\"name\":\"query_sales\",\"params\":{\"action\":\"overview\"},\"displayName\":\"销售查询\"},{\"name\":\"query_procurement\",\"params\":{\"action\":\"summary\"},\"displayName\":\"采购计划\"}],\"content\":\"好的，我来帮您做库存决策分析。让我同时从多个维度获取数据，包括库存状态、销售趋势、采购计划和决策推理。\"}"
+        },
+        "latencyMs": 3151
+      },
+      {
+        "caseId": "intel-decision-002",
+        "passed": true,
+        "latencyMs": 3651
+      },
+      {
+        "caseId": "intel-wf-001",
+        "passed": true,
+        "latencyMs": 3041
+      },
+      {
+        "caseId": "intel-wf-002",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-wf-002",
+          "actualTool": "query_exchange_rates",
+          "expectedTool": "execute_workflow",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 query_exchange_rates，期望 execute_workflow",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_exchange_rates\",\"params\":{\"action\":\"latest\",\"base\":\"CNY\"},\"displayName\":\"汇率查询\"},{\"name\":\"execute_workflow\",\"params\":{\"workflowId\":\"wf-fx-impact\",\"autoDetect\":false},\"displayName\":\"工作流执行\"}],\"content\":\"我来为您执行汇率冲击分析。首先获取最新的汇率数据，同时运行汇率冲击分析工作流。\"}"
+        },
+        "latencyMs": 2821
+      },
+      {
+        "caseId": "intel-tariff-001",
+        "passed": true,
+        "latencyMs": 2024
+      },
+      {
+        "caseId": "intel-tariff-002",
+        "passed": true,
+        "latencyMs": 2660
+      },
+      {
+        "caseId": "intel-tariff-003",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-tariff-003",
+          "actualTool": "run_sandbox",
+          "expectedTool": "query_tariff",
+          "category": "WRONG_TOOL",
+          "message": "LLM 选择了 run_sandbox，期望 query_tariff",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"run_sandbox\",\"params\":{\"scenario\":\"trade_war\",\"rounds\":100},\"displayName\":\"供应链仿真\"},{\"name\":\"query_tariff\",\"params\":{\"action\":\"simulate\",\"scenario\":\"US Section 301 escalation\"},\"displayName\":\"关税查询\"}],\"content\":\"我来为你运行美国Section 301关税升级的沙盒模拟。这个场景将展示关税战对供应链各环节的冲击。\"}"
+        },
+        "latencyMs": 2922
+      },
+      {
+        "caseId": "intel-sandbox-001",
+        "passed": true,
+        "latencyMs": 2397
+      },
+      {
+        "caseId": "intel-compliance-001",
+        "passed": true,
+        "latencyMs": 2411
+      },
+      {
+        "caseId": "intel-compliance-002",
+        "passed": true,
+        "latencyMs": 2433
+      },
+      {
+        "caseId": "intel-finsim-001",
+        "passed": true,
+        "latencyMs": 3371
+      },
+      {
+        "caseId": "intel-feed-001",
+        "passed": true,
+        "latencyMs": 2069
+      },
+      {
+        "caseId": "intel-arb-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-arb-001",
+          "actualTool": "query_arbitrage",
+          "expectedTool": "query_arbitrage",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_arbitrage\",\"params\":{\"product_description\":\"便携榨汁杯 300ml USB充电\",\"target_market\":\"US\",\"source_platform\":\"1688\"},\"displayName\":\"套利引擎\"},{\"name\":\"query_compliance_check\",\"params\":{\"product_name\":\"便携榨汁杯 300ml USB充电\",\"market\":\"US\"},\"displayName\":\"合规审查\"}],\"content\":\"好的，我来帮你分析\\\"便携榨汁杯 300ml USB充电\\\"出口美国的套利可行性。让我同时从多个维度获取数据：\"}"
+        },
+        "latencyMs": 3833
+      },
+      {
+        "caseId": "intel-disc-001",
+        "passed": false,
+        "failure": {
+          "caseId": "intel-disc-001",
+          "actualTool": "query_supplier_discovery",
+          "expectedTool": "query_supplier_discovery",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"query_supplier_discovery\",\"params\":{\"product_description\":\"蓝牙音箱 便携防水\",\"target_market\":\"US\"},\"displayName\":\"供应商发现\"},{\"name\":\"query_amazon_competitors\",\"params\":{\"keyword\":\"bluetooth speaker portable waterproof\",\"action\":\"overview\"},\"displayName\":\"竞品分析\"}],\"content\":\"好的！我来帮您搜索蓝牙音箱（便携防水）的供应商，目标市场美国。让我同时进行供应商发现和竞品分析。\"}"
+        },
+        "latencyMs": 2941
+      },
+      {
+        "caseId": "intel-web-001",
+        "passed": true,
+        "latencyMs": 3028
+      },
+      {
+        "caseId": "intel-chart-001",
+        "passed": true,
+        "latencyMs": 2546
+      },
+      {
+        "caseId": "intel-analyze-chart-001",
+        "passed": true,
+        "latencyMs": 2318
+      },
+      {
+        "caseId": "intel-report-001",
+        "passed": true,
+        "latencyMs": 2237
+      },
+      {
+        "caseId": "sc-eoq-001",
+        "passed": true,
+        "latencyMs": 2687
+      },
+      {
+        "caseId": "sc-ss-001",
+        "passed": true,
+        "latencyMs": 3757
+      },
+      {
+        "caseId": "sc-rop-001",
+        "passed": true,
+        "latencyMs": 2932
+      },
+      {
+        "caseId": "sc-abc-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-abc-001",
+          "actualTool": "classify_abc_xyz",
+          "expectedTool": "classify_abc_xyz",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"classify_abc_xyz\",\"params\":{\"records\":[{\"sku\":\"A001\",\"revenue\":100000,\"demand_std\":15,\"avg_demand\":300}]},\"displayName\":\"ABC-XYZ分类\"}],\"content\":\"我来对这个SKU进行ABC-XYZ分类分析。\"}"
+        },
+        "latencyMs": 2414
+      },
+      {
+        "caseId": "sc-forecast-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-forecast-001",
+          "actualTool": "forecast_demand",
+          "expectedTool": "forecast_demand",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"forecast_demand\",\"params\":{\"demand_history\":[120,135,142,128,150,160],\"periods\":3,\"method\":\"all\"},\"displayName\":\"需求预测\"}],\"content\":\"我来帮你进行需求预测。使用历史数据 [120, 135, 142, 128, 150, 160] 预测未来3期，我将运行多种预测方法（移动平均、指数平滑、线性回归等）进行综合分析。\"}"
+        },
+        "latencyMs": 2945
+      },
+      {
+        "caseId": "sc-seasonal-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-seasonal-001",
+          "actualTool": "calculate_seasonal_decompose",
+          "expectedTool": "calculate_seasonal_decompose",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_seasonal_decompose\",\"params\":{\"demand_history\":[100,120,140,130,110,130,150,140],\"period_length\":4},\"displayName\":\"季节分解\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2375
+      },
+      {
+        "caseId": "sc-mc-001",
+        "passed": true,
+        "latencyMs": 2728
+      },
+      {
+        "caseId": "sc-ww-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-ww-001",
+          "actualTool": "calculate_wagner_whitin",
+          "expectedTool": "calculate_wagner_whitin",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_wagner_whitin\",\"params\":{\"demands\":[100,200,150,80,120],\"order_cost\":100,\"holding_cost_per_unit\":2},\"displayName\":\"动态批量优化\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2392
+      },
+      {
+        "caseId": "sc-nv-001",
+        "passed": true,
+        "latencyMs": 2368
+      },
+      {
+        "caseId": "sc-drp-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-drp-001",
+          "actualTool": "calculate_drp",
+          "expectedTool": "calculate_drp",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_drp\",\"params\":{\"initial_inventory\":500,\"scheduled_receipts\":[200,0,0],\"demand_schedule\":[150,180,200],\"lead_time_days\":1,\"order_quantity\":300,\"safety_stock\":100},\"displayName\":\"分销需求计划\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2922
+      },
+      {
+        "caseId": "sc-wh-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-wh-001",
+          "actualTool": "calculate_warehouse_location",
+          "expectedTool": "calculate_warehouse_location",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_warehouse_location\",\"params\":{\"locations\":[{\"name\":\"A\",\"x\":10,\"y\":20,\"demand\":500},{\"name\":\"B\",\"x\":30,\"y\":40,\"demand\":300}]},\"displayName\":\"仓库选址\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2408
+      },
+      {
+        "caseId": "sc-route-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-route-001",
+          "actualTool": "calculate_transport_route",
+          "expectedTool": "calculate_transport_route",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_transport_route\",\"params\":{\"points\":[{\"name\":\"仓库\",\"x\":0,\"y\":0},{\"name\":\"A点\",\"x\":10,\"y\":5},{\"name\":\"B点\",\"x\":20,\"y\":15}],\"start_point\":\"仓库\"},\"displayName\":\"运输路径优化\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2521
+      },
+      {
+        "caseId": "sc-multi-001",
+        "passed": true,
+        "latencyMs": 3319
+      },
+      {
+        "caseId": "sc-kpi-001",
+        "passed": true,
+        "latencyMs": 3269
+      },
+      {
+        "caseId": "sc-fill-001",
+        "passed": true,
+        "latencyMs": 3021
+      },
+      {
+        "caseId": "sc-lt-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-lt-001",
+          "actualTool": "calculate_lead_time_analysis",
+          "expectedTool": "calculate_lead_time_analysis",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_lead_time_analysis\",\"params\":{\"lead_times\":[12,14,11,13,15,12,14],\"demand_rate\":50,\"service_level\":0.95},\"displayName\":\"提前期分析\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2919
+      },
+      {
+        "caseId": "sc-pv-001",
+        "passed": true,
+        "latencyMs": 3097
+      },
+      {
+        "caseId": "sc-tc-001",
+        "passed": true,
+        "latencyMs": 3668
+      },
+      {
+        "caseId": "sc-score-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-score-001",
+          "actualTool": "calculate_supplier_scoring",
+          "expectedTool": "calculate_supplier_scoring",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_supplier_scoring\",\"params\":{\"suppliers\":[{\"name\":\"A\",\"quality_score\":90,\"delivery_score\":85,\"cost_score\":80,\"service_score\":88,\"flexibility_score\":75}]},\"displayName\":\"供应商综合评分\"}],\"content\":\"好的，我来对供应商 A 进行综合评分分析。\"}"
+        },
+        "latencyMs": 2430
+      },
+      {
+        "caseId": "sc-lc-001",
+        "passed": true,
+        "latencyMs": 2455
+      },
+      {
+        "caseId": "sc-be-001",
+        "passed": true,
+        "latencyMs": 3660
+      },
+      {
+        "caseId": "sc-price-001",
+        "passed": true,
+        "latencyMs": 2977
+      },
+      {
+        "caseId": "sc-jrp-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-jrp-001",
+          "actualTool": "calculate_joint_replenishment",
+          "expectedTool": "calculate_joint_replenishment",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_joint_replenishment\",\"params\":{\"items\":[{\"annual_demand\":10000,\"unit_cost\":50,\"minor_setup_cost\":50,\"name\":\"A\"}],\"major_setup_cost\":200,\"interest_rate\":0.25,\"detailed\":true},\"displayName\":\"联合补货\"}],\"content\":\"好的，我来为您进行联合补货优化分析。不过您只提供了一个产品A，联合补货(JRP)的优势在于多产品共享主订货费。我先用您提供的数据进行计算，同时也建议您补充更多产品以获得更有意义的联合vs独立对比。\"}"
+        },
+        "latencyMs": 4182
+      },
+      {
+        "caseId": "sc-fa-001",
+        "passed": false,
+        "failure": {
+          "caseId": "sc-fa-001",
+          "actualTool": "calculate_forecast_accuracy",
+          "expectedTool": "calculate_forecast_accuracy",
+          "category": "UNKNOWN",
+          "message": "未知失败原因",
+          "rawOutput": "{\"toolCalls\":[{\"name\":\"calculate_forecast_accuracy\",\"params\":{\"forecasts\":[{\"sku\":\"A001\",\"period_values\":[100,110,105]}],\"actuals\":[98,112,108]},\"displayName\":\"预测准确度\"}],\"content\":\"\"}"
+        },
+        "latencyMs": 2443
+      },
+      {
+        "caseId": "sg-graph-001",
+        "passed": true,
+        "latencyMs": 2066
+      },
+      {
+        "caseId": "sg-graph-002",
+        "passed": true,
+        "latencyMs": 2542
+      },
+      {
+        "caseId": "sg-dep-001",
+        "passed": true,
+        "latencyMs": 2756
+      },
+      {
+        "caseId": "sg-impact-001",
+        "passed": true,
+        "latencyMs": 2418
+      },
+      {
+        "caseId": "sg-choke-001",
+        "passed": true,
+        "latencyMs": 2038
+      },
+      {
+        "caseId": "sg-geo-001",
+        "passed": true,
+        "latencyMs": 2012
+      },
+      {
+        "caseId": "sg-tiers-001",
+        "passed": true,
+        "latencyMs": 2137
+      },
+      {
+        "caseId": "sg-health-001",
+        "passed": true,
+        "latencyMs": 1899
+      },
+      {
+        "caseId": "sg-evo-001",
+        "passed": true,
+        "latencyMs": 2712
+      },
+      {
+        "caseId": "sg-tree-001",
+        "passed": true,
+        "latencyMs": 1976
+      }
+    ],
+    "durationMs": 109163
+  },
+  "suggestions": [
+    "WRONG_TOOL (7次): 改进工具描述，增加区分性关键词。考虑在 system prompt 中添加工具选择示例（few-shot）。",
+    "PARAM_MISMATCH (2次): 工具正确但参数值与期望不符。检查 LLM 是否正确理解了用户输入中的数值/名称，可能需要在 prompt 中强化信息提取。"
+  ],
+  "failureReport": "## 失败模式分析报告\n\n**总失败数**: 24\n\n### 按失败类别分布\n\n| 类别 | 数量 | 占比 |\n|------|------|------|\n| 未知错误 (UNKNOWN) | 15 | 62.5% |\n| 工具选择错误 (WRONG_TOOL) | 7 | 29.2% |\n| 参数值不匹配 (PARAM_MISMATCH) | 2 | 8.3% |\n\n### 按工具家族分布\n\n| 家族 | 失败数 |\n|------|--------|\n| supply-chain | 11 |\n| intelligence | 10 |\n| operations | 3 |\n\n### 按难度分布\n\n| 难度 | 失败数 |\n|------|--------|\n| hard | 16 |\n| medium | 7 |\n| easy | 1 |\n\n**主要失败模式**: 未知错误 (UNKNOWN)"
+}

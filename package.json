@@ -1,11 +1,11 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
-  "version": "1.0.0",
+  "name": "supplychain-cortex",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "predev": "node -e \"const{exec}=require('child_process');exec('docker compose up -d searxng 2>&1',(err,stdout,stderr)=>{if(err)console.log('[predev] Docker not available — SearXNG skipped. Run Docker Desktop first.');else console.log('[predev] SearXNG:',stdout.trim()||'started')})\"",
     "dev": "next dev -p 3000",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build": "next build && node -e \"const fs=require('fs');const path=require('path');function copyRecursive(src,dest){if(!fs.existsSync(src))return;const stat=fs.statSync(src);if(stat.isDirectory()){fs.mkdirSync(dest,{recursive:true});for(const entry of fs.readdirSync(src)){copyRecursive(path.join(src,entry),path.join(dest,entry))}}else{fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(src,dest)}}copyRecursive('.next/static','.next/standalone/.next/static');copyRecursive('public','.next/standalone/public')\"",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint . --max-warnings 999",
     "db:push": "prisma db push",
@@ -31,6 +31,10 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.1.1",
     "@mdxeditor/editor": "^3.39.1",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
+    "@opentelemetry/sdk-node": "^0.218.0",
     "@prisma/client": "^6.19",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -64,7 +68,6 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.24",
     "bcryptjs": "^3.0.3",
-    "canvas": "^3.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -97,6 +100,9 @@
     "vaul": "^1.1.2",
     "zod": "^4.0.2",
     "zustand": "^5.0.6"
+  },
+  "optionalDependencies": {
+    "stripe": "^22.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

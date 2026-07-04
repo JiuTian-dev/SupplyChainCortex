@@ -1,0 +1,18 @@
+# SupplyChain Cortex — Grafana Dashboard Provisioning
+#
+# Auto-loads dashboards from /var/lib/grafana/dashboards/ on boot.
+# Loaded from /etc/grafana/provisioning/dashboards/ inside the Grafana container.
+
+apiVersion: 1
+
+providers:
+  - name: supply-chain-cortex
+    orgId: 1
+    folder: SupplyChain Cortex
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

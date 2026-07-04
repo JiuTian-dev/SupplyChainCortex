@@ -1,6 +1,6 @@
 'use client';
 
-import type { Permission } from '@/lib/rbac';
+import type { Permission } from '@/lib/auth/permissions';
 import { usePermissions } from '@/hooks/use-permission';
 
 interface PermissionGateProps {

@@ -62,7 +62,7 @@ function buildOption(spec: ChartSpec): EChartsOption {
     baseOption.yAxis = { type: 'value', axisLabel: { fontSize: 9 } };
     baseOption.series = spec.series.map(s => ({
       name: s.name,
-      type: s.type || seriesType,
+      type: (s.type || seriesType) as 'bar' | 'line' | 'scatter' | 'pie',
       data: s.data,
       smooth: spec.type === 'line',
     }));

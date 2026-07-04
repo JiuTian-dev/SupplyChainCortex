@@ -72,15 +72,15 @@ bun run dev
 
 | 指标 | 数值 |
 |------|------|
-| 测试文件 | 32 |
-| 测试通过 | 583 (2 pre-existing DeepSeek 失败) |
-| cascade-risk 专项测试 | 74 |
+| 测试文件 | 41 |
+| 测试通过 | 748 |
+| cascade-risk 专项测试 | 72 |
 | Agent 引擎 | FSM v2 (6 状态) |
 | Provider 适配器 | DeepSeek V4 Pro / OpenAI / Anthropic |
 | TypeScript 预存错误 | 0 源码层；`.next/dev/types/routes.d.ts` 为 Next.js 生成文件语法错误 |
 | Prisma 模型 | 28 |
-| MCP 工具 | 65 |
-| API 端点 | 63 |
+| MCP 工具 | 82 |
+| API 端点 | 64 |
 | 数据库 | PostgreSQL 16 |
 
 ---
@@ -277,8 +277,8 @@ bun run dev
 bun run dev                     # 自动启动 SearXNG + Next.js
 
 # 质量检查
-npx vitest run src/app/api/cascade-risk/route.test.ts src/lib/services/cascade-risk.test.ts   # 74 cascade-risk tests
-npx vitest run                   # 583 tests (2 pre-existing DeepSeek failures)
+npx vitest run src/app/api/cascade-risk/route.test.ts src/lib/services/cascade-risk.test.ts   # 72 cascade-risk tests
+npx vitest run                   # 748 tests
 npx tsc --noEmit                 # src/ 层 0 错误
 
 # 数据库

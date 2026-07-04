@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { withErrorHandler, apiError } from "@/lib/api-utils";
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import { CACHE_TAGS, CACHE_TTL } from "@/lib/cache";
 import {
   getSupplierPerformanceAnalytics,
@@ -136,6 +137,7 @@ const cachedPerformanceDashboard = unstable_cache(
 //          inventory_report, cost_report, sales_report, logistics_report, supplier_report
 // Also accepts `type` param as an alternative to `action` for report actions.
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action") || "supplier-performance";
   const type = searchParams.get("type") || "";

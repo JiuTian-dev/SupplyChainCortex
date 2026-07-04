@@ -11,8 +11,8 @@ CREATE TABLE "Product" (
     "origin" TEXT NOT NULL DEFAULT 'CN',
     "abcClass" TEXT NOT NULL DEFAULT 'C',
     "fsnClass" TEXT NOT NULL DEFAULT 'N',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -29,9 +29,9 @@ CREATE TABLE "Inventory" (
     "turnoverRate" REAL NOT NULL DEFAULT 0,
     "turnoverDays" INTEGER NOT NULL DEFAULT 0,
     "stockStatus" TEXT NOT NULL DEFAULT 'healthy',
-    "lastSyncAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "lastSyncAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "Inventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -45,7 +45,7 @@ CREATE TABLE "SalesRecord" (
     "quantity" INTEGER NOT NULL,
     "revenue" REAL NOT NULL,
     "platform" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "SalesRecord_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -64,9 +64,9 @@ CREATE TABLE "ShipmentItem" (
     "actualDelivery" TEXT,
     "delayDays" INTEGER NOT NULL DEFAULT 0,
     "riskLevel" TEXT NOT NULL DEFAULT 'low',
-    "events" JSONB NOT NULL DEFAULT [],
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "events" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "ShipmentItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -86,8 +86,8 @@ CREATE TABLE "CostRecord" (
     "totalLanded" REAL NOT NULL,
     "sellingPrice" REAL NOT NULL,
     "grossMargin" REAL NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "CostRecord_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -102,8 +102,8 @@ CREATE TABLE "AlertRule" (
     "unit" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "severity" TEXT NOT NULL DEFAULT 'warning',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -117,7 +117,7 @@ CREATE TABLE "SupplyChainEvent" (
     "severity" TEXT NOT NULL DEFAULT 'info',
     "sku" TEXT,
     "isRead" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
@@ -130,8 +130,8 @@ CREATE TABLE "ReorderOrder" (
     "priority" TEXT NOT NULL DEFAULT '常规',
     "status" TEXT NOT NULL DEFAULT 'pending',
     "notes" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -143,8 +143,8 @@ CREATE TABLE "SupplyChainNote" (
     "category" TEXT NOT NULL DEFAULT 'general',
     "priority" TEXT NOT NULL DEFAULT 'normal',
     "isResolved" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -161,8 +161,8 @@ CREATE TABLE "Supplier" (
     "rating" REAL NOT NULL DEFAULT 0,
     "ratingDetails" JSONB,
     "status" TEXT NOT NULL DEFAULT 'active',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -178,7 +178,7 @@ CREATE TABLE "AuditLog" (
     "ipAddress" TEXT,
     "userAgent" TEXT,
     "severity" TEXT NOT NULL DEFAULT 'info',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
@@ -190,9 +190,9 @@ CREATE TABLE "User" (
     "role" TEXT NOT NULL DEFAULT 'viewer',
     "avatar" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "lastLoginAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "lastLoginAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -202,8 +202,8 @@ CREATE TABLE "Session" (
     "token" TEXT NOT NULL,
     "userAgent" TEXT,
     "ipAddress" TEXT,
-    "expiresAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 

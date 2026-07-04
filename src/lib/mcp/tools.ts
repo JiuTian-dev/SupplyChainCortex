@@ -17,11 +17,12 @@ import { crudTools } from './tools-crud';
 import { operationsTools } from './tools-operations';
 import { intelligenceTools } from './tools-intelligence';
 import { supplyChainTools } from './tools-supply-chain';
+import { supplierGraphTools } from './tools-supplier-graph';
 
 // ─── Tool Definition Types ──────────────────────────────────────────────────────
 
 export interface MCPToolParameter {
-  type: string;
+  type: string | string[];
   description: string;
   enum?: string[];
   items?: { type: string; properties?: Record<string, MCPToolParameter | { type: string; description?: string; enum?: string[] }>; required?: string[]; description?: string; enum?: string[] };
@@ -45,6 +46,7 @@ const tools: MCPTool[] = [
   ...operationsTools,
   ...intelligenceTools,
   ...supplyChainTools,
+  ...supplierGraphTools,
 ];
 
 // ─── Registry Operations ────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import type { MCPTool } from '@/lib/mcp/tools';
 // ─── FSM States ──────────────────────────────────────────────────────────
 
 export type FSMState =
+  | 'retrieve'
   | 'classify'
   | 'plan'
   | 'execute'
@@ -17,7 +18,7 @@ export type FSMState =
   | 'synthesize';
 
 export const FSM_STATES: readonly FSMState[] = [
-  'classify', 'plan', 'execute', 'observe', 'decide', 'synthesize',
+  'retrieve', 'classify', 'plan', 'execute', 'observe', 'decide', 'synthesize',
 ] as const;
 
 // ─── Tool Call / Result ──────────────────────────────────────────────────
@@ -101,6 +102,12 @@ export interface FSMContext {
 
   dynamicContext?: string;
   tieredSystemPrompt?: string;
+
+  /** RAG context injected by the 'retrieve' state (ENABLE_RAG gated) */
+  ragContext?: string;
+
+  /** Decision tracer for deep audit trace (optional, enabled per-request) */
+  tracer?: import('@/lib/audit/decision-tracer').DecisionTracer;
 }
 
 // ─── SSE Events ──────────────────────────────────────────────────────────
@@ -189,4 +196,13 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   query_supplier_location: '供应商地理分布',
   query_warehouse_capacity: '仓库容量',
   batch_create_reorder: '批量补货',
+  query_supplier_graph: '供应商图谱',
+  query_supplier_dependency: '供应商依赖度',
+  query_supplier_impact: '中断影响分析',
+  query_supplier_chokepoints: '卡脖子检测',
+  query_supplier_geo_risk: '地理风险分析',
+  query_supplier_tiers: '供应商层级结构',
+  query_supplier_evolution: '供应商网络演变',
+  query_component_tree: '零部件分类树',
+  query_scraper_health: '数据源健康检查',
 };

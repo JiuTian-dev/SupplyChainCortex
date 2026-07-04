@@ -263,7 +263,7 @@ describe('User Service', () => {
         data: expect.objectContaining({
           email: 'admin@supply-chain.com',
           name: '系统管理员',
-          role: 'admin',
+          role: 'org_admin',
         }),
         select: expect.any(Object),
       });
@@ -279,7 +279,7 @@ describe('User Service', () => {
         data: expect.objectContaining({
           email: 'manager@supply-chain.com',
           name: '运营经理',
-          role: 'manager',
+          role: 'team_admin',
         }),
         select: expect.any(Object),
       });

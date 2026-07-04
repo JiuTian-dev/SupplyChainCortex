@@ -17,7 +17,6 @@ import {
   ChevronDown, Globe, Brain, Clock, Copy, Download,
   Settings, Eye, EyeOff, Paperclip,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   loadMessages, saveMessages, clearStoredMessages,
   renderMarkdown, CopyButton, TypingIndicator,
@@ -90,8 +89,25 @@ function MARCBadges({ text }: { text: string }) {
 interface ToolEvent {
   tool: string;
   params?: Record<string, unknown>;
+  /** 工具返回结果（已序列化为字符串，兼容对象/数组/原始值） */
   result?: string;
   error?: string;
+}
+
+/**
+ * 将任意类型的工具结果安全序列化为字符串，并截断到指定长度。
+ * 解决 Harness 返回对象/数组导致 .slice is not a function 的问题。
+ */
+function safeStringifyResult(value: unknown, maxLen = 2000): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.slice(0, maxLen);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    const str = JSON.stringify(value, null, 2);
+    return str.length > maxLen ? str.slice(0, maxLen) + '\n…(截断)' : str;
+  } catch {
+    return String(value).slice(0, maxLen);
+  }
 }
 
 const TOOL_ICONS: Record<string, string> = {
@@ -160,9 +176,26 @@ function ToolCallChain({ calls }: { calls: ToolEvent[] }) {
   );
 }
 
+// ─── Tool → Panel mapping ──────────────────────────────────────────
+
+const TOOL_PANEL_MAP: Record<string, { panelId: string; label: string }> = {
+  query_inventory: { panelId: 'inventory', label: '库存面板' },
+  query_cost: { panelId: 'cost', label: '成本面板' },
+  query_suppliers: { panelId: 'supplier', label: '供应商面板' },
+  query_logistics: { panelId: 'logistics', label: '物流面板' },
+  query_risk: { panelId: 'risk', label: '风险面板' },
+  query_cascade_risk: { panelId: 'cascade-risk', label: '级联风险' },
+  query_dashboard: { panelId: 'sales', label: '销售面板' },
+  query_analytics: { panelId: 'sales', label: '销售面板' },
+};
+
 // ─── Data Panel ──────────────────────────────────────────────────────
 
-function DataPanel({ tools, onClose }: { tools: ToolEvent[]; onClose: () => void }) {
+function DataPanel({ tools, onClose, onJump }: {
+  tools: ToolEvent[];
+  onClose: () => void;
+  onJump?: (panelId: string) => void;
+}) {
   if (tools.length === 0) return null;
 
   return (
@@ -174,35 +207,47 @@ function DataPanel({ tools, onClose }: { tools: ToolEvent[]; onClose: () => void
         </button>
       </div>
       <div className="p-3 space-y-3">
-        {tools.map((tc, i) => (
-          <div
-            key={i}
-            className="border rounded-lg p-2 transition-all duration-300"
-            style={{ animationDelay: `${i * 50}ms` }}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">{toolIcon(tc.tool)}</span>
-              <span className="text-xs font-semibold">{TOOL_LABELS[tc.tool] || tc.tool}</span>
-              {tc.error ? (
-                <span className="text-[10px] text-red-500 ml-auto">失败</span>
-              ) : (
-                <span className="text-[10px] text-green-600 ml-auto">完成</span>
+        {tools.map((tc, i) => {
+          const panelLink = TOOL_PANEL_MAP[tc.tool];
+          return (
+            <div
+              key={i}
+              className="border rounded-lg p-2 transition-all duration-300"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm">{toolIcon(tc.tool)}</span>
+                <span className="text-xs font-semibold">{TOOL_LABELS[tc.tool] || tc.tool}</span>
+                {tc.error ? (
+                  <span className="text-[10px] text-red-500 ml-auto">失败</span>
+                ) : (
+                  <span className="text-[10px] text-green-600 ml-auto">完成</span>
+                )}
+              </div>
+              {tc.params && Object.keys(tc.params).length > 0 && (
+                <div className="text-[10px] text-zinc-500 mb-1">
+                  {Object.entries(tc.params).filter(([,v]) => v !== undefined && v !== '').map(([k, v]) => (
+                    <span key={k} className="mr-2">{k}: {String(v).slice(0, 40)}</span>
+                  ))}
+                </div>
+              )}
+              {tc.result && (
+                <pre className="text-[10px] text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded p-1.5 max-h-32 overflow-auto font-mono leading-relaxed">
+                  {safeStringifyResult(tc.result, 500)}
+                </pre>
+              )}
+              {panelLink && onJump && !tc.error && (
+                <button
+                  onClick={() => onJump(panelLink.panelId)}
+                  className="mt-1.5 text-[10px] text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5"
+                >
+                  {panelLink.label}
+                  <ArrowRight className="h-2.5 w-2.5" />
+                </button>
               )}
             </div>
-            {tc.params && Object.keys(tc.params).length > 0 && (
-              <div className="text-[10px] text-zinc-500 mb-1">
-                {Object.entries(tc.params).filter(([,v]) => v !== undefined && v !== '').map(([k, v]) => (
-                  <span key={k} className="mr-2">{k}: {String(v).slice(0, 40)}</span>
-                ))}
-              </div>
-            )}
-            {tc.result && (
-              <pre className="text-[10px] text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded p-1.5 max-h-32 overflow-auto font-mono leading-relaxed">
-                {tc.result.slice(0, 500)}
-              </pre>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -216,11 +261,76 @@ function estimateTokens(text: string): number {
   return Math.ceil(cjk / 3 + other / 4);
 }
 
+// ─── Thinking Status Formatting ────────────────────────────────────────
+// Convert technical thinking status to user-friendly Chinese descriptions
+
+const THINKING_STATUS_MAP: Record<string, string> = {
+  'context': '理解上下文',
+  'classifying': '分析需求意图',
+  'planning': '规划分析方案',
+  'executing': '执行数据分析',
+  'observing': '整理分析结果',
+  'deciding': '生成决策建议',
+  'synthesizing': '撰写回答',
+  'searching': '联网搜索信息',
+  'evaluating': '评估回答质量',
+  'adjusting': '优化分析方案',
+};
+
+function formatThinkingStatus(status: string): string {
+  // Handle evaluation scores - convert to user-friendly descriptions
+  if (status.includes('评估')) {
+    if (status.includes('3.5/10')) {
+      return '评估回答：需要调整优化';
+    }
+    if (status.includes('/10')) {
+      const match = status.match(/(\d+\.?\d*)\/10/);
+      if (match) {
+        const score = parseFloat(match[1]);
+        if (score >= 8) return '评估回答：质量优秀';
+        if (score >= 6) return '评估回答：符合要求';
+        if (score >= 4) return '评估回答：需要改进';
+        return '评估回答：需要重新分析';
+      }
+    }
+    return '评估回答质量';
+  }
+  
+  // Handle productDepth, functionalCompleteness, dataAccuracy, answerQuality
+  if (status.includes('productDepth')) {
+    return '分析需求深度';
+  }
+  if (status.includes('functionalCompleteness')) {
+    return '检查功能完整性';
+  }
+  if (status.includes('dataAccuracy')) {
+    return '验证数据准确性';
+  }
+  if (status.includes('answerQuality')) {
+    return '评估回答质量';
+  }
+  
+  // Handle step numbers like "Step 1/5"
+  if (status.match(/Step \d+\/\d+/)) {
+    return `分析步骤 ${status.split(' ')[1]}`;
+  }
+  
+  // Handle "thought" or "thinking" statuses
+  if (status.includes('thought')) {
+    const match = status.match(/thought (\d+)/);
+    return match ? `思考 ${match[1]}` : '深度思考';
+  }
+  
+  // Return mapped status or clean version of original
+  return THINKING_STATUS_MAP[status] || status.replace(/_/g, ' ');
+}
+
 // ─── Main ChatPanel ──────────────────────────────────────────────────
 
-export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
+export function ChatPanel({ settingsOpen, onSettingsOpenChange, onJumpToPanel }: {
   settingsOpen?: boolean;
   onSettingsOpenChange?: (open: boolean) => void;
+  onJumpToPanel?: (panelId: string) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -232,6 +342,8 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
   const [feedbackMap, setFeedbackMap] = useState<FeedbackClaimsMap>({});
   const [confirmationCards, setConfirmationCards] = useState<Record<string, ConfirmationCardData[]>>({});
   const [showDataPanel, setShowDataPanel] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [persistentTools, setPersistentTools] = useState<{ messageId: string; tools: ToolEvent[] } | null>(null);
 
   // ─── Feature 1: Provider/Model ──────────────────────────────────────
   const [selectedProvider, setSelectedProvider] = useState('deepseek');
@@ -454,13 +566,14 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
               setShowDataPanel(true);
             }
 
-            if (parsed.tool && (parsed.result || parsed.error)) {
+            if (parsed.tool && (parsed.result !== undefined || parsed.error)) {
+              const resultStr = parsed.result !== undefined ? safeStringifyResult(parsed.result) : undefined;
               const existing = tools.find(t => t.tool === parsed.tool && !t.result && !t.error);
               if (existing) {
-                existing.result = parsed.result;
+                existing.result = resultStr;
                 existing.error = parsed.error;
               } else {
-                tools.push({ tool: parsed.tool, result: parsed.result, error: parsed.error });
+                tools.push({ tool: parsed.tool, result: resultStr, error: parsed.error });
               }
               setStreamingToolCalls([...tools]);
             }
@@ -484,15 +597,20 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
       setMessages(prev => [...prev, assistantMsg]);
       if (tools.length > 0) {
         setStreamingToolCalls(tools);
+        setPersistentTools({ messageId: assistantId, tools });
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        toast.error('请求失败');
+        const msg = err instanceof Error ? err.message : '请求失败';
+        setLastError(msg);
       }
     } finally {
       setIsLoading(false);
       setStreaming(false);
       setStreamingContent('');
+      if (streamingToolCalls.length > 0) {
+        setShowDataPanel(true);
+      }
       abortRef.current = null;
     }
   }, [input, isLoading, messages]);
@@ -544,7 +662,7 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
 
             {/* Message list */}
             {messages.map(msg => (
-              <div key={msg.id} className={`mb-6 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
+              <div key={msg.id} className={`mb-6 ${msg.role === 'user' ? 'flex justify-end' : ''}`} data-testid="chat-message">
                 {msg.role === 'user' ? (
                   <div className="bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-2xl px-4 py-2.5 max-w-[80%] text-sm">
                     {msg.content}
@@ -665,7 +783,7 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
                   <div className="mt-2 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 text-xs space-y-1">
                     {thinkingSteps.map((s, i) => (
                       <div key={i} className="flex items-center justify-between text-zinc-500">
-                        <span>{s.status === 'context' ? '加载上下文' : s.status === 'classifying' ? '分类意图' : s.status === 'planning' ? '规划工具' : s.status === 'executing' ? '执行工具' : s.status === 'observing' ? '观察结果' : s.status === 'deciding' ? '决策' : s.status === 'synthesizing' ? '合成回复' : s.status === 'searching' ? '联网搜索' : s.status}</span>
+                        <span>{formatThinkingStatus(s.status)}</span>
                         {s.durationMs ? <span className="font-mono text-zinc-400">{s.durationMs}ms</span> : null}
                       </div>
                     ))}
@@ -678,6 +796,45 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
               <div className="flex items-center gap-2 text-zinc-400 text-sm mb-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 思考中...
+              </div>
+            )}
+
+            {/* Error recovery suggestions */}
+            {lastError && !isLoading && (
+              <div className="mb-6 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4">
+                <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300 mb-2">
+                  <X className="h-4 w-4" />
+                  <span className="font-medium">请求失败: {lastError}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setLastError(null);
+                      const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+                      if (lastUserMsg) {
+                        setInput(lastUserMsg.content);
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  >
+                    重试上一条
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedProvider(prev => prev === 'deepseek' ? 'openai' : 'deepseek');
+                      setLastError(null);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    切换 Provider ({selectedProvider === 'deepseek' ? 'OpenAI' : 'DeepSeek'})
+                  </button>
+                  <button
+                    onClick={() => setLastError(null)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    忽略
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -740,6 +897,7 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
                   placeholder="输入问题，例如：库存情况如何、成本优化建议、供应商风险分析..."
                   className="w-full h-11 text-sm border-zinc-200 dark:border-zinc-700 rounded-xl"
                   disabled={isLoading}
+                  data-testid="chat-input"
                 />
               </div>
               <Button
@@ -756,10 +914,11 @@ export function ChatPanel({ settingsOpen, onSettingsOpenChange }: {
       </div>
 
       {/* Slide-out data panel */}
-      {showDataPanel && streamingToolCalls.length > 0 && (
+      {showDataPanel && (persistentTools?.tools.length ?? 0) > 0 && (
         <DataPanel
-          tools={streamingToolCalls}
+          tools={persistentTools!.tools}
           onClose={() => setShowDataPanel(false)}
+          onJump={onJumpToPanel}
         />
       )}
 

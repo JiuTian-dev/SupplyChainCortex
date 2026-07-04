@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { withErrorHandler, AppError } from '@/lib/api-utils';
 import { withApiRateLimit } from '@/lib/api-protection';
+import { optionalRequireAuth } from '@/lib/auth-helpers';
 import {
   getCascadeRisk,
   calibrateAttenuationFactors,
@@ -38,6 +39,7 @@ import {
 import { createAuditLog } from '@/lib/services/audit.service';
 
 export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'analyze';
 
@@ -93,12 +95,12 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
         'competitor_pressure',
         'auto',
       ] as const;
-      if (!validScenarios.includes(scenario)) {
+      if (!validScenarios.includes(scenario as typeof validScenarios[number])) {
         throw new AppError(`无效场景: ${scenario}`, 400);
       }
 
       const report = await getCascadeRisk({
-        scenario: scenario as Parameters<typeof getCascadeRisk>[0]['scenario'],
+        scenario: scenario as 'weather_disruption' | 'exchange_shock' | 'supplier_failure' | 'port_congestion' | 'tariff_escalation' | 'commodity_shock' | 'cbam_enforcement' | 'competitor_pressure' | 'auto',
         sourcePort, sourceSupplier, fusionStrategy,
         includeForwardProjection, includeCounterfactuals, forceCalibration,
       });
@@ -169,6 +171,7 @@ export const GET = withApiRateLimit(withErrorHandler(async (request: NextRequest
  * Returns baseline vs intervened comparison.
  */
 export const POST = withApiRateLimit(withErrorHandler(async (request: NextRequest) => {
+  await optionalRequireAuth();
   const body = await request.json().catch(() => ({}));
   const { action, intervention, target, newValue } = body;
 

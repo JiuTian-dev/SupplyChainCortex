@@ -7,8 +7,15 @@
  * GET /api/engine-calibrate?action=rollback  → revert to last known good weights
  */
 
+/**
+ * @internal 待评估 — 此路由在前端组件中无直接调用，疑似无运行时引用。
+ * 决策：保留以备运维/外部系统/未来用途，但标注待评估。
+ * 评估建议：如确认无任何调用方（含外部脚本、Prometheus、运维工具），可考虑删除。
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/api-utils';
+import { requireAdmin } from '@/lib/auth-helpers';
 import { runCalibration } from '@/lib/engine/calibration';
 import { setConfigVersion } from '@/lib/engine/cache';
 import { updateWeights, getCalibratedWeights, buildConfidenceWeights, loadWeightsFromDB } from '@/lib/engine/weights';
@@ -20,6 +27,7 @@ import crypto from 'crypto';
 const ROLLBACK_STORAGE_KEY = 'engine-weight-rollback';
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
+  await requireAdmin();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
